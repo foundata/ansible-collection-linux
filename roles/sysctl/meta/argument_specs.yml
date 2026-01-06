@@ -1,0 +1,73 @@
+# Role argument validation.
+#
+# See defaults/main.yml for details on each variable. For more information on
+# the argument_specs.yml format, refer to the official Ansible documentation:
+# https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_reuse_roles.html#role-argument-validation
+
+---
+
+argument_specs:
+
+  # foundata.linux/roles/run/tasks/main.yml entry point
+  main:
+    short_description: "Main entry point for the foundata.linux.sysctl role"
+    options:
+
+      sysctl_linux_state:
+        description: |
+          Determines whether the managed resources should be `present` or `absent`.
+
+          `present` ensures that required components, such as software packages, are
+          installed and configured.
+
+          `absent` reverts changes as much as possible, such as removing packages,
+          deleting created users, stopping services, restoring modified settings, …
+
+          Note: For this role, the required component and package set is minimal. There
+          are no users or services to manage and the components needed to set kernel
+          parameter are preinstalled even on hardened systems. They also cannot be
+          safely removed due to dependencies, so the role rarely modifies the system
+          in this regard.
+        type: "str"
+        default: "present"
+        choices:
+          - "present"
+          - "absent"
+
+      sysctl_linux_autoupgrade:
+        description: |
+          If set to `true`, all managed packages will be upgraded during each Ansible
+          run (e.g., when the package provider detects a newer version than the
+          currently installed one).
+        type: "bool"
+        default: false
+
+      sysctl_linux_parameters:
+        #description: |
+        #  FIXME
+        type: "dict"
+        required: true
+
+      sysctl_linux_reload:
+        #description: |
+        #  FIXME
+        type: "bool"
+        default: true
+
+      sysctl_linux_sysctl_file:
+        #description: |
+        #  FIXME
+        type: "str"
+        default: "/etc/sysctl.conf" # FIXME better use /etc/sysctl.d/99-ansible.conf and explain, if one really wants to be 100% sure, set this to /etc/sysctl.conf? But be arawre that settings have to be removed from there before another file can be used to set them then.
+
+      sysctl_linux_ignore_errors:
+        #description: |
+        #  FIXME
+        type: "bool"
+        default: false
+
+      sysctl_linux_persist:
+        #description: |
+        #  FIXME Useful for temporary tuning or testing before committing.
+        type: "bool"
+        default: true

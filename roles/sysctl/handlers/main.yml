@@ -1,0 +1,30 @@
+# Handlers: Tasks that are triggered and run only when notified.
+
+---
+
+- name: "Handlers | Reload kernel parameters (sysctl) (all config files, following precedence)"
+  # Using command module because ansible.posix.sysctl only reloads individual
+  # parameters, while "sysctl --system" reloads all configuration files in the
+  # following list in given order from top to bottom (while last read files
+  # and values can overwrite previously defined things), cf. man sysctl(8):
+  #
+  # - /etc/sysctl.d/*.conf
+  # - /run/sysctl.d/*.conf
+  # - /usr/local/lib/sysctl.d/*.conf
+  # - /usr/lib/sysctl.d/*.conf
+  # - /lib/sysctl.d/*.conf
+  # - /etc/sysctl.conf
+  #
+  # As /etc/sysctl.conf is read last, it can replace/override any parameters
+  # previously set in files in the listed directories.
+  ansible.builtin.command:
+    argv:
+      - "/usr/sbin/sysctl"
+      - "--system"
+  # There is no sane way to check for changes when loading all values. However,
+  # this is acceptable as this handler only get's triggered on change.
+  when:
+    - sysctl_linux_reload
+  changed_when: false # FIXME noqa ansible lint
+  listen:
+    - "sysctl_linux: reload all"

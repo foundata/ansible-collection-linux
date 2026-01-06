@@ -1,0 +1,45 @@
+# Configuration: Manage sysctl kernel parameters.
+#
+# This file contains the core logic for setting sysctl parameters using
+# the ansible.posix.sysctl module.
+
+---
+
+## FIXME task to create sysctl_linux_sysctl_file if needed, owned by root:root 644
+## FIXME task to put an ansible managed header into the file
+
+
+- name: "Config | Default | Set sysctl parameters"
+  ansible.posix.sysctl:
+    name: "{{ item['key'] }}"
+    value: "{{ item['value'] }}"
+    state: "present"
+    sysctl_file: "{{ sysctl_linux_sysctl_file }}"
+    sysctl_set: true # ensure writable; fail if invalid or read-only
+    reload: false # will be done via handler
+    ignoreerrors: "{{ sysctl_linux_ignore_errors | default(omit) }}"
+  loop: "{{ __sysctl_linux_effective_parameters | dict2items }}"
+  loop_control:
+    label: "{{ item['key'] }}={{ item['value'] }}"
+  when:
+    - item['value'] is not none
+    - item['value'] | string | length > 0
+  notify:
+    - "sysctl_linux: reload all"
+
+
+# FIXME loop over files (sysctl_linux_sysctl_file AND /etc/sysctl.conf if sysctl_linux_sysctl_file is set to another value)
+- name: "Config | Default | Remove sysctl parameters marked for deletion"
+  ansible.posix.sysctl:
+    name: "{{ item['key'] }}"
+    state: "absent"
+    sysctl_file: "{{ sysctl_linux_sysctl_file }}"
+    reload: false # will be done via handler
+    ignoreerrors: "{{ sysctl_linux_ignore_errors | default(omit) }}"
+  loop: "{{ __sysctl_linux_effective_parameters | dict2items }}"
+  loop_control:
+    label: "{{ item['key'] }} (remove)"
+  when:
+    - item['value'] is none or item['value'] | string | length == 0
+  notify:
+    - "sysctl_linux: reload all"

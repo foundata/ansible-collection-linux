@@ -1,0 +1,13 @@
+# Uninstall: Manage basic resource removal, such as packages or service users.
+
+---
+
+- name: "Setup | Uninstall | Remove packages"
+  ansible.builtin.package:
+    name: "{{ __sysctl_linux_packages_uninstall }}"
+    state: "absent"
+  when:
+    - __sysctl_linux_packages_uninstall is defined
+    - (__sysctl_linux_packages_uninstall | length) > 0
+
+## FIXME task to remove sysctl_linux_sysctl_file if needed and != "/etc/sysctl.conf"

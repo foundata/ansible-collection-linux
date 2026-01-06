@@ -1,0 +1,30 @@
+# Install: Manage basic resource setup, such as packages or service users.
+
+---
+
+- name: "Setup | Install | Default | Remove unwanted packages (e.g., to prevent conflicts or resolve incompatibilities)"
+  ansible.builtin.package:
+    name: "{{ __sysctl_linux_packages_removal }}"
+    state: "absent"
+  when:
+    - __sysctl_linux_packages_removal is defined
+    - (__sysctl_linux_packages_removal | length) > 0
+
+
+- name: "Setup | Install | Default | Install or upgrade packages"
+  ansible.builtin.package:
+    name: "{{ __sysctl_linux_packages_install }}"
+    state: "{{ 'latest' if sysctl_linux_autoupgrade else 'present' }}"
+  when:
+    - __sysctl_linux_packages_install is defined
+    - (__sysctl_linux_packages_install | length) > 0
+
+
+- name: "Setup | Install | Default | Remove unwanted files and directories (e.g., to prevent conflicts or resolve incompatibilities)"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: "absent"
+  when:
+    - __sysctl_linux_paths_removal is defined
+    - (__sysctl_linux_paths_removal | length) > 0
+  loop: "{{ __sysctl_linux_paths_removal }}"
