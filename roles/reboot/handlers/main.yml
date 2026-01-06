@@ -1,0 +1,16 @@
+# Handlers: Tasks that are triggered and run only when notified.
+
+---
+
+- name: "Handlers | Reboot system if needed"
+  ansible.builtin.reboot:
+    boot_time_command: "{{ reboot_linux_boot_time_cmd }}"
+    connect_timeout: "{{ reboot_linux_connect_timeout }}"
+    msg: "{{ reboot_linux_msg }}"
+    post_reboot_delay: "{{ reboot_linux_post_delay }}"
+    reboot_timeout: "{{ reboot_linux_timeout }}"
+    test_command: "{{ reboot_linux_test_cmd }}"
+  when:
+    - __reboot_linux_required
+  listen:
+    - "reboot_linux: reboot system"

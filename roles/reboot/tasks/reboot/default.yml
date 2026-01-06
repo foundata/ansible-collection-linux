@@ -1,0 +1,21 @@
+# Reboot: Manage and execute immediate reboots
+
+---
+
+- name: "Reboot | Reboot system if needed"
+  ansible.builtin.reboot:
+    boot_time_command: "{{ reboot_linux_boot_time_cmd }}"
+    connect_timeout: "{{ reboot_linux_connect_timeout if reboot_linux_connect_timeout > 0 else omit }}"
+    msg: "{{ reboot_linux_msg }}"
+    post_reboot_delay: "{{ reboot_linux_post_delay }}"
+    reboot_timeout: "{{ reboot_linux_timeout }}"
+    test_command: "{{ reboot_linux_test_cmd }}"
+  when:
+    - __reboot_linux_required
+  register: __reboot_linux_reboot_result
+
+
+- name: "Reboot | Set fact if a reboot was performed"
+  ansible.builtin.set_fact:
+    __reboot_linux_reboot_performed: "{{ (__reboot_linux_reboot_result is defined and
+                                          __reboot_linux_reboot_result is succeeded) | bool }}"

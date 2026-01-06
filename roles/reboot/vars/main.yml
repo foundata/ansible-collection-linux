@@ -1,0 +1,98 @@
+# Internal role variables and values that must NOT be overridden by the user.
+#
+# Variables defined here usually override earlier definitions due to the high
+# precedence of this file. Each variable should have a concise comment above
+# it, describing its purpose and how it fits into the role's functionality.
+
+---
+
+# List of facts used by the role (gathered on a best-effort basis if needed).
+#
+# To identify which subset a fact belongs to during development, you can use
+# the following snippet:
+#
+# - ansible.builtin.setup:
+#     gather_subset:
+#       - '!min'
+#       - '<subset_name, see parameter doc for details>'
+__reboot_linux_used_facts:
+  # from subset "distribution"
+  - "distribution"
+  - "distribution_major_version"
+  - "distribution_version"
+  - "os_family"
+
+
+# List of platforms this role supports and was designed for.
+#
+# A warning will be issued if the list contains values and the role is executed
+# on an unknown (not listed) platform, but execution will continue. Example:
+#
+# - name: "Fedora" # A ansible_facts value ('distribution' or 'os_family')
+#   versions: # A ansible_facts value ('distribution_major_version' or
+#     - "all" # 'distribution_version') or "all"
+# - name: "Ubuntu"
+#   versions:
+#     - "22.04"
+#     - "24.04"
+# - name: "RedHat"
+#   versions:
+#     - "all"
+# - name: "Debian"
+#   versions:
+#     - "all"
+__reboot_linux_supported_platforms:
+  - name: "Debian"
+    versions:
+      - "12"
+      - "13"
+  - name: "Fedora"
+    versions:
+      - "43"
+      - "42"
+  - name: "openSUSE Leap"
+    versions:
+      - "16.0"
+  - name: "RedHat" # includes AlmaLinux, Rocky and CentOS Stream
+    versions:
+      - "9"
+      - "10"
+  - name: "Ubuntu"
+    versions:
+      - "24.04"
+      - "22.04"
+
+
+# List of package names to be installed when reboot_linux_state is
+# set to "present".
+__reboot_linux_packages_install:
+  [] # Remove the "[]" when adding values to this list.
+
+
+# List of package names to be uninstalled when reboot_linux_state is
+# set to "absent". This variable is useful when __reboot_linux_packages_install
+# contains packages that are required for the managed software to function but
+# should not be removed during uninstallation, as doing so could break other
+# software. This is usually the case if there are common dependencies like
+# "curl" or "openssl" which typically should remain installed even after
+# uninstalling the software managed by this role.
+__reboot_linux_packages_uninstall: "{{ reboot_linux_packages_install }}"
+
+
+# List of package names to be removed unconditionally before installation
+# (e.g., to prevent conflicts or resolve incompatibilities).
+__reboot_linux_packages_removal:
+  [] # Remove the "[]" when adding values to this list.
+
+
+# List of paths of files and directories to be removed unconditionally after
+# installation. This is useful for removing default configuration resources
+# that would otherwise create confusion or conflict with custom configurations
+# managed by this role.
+__reboot_linux_paths_removal:
+  [] # Remove the "[]" when adding values to this list.
+
+
+### Override defaults of dependencies used by this role (if any).
+
+# nothing right now

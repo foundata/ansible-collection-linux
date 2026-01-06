@@ -1,0 +1,68 @@
+# Main entry point for the role.
+
+---
+
+- name: "Main | Include role initialization tasks"
+  ansible.builtin.include_tasks:
+    file: "{{ role_path }}/tasks/init.yml"
+    apply:
+      tags:
+        - "always"
+        - "reboot_linux_always"
+  tags:
+    - "always"
+    - "reboot_linux_always"
+
+
+- name: "Main | Include setup tasks (install): best platform matches (if any), then default"
+  ansible.builtin.include_tasks:
+    file: "{{ __reboot_linux_task_file }}"
+    apply:
+      tags:
+        - "reboot_linux_setup"
+  vars:
+    __reboot_linux_task_file: "{{ role_path }}/tasks/setup/install/{{ __reboot_linux_loop_item }}"
+  when:
+    - reboot_linux_state == 'present'
+    - __reboot_linux_task_file is file
+  loop: "{{ __reboot_linux_platform_filenames_most_specific_first + ['default.yml'] }}"
+  loop_control:
+    loop_var: "__reboot_linux_loop_item"
+  tags:
+    - "reboot_linux_setup"
+
+
+- name: "Main | Include reboot tasks: best platform matches (if any), then default"
+  ansible.builtin.include_tasks:
+    file: "{{ __reboot_linux_task_file }}"
+    apply:
+      tags:
+        - "reboot_linux_reboot"
+  vars:
+    __reboot_linux_task_file: "{{ role_path }}/tasks/reboot/{{ __reboot_linux_loop_item }}"
+  when:
+    - reboot_linux_state == 'present'
+    - __reboot_linux_task_file is file
+  loop: "{{ __reboot_linux_platform_filenames_most_specific_first + ['default.yml'] }}"
+  loop_control:
+    loop_var: "__reboot_linux_loop_item"
+  tags:
+    - "reboot_linux_reboot"
+
+
+- name: "Main | Include setup tasks (uninstall): best platform matches (if any), then default"
+  ansible.builtin.include_tasks:
+    file: "{{ __reboot_linux_task_file }}"
+    apply:
+      tags:
+        - "reboot_linux_setup"
+  vars:
+    __reboot_linux_task_file: "{{ role_path }}/tasks/setup/uninstall/{{ __reboot_linux_loop_item }}"
+  when:
+    - reboot_linux_state == 'absent'
+    - __reboot_linux_task_file is file
+  loop: "{{ __reboot_linux_platform_filenames_most_specific_first + ['default.yml'] }}"
+  loop_control:
+    loop_var: "__reboot_linux_loop_item"
+  tags:
+    - "reboot_linux_setup"

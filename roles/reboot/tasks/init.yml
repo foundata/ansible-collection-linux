@@ -1,0 +1,157 @@
+# Initialization: Manage internal role setup and the Ansible environment.
+
+---
+
+- name: "Init | Gather role-specific facts"
+  ansible.builtin.setup:
+    gather_subset:
+      - "distribution"
+  when:
+    - not ansible_facts.keys() | list | intersect(__reboot_linux_used_facts) == __reboot_linux_used_facts
+
+
+- name: "Init | Include role meta data"
+  ansible.builtin.include_vars:
+    file: "../meta/main.yml"
+    name: "__reboot_linux_meta"
+
+
+- name: "Init | Check Ansible version requirement and fail if unmet"
+  ansible.builtin.fail:
+    msg: >
+      This role requires Ansible {{ __reboot_linux_meta['galaxy_info']['min_ansible_version'] }}
+      or higher. You are currently running Ansible {{ ansible_version['full'] }} .
+  when:
+    - ansible_version['full'] is version_compare(__reboot_linux_meta['galaxy_info']['min_ansible_version'], "<")
+
+
+- name: "Init | Notify when platform support check is not possible"
+  ansible.builtin.debug:
+    msg: >
+      The list of supported platforms cannot be checked as it is either empty
+      or distribution facts are missing.
+    verbosity: 1
+  when:
+    - ansible_facts['os_family'] is not defined or
+      ansible_facts['distribution'] is not defined or
+      ansible_facts['distribution_version'] is not defined or
+      ansible_facts['distribution_major_version'] is not defined or
+      (__reboot_linux_supported_platforms | length) < 1
+
+
+- name: "Init | Warn when platform is unsupported"
+  ansible.builtin.fail:
+    msg: >
+      Neither {{ ansible_facts['distribution'] }} (distribution) nor {{ ansible_facts['os_family'] }} (os_family)
+      with versions '{{ ansible_facts['distribution_major_version'] }}', '{{ ansible_facts['distribution_version'] }}',
+      or 'all' is in the list of supported platforms from vars/main.yml: {{ __reboot_linux_supported_platforms }}
+  when:
+    - (__reboot_linux_supported_platforms | length) > 0
+    - (__reboot_linux_supported_platforms
+       | selectattr('name', 'match', '^(' ~ ansible_facts['distribution'] ~ '|' ~ ansible_facts['os_family'] ~ ')$', ignorecase=true)
+       | map(attribute='versions') | flatten
+       | select('match', '^(' ~ ansible_facts['distribution_major_version'] ~ '|' ~ ansible_facts['distribution_version'] ~ '|all)$', ignorecase=true)
+       | list | length) < 1
+  ignore_errors: true # noqa: ignore-errors
+
+
+- name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
+  ansible.builtin.set_fact:
+    __reboot_linux_platform_filenames_raw:
+      - "{{ ansible_facts['distribution'].replace(' ', '_') | lower }}_{{ ansible_facts['distribution_version'].replace(' ', '_') | lower }}.yml"
+      - "{{ ansible_facts['distribution'].replace(' ', '_') | lower }}_{{ ansible_facts['distribution_major_version'].replace(' ', '_') | lower }}.yml"
+      - "{{ ansible_facts['distribution'].replace(' ', '_') | lower }}.yml"
+      - "{{ ansible_facts['os_family'].replace(' ', '_') | lower }}.yml"
+
+
+- name: "Init | Set unique platform-specific filename list (most to least specific)"
+  ansible.builtin.set_fact:
+    __reboot_linux_platform_filenames_most_specific_first: "{{ (__reboot_linux_platform_filenames_raw | ansible.builtin.unique | default([])) }}"
+
+
+- name: "Init | Set unique platform-specific filename list (least to most specific)"
+  ansible.builtin.set_fact:
+    __reboot_linux_platform_filenames_most_specific_last: "{{ __reboot_linux_platform_filenames_most_specific_first | reverse }}"
+
+
+- name: "Init | Include platform-specific variables (if any), overwrite values with more specific ones"
+  ansible.builtin.include_vars:
+    file: "{{ __reboot_linux_vars_file }}"
+  vars:
+    __reboot_linux_vars_file: "{{ role_path }}/vars/{{ item }}"
+  when:
+    - __reboot_linux_vars_file is file
+  loop: "{{ __reboot_linux_platform_filenames_most_specific_last }}"
+
+
+### Reboot specific
+
+- name: "Init | Determine if reboot is required"
+  # Using the shell module here as we need to run multiple conditional checks
+  # that would require many (slow) separate Ansible tasks otherwise. The script
+  # handles OS and tools portability internally. This might be moved into a
+  # dedicated Ansible module or fact as an improvement.
+  ansible.builtin.shell:
+    cmd: |
+      set -u
+      __reboot_required='0'
+
+      # Check Debian-like OS reboot indicator file
+      if [ "${__reboot_required}" != '1' ] \
+        && [ -f '/var/run/reboot-required' ]; then
+        __reboot_required='1'
+      fi
+
+      # Check RedHat-like OS reboot indicator (needs-restarting)
+      # Exit code 1 = reboot required, 0 = no reboot required
+      if [ "${__reboot_required}" != '1' ] \
+        && command -v 'needs-restarting' >/dev/null 2>&1 \
+        && ! needs-restarting -r >/dev/null 2>&1; then
+        __reboot_required='1'
+      fi
+
+      # Check if running kernel differs from newest installed kernel
+      if [ "${__reboot_required}" != '1' ]; then
+        __kernel_installed=''
+        if [ -d '/boot' ]; then
+          __kernel_installed="$(
+            find /boot -maxdepth 1 -name 'vmlinuz-*' -printf '%f\n' \
+            | sort -V \
+            | tail -n 1
+          )"
+        fi
+        __kernel_current="$(uname -r)"
+        if [ -n "${__kernel_installed}" ] \
+          && ! printf '%s' "${__kernel_installed}" | grep -q -F -e "${__kernel_current}"; then
+          __reboot_required='1'
+        fi
+        unset __kernel_installed __kernel_current
+      fi
+
+      # Check if SELinux mode changed (requires reboot to apply)
+      if [ "${__reboot_required}" != '1' ] \
+        && command -v 'sestatus' >/dev/null 2>&1; then
+        export LC_ALL='en_US.UTF-8'
+        __selinux_current="$(sestatus 2>/dev/null | grep -i -E 'current.+mode' \
+          | cut -d':' -f2 | tr '[:upper:]' '[:lower:]' \
+          | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        __selinux_config="$(sestatus 2>/dev/null | grep -i -E 'mode.+file' \
+          | cut -d':' -f2 | tr '[:upper:]' '[:lower:]' \
+          | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        if [ -n "${__selinux_current}" ] \
+          && [ -n "${__selinux_config}" ] \
+          && [ "${__selinux_current}" != "${__selinux_config}" ]; then
+          __reboot_required='1'
+        fi
+        unset __selinux_current __selinux_config
+      fi
+
+      printf '%s' "${__reboot_required}"
+    executable: "/bin/bash"
+  changed_when: false
+  register: __reboot_linux_check_result
+
+
+- name: "Init | Set fact if a reboot is required"
+  ansible.builtin.set_fact:
+    __reboot_linux_required: "{{ __reboot_linux_check_result['stdout'] | default('0') | int | bool }}"

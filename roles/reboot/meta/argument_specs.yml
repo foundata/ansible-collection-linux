@@ -1,0 +1,96 @@
+# Role argument validation.
+#
+# See defaults/main.yml for details on each variable. For more information on
+# the argument_specs.yml format, refer to the official Ansible documentation:
+# https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_reuse_roles.html#role-argument-validation
+
+---
+
+argument_specs:
+
+  # foundata.linux/roles/run/tasks/main.yml entry point
+  main:
+    short_description: "Main entry point for the foundata.linux.reboot role"
+    options:
+
+      reboot_linux_state:
+        description: |
+          Determines whether the managed resources should be `present` or `absent`.
+
+          `present` ensures that required components, such as software packages, are
+          installed and configured.
+
+          `absent` reverts changes as much as possible, such as removing packages,
+          deleting created users, stopping services, restoring modified settings, …
+
+          Note: For this role, the required component and package set is minimal. There
+          are no users or services to manage and the components needed to detect a
+          required reboot are usually preinstalled even on hardened systems. They also
+          cannot be safely removed due to dependencies, so the role rarely modifies the
+          system beside executing reboots.
+        type: "str"
+        default: "present"
+        choices:
+          - "present"
+          - "absent"
+
+      reboot_linux_autoupgrade:
+        description: |
+          If set to `true`, all managed packages will be upgraded during each Ansible
+          run (e.g., when the package provider detects a newer version than the
+          currently installed one).
+        type: "bool"
+        default: false
+
+      reboot_linux_boot_time_cmd:
+        description: |
+          Command to run that returns a unique string indicating the last time the
+          system was booted.
+
+          Setting this to a command that has different output each time it is run will
+          cause the task to fail.
+        type: "str"
+        default: "cat '/proc/sys/kernel/random/boot_id'"
+
+      reboot_linux_connect_timeout:
+        description: |
+          Maximum seconds to wait for a successful connection to the managed hosts
+          before trying again.
+
+          If set to 0, the default setting for the underlying connection plugin is
+          used.
+        type: "int"
+        default: 0
+
+      reboot_linux_msg:
+        description: |
+          Message to display to users before reboot.
+        type: "str"
+        default: "Reboot initiated by Ansible (foundata.linux.reboot)"
+
+      reboot_linux_post_delay:
+        description: |
+          Seconds to wait after the reboot command was successful before attempting to
+          validate the system rebooted successfully.
+
+          This is useful if you want wait for something to settle despite your
+          connection already working.
+        type: "int"
+        default: 0
+
+      reboot_linux_timeout:
+        description: |
+          Maximum seconds to wait for machine to reboot and respond to a test command.
+
+          This timeout is evaluated separately for both reboot verification and test
+          command success so the maximum execution time for the module is twice this
+          amount.
+        type: "int"
+        default: 300
+
+      reboot_linux_test_cmd:
+        description: |
+          Command to run on the rebooted host and expect success from to determine the
+          machine is ready for further tasks.
+        type: "str"
+        default: "id"
