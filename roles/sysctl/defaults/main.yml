@@ -26,8 +26,6 @@ sysctl_linux_parameters: {}
 
 sysctl_linux_reload: true
 
-sysctl_linux_sysctl_file: "/etc/sysctl.conf"
+sysctl_linux_verify: true
 
-sysctl_linux_ignore_errors: false
-
-sysctl_linux_persist: true
+sysctl_linux_ignore_unknown_key_errors: false

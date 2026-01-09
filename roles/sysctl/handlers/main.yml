@@ -2,7 +2,7 @@
 
 ---
 
-- name: "Handlers | Reload kernel parameters (sysctl) (all config files, following precedence)"
+- name: "Handlers | Reload kernel parameters (sysctl) from all config files (following precedence)"
   # Using command module because ansible.posix.sysctl only reloads individual
   # parameters, while "sysctl --system" reloads all configuration files in the
   # following list in given order from top to bottom (while last read files
@@ -19,12 +19,12 @@
   # previously set in files in the listed directories.
   ansible.builtin.command:
     argv:
-      - "/usr/sbin/sysctl"
+      - "{{ __sysctl_linux_sysctl_executable }}"
       - "--system"
-  # There is no sane way to check for changes when loading all values. However,
-  # this is acceptable as this handler only get's triggered on change.
   when:
     - sysctl_linux_reload
+  # There is no sane way to check for changes when loading all values. However,
+  # this is acceptable as this handler only get's triggered on change.
   changed_when: false # FIXME noqa ansible lint
   listen:
-    - "sysctl_linux: reload all"
+    - "sysctl_linux: reload"

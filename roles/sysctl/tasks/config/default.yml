@@ -5,41 +5,136 @@
 
 ---
 
-## FIXME task to create sysctl_linux_sysctl_file if needed, owned by root:root 644
-## FIXME task to put an ansible managed header into the file
+- name: "Config | Default | Ensure drop-in config directory exists with proper permissions"
+  ansible.builtin.file:
+    path: "{{ __sysctl_linux_config_dropin_dir }}"
+    state: "directory"
+    owner: "{{ __sysctl_linux_config_dropin_dir_owner }}"
+    group: "{{ __sysctl_linux_config_dropin_dir_group }}"
+    mode: "{{ __sysctl_linux_config_dropin_dir_mode }}"
 
 
-- name: "Config | Default | Set sysctl parameters"
+- name: "Config | Default | Ensure drop-in config file exists with proper permissions"
+  ansible.builtin.file:
+    path: "{{ __sysctl_linux_config_dropin_file }}"
+    state: "touch"
+    owner: "{{ __sysctl_linux_config_dropin_file_owner }}"
+    group: "{{ __sysctl_linux_config_dropin_file_group }}"
+    mode: "{{ __sysctl_linux_config_dropin_file_mode }}"
+    access_time: "preserve"
+    modification_time: "preserve"
+
+
+# ansible.posix.sysctl is used below, so no Jinja template file is involved.
+# Therefore, a header must be managed explicitly by a task.
+- name: "Config | Default | Ensure 'Ansible managed' header in sysctl drop-in config file"
+  ansible.builtin.lineinfile:
+    path: "{{ __sysctl_linux_config_dropin_file }}"
+    regexp: '(?i)^#\s+ansible\s+managed'
+    line: "# Ansible managed (ATTENTION: manual changes will be discarded)"
+    insertbefore: "BOF"
+    state: "present"
+
+
+- name: "Config | Default | Set sysctl drop-in parameters"
   ansible.posix.sysctl:
     name: "{{ item['key'] }}"
     value: "{{ item['value'] }}"
     state: "present"
-    sysctl_file: "{{ sysctl_linux_sysctl_file }}"
-    sysctl_set: true # ensure writable; fail if invalid or read-only
-    reload: false # will be done via handler
-    ignoreerrors: "{{ sysctl_linux_ignore_errors | default(omit) }}"
+    sysctl_file: "{{ __sysctl_linux_config_dropin_file }}"
+    # fail if parameter is invalid or read-only
+    sysctl_set: "{{ sysctl_linux_verify | default(omit) }}"
+    # reloading will be done by handler, following precedence
+    reload: false
+    ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | default(omit) }}"
   loop: "{{ __sysctl_linux_effective_parameters | dict2items }}"
   loop_control:
+    # human-friendly output like "item=net.ipv4.ip_forward=1"
     label: "{{ item['key'] }}={{ item['value'] }}"
   when:
+    - __sysctl_linux_effective_parameters | length > 0
+    # none (Python / Ansible) == null (YAML)
     - item['value'] is not none
     - item['value'] | string | length > 0
   notify:
-    - "sysctl_linux: reload all"
+    - "sysctl_linux: reload"
 
 
-# FIXME loop over files (sysctl_linux_sysctl_file AND /etc/sysctl.conf if sysctl_linux_sysctl_file is set to another value)
-- name: "Config | Default | Remove sysctl parameters marked for deletion"
+- name: "Config | Default | Build list of sysctl drop-in parameters to remove from config"
+  ansible.builtin.set_fact:
+    __sysctl_linux_parameters_remove: >-
+      {{
+        __sysctl_linux_effective_parameters
+        | dict2items
+        | selectattr('value', 'in', [none, ''])
+        | list
+      }}
+
+
+- name: "Config | Default | Remove sysctl drop-in parameters marked for deletion from config"
   ansible.posix.sysctl:
     name: "{{ item['key'] }}"
     state: "absent"
-    sysctl_file: "{{ sysctl_linux_sysctl_file }}"
-    reload: false # will be done via handler
-    ignoreerrors: "{{ sysctl_linux_ignore_errors | default(omit) }}"
-  loop: "{{ __sysctl_linux_effective_parameters | dict2items }}"
+    sysctl_file: "{{ __sysctl_linux_config_dropin_file }}"
+    # reloading will be done by handler, following precedence
+    reload: false
+    ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | default(omit) }}"
+  loop: "{{ __sysctl_linux_parameters_remove }}"
   loop_control:
-    label: "{{ item['key'] }} (remove)"
+    # human-friendly output like "item=net.ipv4.ip_forward=1"
+    label: "{{ item['key'] }}={{ item['value'] }} (remove)"
   when:
-    - item['value'] is none or item['value'] | string | length == 0
+    - __sysctl_linux_parameters_remove | length > 0
   notify:
-    - "sysctl_linux: reload all"
+    - "sysctl_linux: reload"
+
+
+- name: "Config | Default | Check if main config file exists"
+  ansible.builtin.stat:
+        path: "{{ __sysctl_linux_config_file }}"
+  register: __sysctl_linux_config_file_stat
+
+
+- name: "Config | Default | Build list of sysctl drop-in parameters that should take precedence"
+  ansible.builtin.set_fact:
+    __sysctl_linux_parameters_comment: >-
+      {{
+        sysctl_linux_parameters
+        | dict2items
+        | selectattr('value', 'ne', none)
+        | rejectattr('value', 'equalto', '')
+        | map(attribute='key')
+        | map('regex_escape')
+        | list
+      }}
+  when:
+    - __sysctl_linux_config_file_stat['stat']['exists'] | default(false)
+
+
+# Remember: It is possible to overwrite values, last occurrence wins.
+- name: "Config | Default | Comment out duplicates in main config file (if any) to ensure drop-in config precedence"
+  ansible.builtin.replace:
+    path: "{{ __sysctl_linux_config_file }}"
+    # Notes on the regex:
+    # - ({{ __sysctl_linux_parameters_comment | join('|') }}) will result in something like
+    #   vm\.swappiness|net\.ipv4\.ip_forward (escaping is done )
+    # - When options are joined with '|', an empty (whitespace-only) option would
+    #   produce patterns like 'foo||bar', where '||' matches an empty string at any
+    #   position. The 'select' filter prevents this.
+    # - (?=\s*(?:=|\s|$)) is a safeguard to prevent partial-key matches (e.g.,
+    #   'net.ipv4.foo' accidentally matching 'net.ipv4.foobar_baz').
+    #   The expression is compatible with the obvious
+    #     net.ipv4.foo=5
+    #     net.ipv4.foo = 5
+    #   and non-obvious
+    #     net.ipv4.foo
+    #   syntax (without value is valid and means "set to kernel default" or
+    #   "query value", depending on context).
+    regexp: >-
+      ^(?![\t ]*#)([\t ]*)({{ __sysctl_linux_parameters_comment | select | join('|') }})(?=\s*(?:=|\s|$))(.*)
+    replace: '#\1\2\3'
+  when:
+    - __sysctl_linux_config_file_stat['stat']['exists'] | default(false)
+    - __sysctl_linux_parameters_comment | length > 0
+  notify:
+    - "sysctl_linux: reload"

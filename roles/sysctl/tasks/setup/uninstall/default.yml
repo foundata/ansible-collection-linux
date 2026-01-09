@@ -10,4 +10,21 @@
     - __sysctl_linux_packages_uninstall is defined
     - (__sysctl_linux_packages_uninstall | length) > 0
 
-## FIXME task to remove sysctl_linux_sysctl_file if needed and != "/etc/sysctl.conf"
+
+- name: "Setup | Uninstall | Remove additional sysctl config file (if any)"
+  ansible.builtin.file:
+    path: "{{ sysctl_linux_config_file }}"
+    state: "absent"
+  when:
+    - sysctl_linux_config_file != '/etc/sysctl.conf'
+  notify:
+    - "sysctl_linux: reload"
+
+
+- name: "Setup | Uninstall | Remove Ansible managed header from /etc/sysctl.conf (if any)"
+  ansible.builtin.lineinfile:
+    path: "{{ sysctl_linux_config_file }}"
+    regexp: '(?i)^#\s+ansible\s+managed'
+    state: "absent"
+  when:
+    - sysctl_linux_config_file == '/etc/sysctl.conf'

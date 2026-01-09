@@ -79,26 +79,6 @@ Enable security hardening with custom overrides (FIXME not implemented yet):
           "kernel.randomize_va_space": 2
 ```
 
-
-Container-friendly configuration (ignoring errors, genereally noch recommended)
-
-```yaml
----
-
-- name: "Configure sysctl in container environment"
-  hosts: "containers"
-  tasks:
-
-    - name: "Apply sysctl settings, ignoring unsupported parameters"
-      ansible.builtin.include_role:
-        name: "foundata.linux.sysctl"
-      vars:
-        sysctl_linux_ignore_errors: true
-        sysctl_linux_parameters:
-          "net.core.somaxconn": 1024
-```
-
-
 Remove a parameter (and use kernel defaults afterwards)
 
 ```yaml

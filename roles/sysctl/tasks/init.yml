@@ -86,9 +86,9 @@
 
 ### sysctl specific
 
-- name: "Init | Merge security defaults, (FIXME presets) and user parameters"
+- name: "Init | Merge (FIXME security defaults), (FIXME presets) and user parameters"
   ansible.builtin.set_fact:
-    __sysctl_linux_merged_parameters: >-
+    __sysctl_linux_effective_parameters: >-
       {{
         ((sysctl_linux_security_hardening | default(false) | bool)
           | ternary(__sysctl_linux_security_defaults | default({}), {}))

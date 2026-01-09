@@ -43,31 +43,53 @@ argument_specs:
         default: false
 
       sysctl_linux_parameters:
-        #description: |
-        #  FIXME
+        description: |
+          Dictionary of kernel parameters to manage via sysctl. Keys are parameter
+          names (e.g., `net.ipv4.ip_forward`), values are the desired settings.
+
+          Setting a value to `null` or an empty string removes the parameter from
+          the managed drop-in configuration file, reverting to the kernel default.
+
+          Example:
+
+          ```yaml
+          sysctl_linux_parameters:
+            "net.ipv4.ip_forward": null # use kernel default, remove
+            "vm.swappiness": 5
+          ```
         type: "dict"
         required: true
 
       sysctl_linux_reload:
-        #description: |
-        #  FIXME
+        description: |
+          If set to `true`, triggers `sysctl --system` after configuration changes
+          to reload all sysctl configuration files following the proper precedence
+          order. This ensures all drop-in files and the main configuration are
+          applied consistently.
+
+          Set to `false` in container environments where `sysctl --system` may fail
+          due to read-only kernel parameters.
         type: "bool"
         default: true
 
-      sysctl_linux_sysctl_file:
-        #description: |
-        #  FIXME
-        type: "str"
-        default: "/etc/sysctl.conf" # FIXME better use /etc/sysctl.d/99-ansible.conf and explain, if one really wants to be 100% sure, set this to /etc/sysctl.conf? But be arawre that settings have to be removed from there before another file can be used to set them then.
+      sysctl_linux_verify:
+        description: |
+          If set to `true`, verifies the parameter value using the sysctl command
+          and actively sets it in the running kernel using `sysctl -w` if the
+          current value differs from the desired one.
 
-      sysctl_linux_ignore_errors:
-        #description: |
-        #  FIXME
+          When `false`, only writes the parameter to the configuration file without
+          verifying or immediately applying it to the running kernel.
+        type: "bool"
+        default: true
+
+      sysctl_linux_ignore_unknown_key_errors:
+        description: |
+          If set to `true`, ignores errors caused by unknown or unsupported kernel
+          parameter keys. This is useful in container environments where certain
+          parameters may not exist or be accessible.
+
+          Generally not recommended for bare-metal or VM deployments where all
+          expected parameters should be available.
         type: "bool"
         default: false
-
-      sysctl_linux_persist:
-        #description: |
-        #  FIXME Useful for temporary tuning or testing before committing.
-        type: "bool"
-        default: true

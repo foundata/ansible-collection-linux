@@ -86,6 +86,7 @@
 
 ### Reboot specific
 
+
 - name: "Init | Determine if reboot is required"
   # Using the shell module here as we need to run multiple conditional checks
   # that would require many (slow) separate Ansible tasks otherwise. The script

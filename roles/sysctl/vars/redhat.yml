@@ -8,5 +8,7 @@
 
 ---
 
-__run_sshd_packages_install:
+__sysctl_linux_packages_install:
   - "procps-ng"
+
+__sysctl_linux_sysctl_executable: "/usr/bin/sysctl"

@@ -17,7 +17,15 @@ It provides resources to manage common Linux system components and configuration
 
 ## Included content<a id="content"></a>
 
-FIXME
+### Role: `foundata.linux.reboot`
+
+See the [role's `README.md`](./roles/reboot/README.md) for more information and usage examples.
+
+
+
+### Role: `foundata.linux.sysctl`
+
+See the [role's `README.md`](./roles/sysctl/README.md) for more information and usage examples.
 
 
 
