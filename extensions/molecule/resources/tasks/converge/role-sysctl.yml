@@ -1,0 +1,10 @@
+
+- name: "Molecule | Converge | Include the foundata.linux.sysctl role"
+  ansible.builtin.include_role:
+    name: "foundata.linux.sysctl"
+  vars:
+    sysctl_linux_reload: false  # Disabled: sysctl --system fails in containers due to read-only system params
+    sysctl_linux_parameters:
+      "net.ipv4.tcp_syncookies": 1
+      "net.ipv4.tcp_timestamps": 1
+

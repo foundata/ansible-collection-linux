@@ -1,0 +1,16 @@
+# Tasks for the Molecule prepare stage: Add resources needed for later steps
+# (e.g. verify) on all driver-created instances.
+
+- name: "Molecule | Prepare | Check for container environment (podman/docker)"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "/run/.containerenv"
+    - "/.dockerenv"
+  register: __testing_container_check
+
+
+- name: "Molecule | Prepare | Set container detection fact"
+  ansible.builtin.set_fact:
+    __testing_is_container: >-
+      {{ (__testing_container_check['results'] | map(attribute='stat.exists') | select('truthy') | list | length) > 0 }}

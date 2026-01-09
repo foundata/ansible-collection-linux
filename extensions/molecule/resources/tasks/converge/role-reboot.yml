@@ -1,0 +1,4 @@
+
+- name: "Molecule | Converge | Include the foundata.linux.reboot role"
+  ansible.builtin.include_role:
+    name: "foundata.linux.reboot"
