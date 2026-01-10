@@ -32,50 +32,36 @@
   ansible.builtin.assert:
     that:
       - "'ansible managed' in (__testing_file_content | lower)"
-      - "__testing_file_content is regex('net\\.ipv4\\.tcp_syncookies\\s*=\\s*1')"
+      - "__testing_file_content is regex('net\\.ipv4\\.tcp_syncookies\\s*=\\s*0')"
       - "__testing_file_content is regex('net\\.ipv4\\.tcp_timestamps\\s*=\\s*1')"
+      - "__testing_file_content is regex('net\\.core\\.somaxconn\\s*=\\s*12288')"
     fail_msg: "The sysctl drop-in configuration file does not contain the expected parameters."
     success_msg: "The sysctl drop-in configuration file contains all expected parameters."
 
 
-- name: "Molecule | Verify | Check for container environment (podman/docker)"
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop:
-    - "/run/.containerenv"
-    - "/.dockerenv"
-  register: __testing_container_check
-
-
-- name: "Molecule | Verify | Set container detection fact"
-  ansible.builtin.set_fact:
-    __testing_is_container: >-
-      {{ (__testing_container_check['results'] | map(attribute='stat.exists') | select('truthy') | list | length) > 0 }}
-
-
-- name: "Molecule | Verify | Get active kernel parameter values (skipped containers due to read-only system params)"
-  ansible.builtin.command:
-    cmd: "sysctl -n {{ item }}"
-  loop:
-    - "net.ipv4.tcp_syncookies"
-    - "net.ipv4.tcp_timestamps"
-  register: __testing_active_params
-  changed_when:
-    - false
+- name: "Molecule | Verify | Verify kernel parameters (skipped in containerized systems due to read-only params)"
   when:
-    - not (__testing_is_container | default(false) | bool)
+    - not __sysctl_linux_is_container
+  block:
 
+    - name: "Molecule | Verify | Get active kernel parameter values "
+      ansible.builtin.command:
+        argv:
+          - "{{ __sysctl_linux_sysctl_executable }}"
+          - "--values"
+          - "{{ item }}"
+      loop:
+        - "net.ipv4.tcp_syncookies"
+        - "net.ipv4.tcp_timestamps"
+        - "net.core.somaxconn"
+      register: __testing_active_params
+      changed_when: false
 
-- name: "Molecule | Verify | Assert active kernel parameters have expected values (skipped containers due to read-only system params)"
-  ansible.builtin.assert:
-    that:
-      - __testing_active_params['results'][0]['stdout'] == "1"
-      - __testing_active_params['results'][1]['stdout'] == "1"
-    fail_msg: >-
-      Active kernel parameters do not match expected values. Got:
-      tcp_syncookies={{ __testing_active_params['results'][0]['stdout'] }},
-      tcp_timestamps={{ __testing_active_params['results'][1]['stdout'] }}
-    success_msg: >-
-      All active kernel parameters have the expected values (tcp_syncookies=1, tcp_timestamps=1).
-  when:
-    - not (__testing_is_container | default(false) | bool)
+    - name: "Molecule | Verify | Assert active kernel parameters have expected values (skipped in containers due to read-only system params)"
+      ansible.builtin.assert:
+        that:
+          - __testing_active_params['results'][0]['stdout'] == "0"
+          - __testing_active_params['results'][1]['stdout'] == "1"
+          - __testing_active_params['results'][1]['stdout'] == "12288"
+        fail_msg: "Active kernel parameters do not match expected values."
+        success_msg: "All active kernel parameters have the expected values."

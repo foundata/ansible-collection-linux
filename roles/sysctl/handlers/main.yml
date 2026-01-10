@@ -2,7 +2,7 @@
 
 ---
 
-- name: "Handlers | Reload kernel parameters (sysctl) from all config files (following precedence)"
+- name: "Handlers | Reload all kernel parameters (following precedence) (sysctl --system)"
   # Using command module because ansible.posix.sysctl only reloads individual
   # parameters, while "sysctl --system" reloads all configuration files in the
   # following list in given order from top to bottom (while last read files
@@ -26,5 +26,26 @@
   # There is no sane way to check for changes when loading all values. However,
   # this is acceptable as this handler only get's triggered on change.
   changed_when: false # FIXME noqa ansible lint
+  failed_when:
+    - __sysctl_reload_result is failure
+    - not __sysctl_linux_is_container # best effort in containers
+  register: __sysctl_reload_result
+  listen:
+    - "sysctl_linux: reload"
+
+
+- name: "Handlers | Log failed sysctl reload attempt (due to read-only params in containerized systems)"
+  ansible.builtin.debug:
+    msg: >-
+      sysctl --system attempted in container (rc={{ __sysctl_reload_result['rc'] }}; failures tolerated).
+      stdout={{ (__sysctl_reload_result['stdout'] | default('') | trim) | regex_replace('\n+', ' | ') }}
+      stderr={{ (__sysctl_reload_result['stderr'] | default('') | trim) | regex_replace('\n+', ' | ') }}
+    verbosity: 3
+  changed_when: false
+  when:
+    - sysctl_linux_reload
+    - __sysctl_linux_is_container
+    - __sysctl_reload_result is defined
+    - __sysctl_reload_result['rc'] != 0 # comparing rc; failure test masked in containers in the previous handle
   listen:
     - "sysctl_linux: reload"

@@ -155,3 +155,15 @@
 - name: "Init | Set fact if a reboot is required"
   ansible.builtin.set_fact:
     __reboot_linux_required: "{{ __reboot_linux_check_result['stdout'] | default('0') | int | bool }}"
+
+
+# Required for checkability due to the inability to reboot containerized systems
+- name: "Init | Set container detection fact"
+  ansible.builtin.set_fact:
+    __reboot_linux_is_container: >-
+      {{
+        ((ansible_facts['virtualization_role'] == 'guest' and
+          ansible_facts['virtualization_type'] in ['docker', 'podman', 'containerd', 'lxc'])
+         or
+         (ansible_facts.get('env', {}).get('container') is not none))
+      }}

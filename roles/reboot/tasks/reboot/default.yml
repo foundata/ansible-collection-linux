@@ -2,7 +2,7 @@
 
 ---
 
-- name: "Reboot | Reboot system if needed"
+- name: "Reboot | Default | Reboot system if needed"
   ansible.builtin.reboot:
     boot_time_command: "{{ reboot_linux_boot_time_cmd }}"
     connect_timeout: "{{ reboot_linux_connect_timeout if reboot_linux_connect_timeout > 0 else omit }}"
@@ -15,7 +15,11 @@
   register: __reboot_linux_reboot_result
 
 
-- name: "Reboot | Set fact if a reboot was performed"
+- name: "Reboot | Default | Set fact with reboot result data (rebooted, elapsed)"
   ansible.builtin.set_fact:
-    __reboot_linux_reboot_performed: "{{ (__reboot_linux_reboot_result is defined and
-                                          __reboot_linux_reboot_result is succeeded) | bool }}"
+    # Remember to update the fact task in handlers/main.yaml if this changes
+    reboot_linux_result:
+      # seconds that elapsed waiting for the system to be rebooted
+      elapsed: "{{ __reboot_linux_reboot_result['elapsed'] | default(false) }}"
+      # true if the machine was rebooted
+      rebooted: "{{ __reboot_linux_reboot_result['rebooted'] | default(0) }}"

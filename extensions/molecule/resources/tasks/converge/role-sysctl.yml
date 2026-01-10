@@ -1,10 +1,37 @@
+# Tasks for the Molecule converge stage: Execute the collection role "sysctl"
+# against all driver-created instances.
+
+# This prevents testing whether the role itself verifies these facts'
+# availability but it avoids fragile workarounds (like parsing container
+# names) if additional platform specific preparations are needed.
+- name: "Molecule | Converge | Gather playbook-specific facts"
+  ansible.builtin.setup:
+    gather_subset:
+      - "virtualization_role"
+      - "virtualization_type"
+  when:
+    - ansible_facts['virtualization_role'] is not defined or
+      ansible_facts['virtualization_type'] is not defined
+
+
+# Required for checkability due to read-only kernel parameters in containerized systems
+- name: "Molecule | Converge | Set container detection fact"
+  ansible.builtin.set_fact:
+    __testing_is_container: >-
+      {{
+        ((ansible_facts['virtualization_role'] == 'guest' and
+          ansible_facts['virtualization_type'] in ['docker', 'podman', 'containerd', 'lxc'])
+          or
+          (ansible_facts.get('env', {}).get('container') is not none))
+      }}
+
 
 - name: "Molecule | Converge | Include the foundata.linux.sysctl role"
   ansible.builtin.include_role:
     name: "foundata.linux.sysctl"
   vars:
-    sysctl_linux_reload: false  # Disabled: sysctl --system fails in containers due to read-only system params
+    sysctl_linux_verify: "{{ (not __testing_is_container) }}"
     sysctl_linux_parameters:
-      "net.ipv4.tcp_syncookies": 1
+      "net.ipv4.tcp_syncookies": 0
       "net.ipv4.tcp_timestamps": 1
-
+      "net.core.somaxconn": 12288

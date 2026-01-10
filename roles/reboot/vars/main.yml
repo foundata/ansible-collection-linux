@@ -21,6 +21,9 @@ __reboot_linux_used_facts:
   - "distribution_major_version"
   - "distribution_version"
   - "os_family"
+  # from subset "virtual"
+  - "virtualization_role"
+  - "virtualization_type"
 
 
 # List of platforms this role supports and was designed for.

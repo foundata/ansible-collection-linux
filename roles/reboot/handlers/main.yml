@@ -12,5 +12,19 @@
     test_command: "{{ reboot_linux_test_cmd }}"
   when:
     - __reboot_linux_required
+    - not __reboot_linux_is_container
+  register: __reboot_linux_reboot_result
+  listen:
+    - "reboot_linux: reboot system"
+
+
+- name: "Handlers | Set fact with reboot result data (rebooted, elapsed)"
+  ansible.builtin.set_fact:
+    # Remember to update the fact task in tasks/reboot/default.yaml if this changes
+    reboot_linux_result:
+      # seconds that elapsed waiting for the system to be rebooted
+      elapsed: "{{ __reboot_linux_reboot_result['elapsed'] | default(false) }}"
+      # true if the machine was rebooted
+      rebooted: "{{ __reboot_linux_reboot_result['rebooted'] | default(0) }}"
   listen:
     - "reboot_linux: reboot system"
