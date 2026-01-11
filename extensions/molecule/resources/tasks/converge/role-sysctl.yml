@@ -35,3 +35,4 @@
       "net.ipv4.tcp_syncookies": 0
       "net.ipv4.tcp_timestamps": 1
       "net.core.somaxconn": 12288
+    sysctl_linux_config_dropin_file_name: "90-custom-dropin.conf"

@@ -29,3 +29,5 @@ sysctl_linux_reload: true
 sysctl_linux_verify: true
 
 sysctl_linux_ignore_unknown_key_errors: false
+
+sysctl_linux_config_dropin_file_name: "90-managed.conf"

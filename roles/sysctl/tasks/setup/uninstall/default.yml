@@ -11,20 +11,12 @@
     - (__sysctl_linux_packages_uninstall | length) > 0
 
 
-- name: "Setup | Uninstall | Remove additional sysctl config file (if any)"
+- name: "Setup | Uninstall | Remove managed drop-in sysctl config file(s) (if any)"
   ansible.builtin.file:
-    path: "{{ sysctl_linux_config_file }}"
+    path: "{{ item }}"
     state: "absent"
-  when:
-    - sysctl_linux_config_file != '/etc/sysctl.conf'
+  loop:
+    - "{{ __sysctl_linux_config_dropin_file_path }}"
+    - "{{ __sysctl_linux_config_dropin_file_path_default }}"
   notify:
     - "sysctl_linux: reload"
-
-
-- name: "Setup | Uninstall | Remove Ansible managed header from /etc/sysctl.conf (if any)"
-  ansible.builtin.lineinfile:
-    path: "{{ sysctl_linux_config_file }}"
-    regexp: '(?i)^#\s+ansible\s+managed'
-    state: "absent"
-  when:
-    - sysctl_linux_config_file == '/etc/sysctl.conf'

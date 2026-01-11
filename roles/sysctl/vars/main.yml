@@ -101,20 +101,23 @@ __sysctl_linux_paths_removal:
 # These variables define the different locations of configuration files, the
 # include directory, and the Ansible-managed configuration file, ensuring
 # consistent file handling across distributions.
-__sysctl_linux_config_file: "/etc/sysctl.conf"
+__sysctl_linux_config_file_path: "/etc/sysctl.conf"
 __sysctl_linux_config_file_owner: "root"
 __sysctl_linux_config_file_group: "root"
 __sysctl_linux_config_file_mode: "u=rw,g=r,o=r" # 0644
 
-__sysctl_linux_config_dropin_dir: "/etc/sysctl.d"
+# path variable is not user-configurable because the sysctl drop-in path is fixed (cf. sysctl(8)).
+__sysctl_linux_config_dropin_dir_path: "/etc/sysctl.d"
 __sysctl_linux_config_dropin_dir_owner: "root"
 __sysctl_linux_config_dropin_dir_group: "root"
 __sysctl_linux_config_dropin_dir_mode: "u=rwx,g=rx,o=rx" # 0755
 
-__sysctl_linux_config_dropin_file: "{{ __sysctl_linux_config_dropin_dir }}/99-zz-managed.conf" # 99-zz prefix to ensure precedence / late include
+__sysctl_linux_config_dropin_file_path: "{{ __sysctl_linux_config_dropin_dir_path }}/{{ sysctl_linux_config_dropin_file_name }}"
+__sysctl_linux_config_dropin_file_path_default: "{{ __sysctl_linux_config_dropin_dir_path }}/90-managed.conf" # needed to detect non-default names
 __sysctl_linux_config_dropin_file_owner: "{{ __sysctl_linux_config_file_owner }}"
 __sysctl_linux_config_dropin_file_group: "{{ __sysctl_linux_config_file_group }}"
 __sysctl_linux_config_dropin_file_mode: "{{ __sysctl_linux_config_file_mode }}"
+
 
 
 # Executable paths
