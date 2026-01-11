@@ -11,5 +11,3 @@
       - reboot_linux_result is defined
     fail_msg: "The fact 'reboot_linux_result' is not defined. Role initialization may have failed."
     success_msg: "The fact 'reboot_linux_result' is defined (value: {{ reboot_linux_result }})."
-
-
