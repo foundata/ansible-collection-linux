@@ -62,9 +62,9 @@ argument_specs:
           - `database`: Memory management, shared memory, low swappiness, I/O tuning.
             Recommended for PostgreSQL, MySQL, Redis, Elasticsearch.
             See [`database.md`](../vars/profiles/database.md) for details.
-          - `fileserver`: Network throughput and storage I/O. Recommended for NFS,
-            Samba, SFTP, backup targets.
-            See [`fileserver.md`](../vars/profiles/fileserver.md) for details.
+          - `file`: Network throughput and storage I/O. Recommended for fileservers (NFS,
+            Samba, SFTP) backup targets ad their like. See [`file.md`](../vars/profiles/file.md)
+            for details.
           - `virtualization`: Memory overcommit, scheduler tuning, storage I/O.
             Recommended for KVM/QEMU hosts, Proxmox.
             See [`virtualization.md`](../vars/profiles/virtualization.md) for details.
@@ -83,7 +83,7 @@ argument_specs:
           - "none"
           - "web"
           - "database"
-          - "fileserver"
+          - "file"
           - "virtualization"
           - "router"
           - "router_v4only"
