@@ -1,4 +1,4 @@
-# Internal role variables specific to: RedHat (os_family or distribution)
+# Internal role variables specific to: Fedora (distribution)
 #
 # Only values specific to the platform and its functionality should be included
 # here. Variables in this file override those defined in vars/main.yml.
@@ -8,5 +8,4 @@
 
 ---
 
-__sysctl_linux_packages_install:
-  - "procps-ng"
+__sysctl_linux_sysctl_executable: "/usr/bin/sysctl"
