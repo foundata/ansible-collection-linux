@@ -55,7 +55,7 @@ argument_specs:
 
           Possible values:
 
-          - `none`: No tuning applied. Only explicit `sysctl_linux_parameters` are set.
+          - '' (empty string): No tuning applied. Only explicit `sysctl_linux_parameters` are set.
           - `web`: High connection count and throughput. Recommended for web servers,
             API gateways, load balancers, reverse proxies.
             See [`web.md`](../vars/profiles/web.md) for details.
@@ -78,9 +78,9 @@ argument_specs:
             explicitly disables IPv4 forwarding.
             See [`router_v6only.md`](../vars/profiles/router_v6only.md) for details.
         type: "str"
-        default: "none"
+        default: ""
         choices:
-          - "none"
+          - ""
           - "web"
           - "database"
           - "file"
