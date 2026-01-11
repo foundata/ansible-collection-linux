@@ -22,6 +22,8 @@ sysctl_linux_state: "present"
 # the currently installed one). Defaults to false.
 sysctl_linux_autoupgrade: false
 
+sysctl_linux_profile: "none"
+
 sysctl_linux_parameters: {}
 
 sysctl_linux_reload: true

@@ -25,7 +25,7 @@
     modification_time: "preserve"
 
 
-- name: "Config | Default | Remove old default drop-in config file (if custom filename is used)"
+- name: "Config | Default | Remove default drop-in config file (if custom filename is used)"
   ansible.builtin.file:
     path: "{{ __sysctl_linux_config_dropin_file_path_default }}"
     state: "absent"

@@ -42,6 +42,53 @@ argument_specs:
         type: "bool"
         default: false
 
+      sysctl_linux_profile:
+        description: |
+          Selects a predefined set of kernel parameters optimized for a specific workload.
+          Each profile provides tuned values for network, memory, I/O, and security settings.
+          Some values are auto-calculated based on system resources (RAM, CPU cores) to
+          fit the target system. All profiles include security best practices such as
+          source validation, ICMP hardening, and filesystem protections.
+
+          Use `sysctl_linux_parameters` to override any profile value if needed for your
+          specific use-case.
+
+          Possible values:
+
+          - `none`: No tuning applied. Only explicit `sysctl_linux_parameters` are set.
+          - `web`: High connection count and throughput. Recommended for web servers,
+            API gateways, load balancers, reverse proxies.
+            See [`web.md`](../vars/profiles/web.md) for details.
+          - `database`: Memory management, shared memory, low swappiness, I/O tuning.
+            Recommended for PostgreSQL, MySQL, Redis, Elasticsearch.
+            See [`database.md`](../vars/profiles/database.md) for details.
+          - `fileserver`: Network throughput and storage I/O. Recommended for NFS,
+            Samba, SFTP, backup targets.
+            See [`fileserver.md`](../vars/profiles/fileserver.md) for details.
+          - `virtualization`: Memory overcommit, scheduler tuning, storage I/O.
+            Recommended for KVM/QEMU hosts, Proxmox.
+            See [`virtualization.md`](../vars/profiles/virtualization.md) for details.
+          - `router`: Connection tracking, neighbor tables, IP forwarding (IPv4 + IPv6).
+            Recommended for firewalls, NAT gateways, VPN concentrators.
+            See [`router.md`](../vars/profiles/router.md) for details.
+          - `router_v4only`: Like `router` but enables IPv4 forwarding only and
+            explicitly disables IPv6 forwarding.
+            See [`router_v4only.md`](../vars/profiles/router_v4only.md) for details.
+          - `router_v6only`: Like `router` but enables IPv6 forwarding only and
+            explicitly disables IPv4 forwarding.
+            See [`router_v6only.md`](../vars/profiles/router_v6only.md) for details.
+        type: "str"
+        default: "none"
+        choices:
+          - "none"
+          - "web"
+          - "database"
+          - "fileserver"
+          - "virtualization"
+          - "router"
+          - "router_v4only"
+          - "router_v6only"
+
       sysctl_linux_parameters:
         description: |
           Dictionary of kernel parameters to manage via sysctl. Keys are parameter
@@ -50,12 +97,24 @@ argument_specs:
           Setting a value to `null` or an empty string removes the parameter from
           the managed drop-in configuration file, reverting to the kernel default.
 
+          These parameters take precedence over any values set by `sysctl_linux_profile`
+          (if any). This allows using a profile as a baseline while customizing specific
+          values.
+
           Example:
 
           ```yaml
           sysctl_linux_parameters:
-            "net.ipv4.ip_forward": null # use kernel default, remove
+            "net.ipv4.ip_forward": null  # use kernel default, remove from config
             "vm.swappiness": 5
+          ```
+
+          Example overriding a profile value:
+
+          ```yaml
+          sysctl_linux_profile: "database"
+          sysctl_linux_parameters:
+            "vm.swappiness": 1  # override database profile default
           ```
         type: "dict"
         required: true
@@ -64,8 +123,8 @@ argument_specs:
         description: |
           If set to `true`, triggers `sysctl --system` after configuration changes
           to reload all sysctl configuration files following the proper precedence
-          order. This ensures all drop-in files and the main configuration are
-          applied consistently.
+          order. This ensures all drop-in files and possibly existing other sysctl
+          configuration files not managed by this role are applied consistently.
 
           Set to `false` in container environments where `sysctl --system` may fail
           due to read-only kernel parameters.

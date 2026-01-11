@@ -1,0 +1,6 @@
+# Variables for the sysctl profile "virtualization"
+
+---
+
+# FIXME to be implemented
+__sysctl_linux_profile_parameters: {}

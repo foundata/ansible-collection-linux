@@ -85,14 +85,22 @@
 
 ### sysctl specific
 
-- name: "Init | Merge (FIXME security defaults), (FIXME presets) and user parameters"
+
+- name: "Init | Include sysctl profile-specific variables (if any)"
+  ansible.builtin.include_vars:
+    file: "{{ role_path }}/vars/profile/{{ sysctl_linux_profile }}.yml"
+  when:
+    - sysctl_linux_profile != "none"
+
+
+- name: "Init | Merge profile and user parameters (user takes precedence)"
   ansible.builtin.set_fact:
     __sysctl_linux_effective_parameters: >-
       {{
-        ((sysctl_linux_security_hardening | default(false) | bool)
-          | ternary(__sysctl_linux_security_defaults | default({}), {}))
+        (__sysctl_linux_profile_parameters | default({}))
         | combine(sysctl_linux_parameters | default({}))
       }}
+
 
 # Required for checkability due to read-only kernel parameters in containerized systems
 - name: "Init | Set container detection fact"
