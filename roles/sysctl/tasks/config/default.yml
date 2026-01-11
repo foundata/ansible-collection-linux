@@ -46,6 +46,29 @@
     state: "present"
 
 
+- name: "Config | Default | Read current sysctl drop-in file"
+  ansible.builtin.slurp:
+    src: "{{ __sysctl_linux_config_dropin_file_path }}"
+  register: __sysctl_linux_dropin_file_content
+  failed_when: false
+
+
+- name: "Config | Default | Parse existing parameters from drop-in file"
+  ansible.builtin.set_fact:
+    __sysctl_linux_existing_parameters: >-
+      {{
+        (__sysctl_linux_dropin_file_content['content'] | default('') | b64decode)
+        .split('\n')
+        | reject('match', '^\s*#')
+        | reject('match', '^\s*$')
+        | map('regex_replace', '\s*=\s*', '=')
+        | map('regex_search', '^([^=]+)=')
+        | select('string')
+        | map('regex_replace', '=$', '')
+        | list
+      }}
+
+
 - name: "Config | Default | Set sysctl drop-in parameters"
   ansible.posix.sysctl:
     name: "{{ item['key'] }}"
@@ -72,18 +95,27 @@
 
 - name: "Config | Default | Build list of sysctl drop-in parameters to remove from config"
   ansible.builtin.set_fact:
+    # Combines orphaned parameters (in file but not in effective params) with
+    # explicit removals (value is null or empty string, e.g. to override profiles)
     __sysctl_linux_parameters_remove: >-
       {{
-        __sysctl_linux_effective_parameters
-        | dict2items
-        | selectattr('value', 'in', [none, ''])
-        | list
+        (
+          __sysctl_linux_existing_parameters
+          | difference(__sysctl_linux_effective_parameters.keys() | list)
+        ) + (
+          __sysctl_linux_effective_parameters
+          | dict2items
+          | selectattr('value', 'in', [none, ''])
+          | map(attribute='key')
+          | list
+        )
+        | unique
       }}
 
 
 - name: "Config | Default | Remove sysctl drop-in parameters marked for deletion from config"
   ansible.posix.sysctl:
-    name: "{{ item['key'] }}"
+    name: "{{ item }}"
     state: "absent"
     sysctl_file: "{{ __sysctl_linux_config_dropin_file_path }}"
     # reloading will be done by handler, following precedence
@@ -91,8 +123,7 @@
     ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | default(omit) }}"
   loop: "{{ __sysctl_linux_parameters_remove }}"
   loop_control:
-    # human-friendly output like "item=net.ipv4.ip_forward=1"
-    label: "{{ item['key'] }}={{ item['value'] }} (remove)"
+    label: "{{ item }} (remove)"
   when:
     - __sysctl_linux_parameters_remove | length > 0
   notify:

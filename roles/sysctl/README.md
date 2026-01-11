@@ -98,13 +98,15 @@ Override profile values with custom parameters:
   hosts: "databases"
   tasks:
 
-    - name: "Apply database profile with custom swappiness"
+    - name: "Apply database profile with custom swappiness and min_free; Allow routing"
       ansible.builtin.include_role:
         name: "foundata.linux.sysctl"
       vars:
         sysctl_linux_profile: "database"
         sysctl_linux_parameters:
-          "vm.swappiness": 1  # override profile default
+          "vm.swappiness": 1  # override profile default with another value
+          "vm.min_free_kbytes": null  # override profile default, do not manage and use kernel default
+          "net.ipv4.ip_forward": 1 # additional parameter not handled by the profile at all
 ```
 
 

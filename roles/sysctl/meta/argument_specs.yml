@@ -94,8 +94,14 @@ argument_specs:
           Dictionary of kernel parameters to manage via sysctl. Keys are parameter
           names (e.g., `net.ipv4.ip_forward`), values are the desired settings.
 
-          Setting a value to `null` or an empty string removes the parameter from
-          the managed drop-in configuration file, reverting to the kernel default.
+          The drop-in configuration file is fully declarative: any parameter in the
+          file that is not present in the effective configuration (profile + this
+          dictionary) will be automatically removed. This ensures the file always
+          reflects exactly what is defined in your Ansible configuration.
+
+          To explicitly prevent a profile parameter from being set (e.g., to use the
+          kernel default instead), set its value to `null` or an empty string. This
+          removes the parameter from the managed drop-in configuration file.
 
           These parameters take precedence over any values set by `sysctl_linux_profile`
           (if any). This allows using a profile as a baseline while customizing specific
