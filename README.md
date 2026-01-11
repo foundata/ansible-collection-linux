@@ -5,6 +5,18 @@ This repository contains the `foundata.linux` Ansible Collection.
 It provides resources to manage common Linux system components and configuration, e.g. users, shell, Kernel parmeters (sysctl), storage or automatic updates.
 
 
+<div align="center" id="project-readme-header">
+<br>
+<br>
+
+**⭐ Found this useful? Support open-source and star this project:**
+
+[![GitHub repository](https://img.shields.io/github/stars/foundata/ansible-collection-linux.svg)](https://github.com/foundata/ansible-collection-linux)
+
+<br>
+</div>
+
+
 
 ## Table of contents<a id="toc"></a>
 
