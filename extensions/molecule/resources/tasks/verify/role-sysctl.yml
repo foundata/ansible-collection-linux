@@ -67,21 +67,21 @@
     success_msg: "The sysctl drop-in configuration file contains all expected parameters."
 
 
-- name: "Molecule | Verify | Check sysctl main confconfiguration file exists (created by 'prepare' molecule stage)"
+- name: "Molecule | Verify | Check sysctl main configuration file exists (created by 'prepare' molecule stage)"
   ansible.builtin.stat:
     path: "{{ __sysctl_linux_config_file_path }}"
   register: __testing_config_file
 
 
-- name: "Molecule | Verify | Assert sysctl main confconfiguration file exists exists (created by 'prepare' molecule stage)"
+- name: "Molecule | Verify | Assert sysctl main configuration file exists (created by 'prepare' molecule stage)"
   ansible.builtin.assert:
     that:
       - __testing_config_file['stat']['exists']
-    fail_msg: "The sysctl main confconfiguration file exists '{{ __sysctl_linux_config_file_path }}' does not exist."
-    success_msg: "The sysctl main confconfiguration file exists {'{ __sysctl_linux_config_file_path }}' exists."
+    fail_msg: "The sysctl main configuration file '{{ __sysctl_linux_config_file_path }}' does not exist."
+    success_msg: "The sysctl main configuration file '{{ __sysctl_linux_config_file_path }}' exists."
 
 
-- name: "Molecule | Verify | Read sysctl main confconfiguration file content"
+- name: "Molecule | Verify | Read sysctl main configuration file content"
   ansible.builtin.slurp:
     src: "{{ __sysctl_linux_config_file_path }}"
   register: __testing_main_config_content
@@ -89,7 +89,7 @@
     - __testing_config_file['stat']['exists']
 
 
-- name: "Molecule | Verify | Assert only managed parameters are commented out in sysctl main confconfiguration file (to ensure precedence)"
+- name: "Molecule | Verify | Assert only managed parameters are commented out in sysctl main configuration file (to ensure precedence)"
   vars:
     __testing_file_content: "{{ __testing_main_config_content['content'] | b64decode }}"
   ansible.builtin.assert:
