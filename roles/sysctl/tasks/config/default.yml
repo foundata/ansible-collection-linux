@@ -123,6 +123,7 @@
     ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | default(omit) }}"
   loop: "{{ __sysctl_linux_parameters_remove }}"
   loop_control:
+    # human-friendly output like "item=net.ipv4.ip_forward (remove)"
     label: "{{ item }} (remove)"
   when:
     - __sysctl_linux_parameters_remove | length > 0
