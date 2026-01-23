@@ -59,8 +59,8 @@
       {{
         (__sysctl_linux_dropin_file_content['content'] | ansible.builtin.default('') | ansible.builtin.b64decode)
         .split('\n')
-        | reject('match', '^\s*#')
-        | reject('match', '^\s*$')
+        | ansible.builtin.reject('match', '^\s*#')
+        | ansible.builtin.reject('match', '^\s*$')
         | ansible.builtin.map('regex_replace', '\s*=\s*', '=')
         | ansible.builtin.map('regex_search', '^([^=]+)=')
         | select('string')
@@ -144,7 +144,7 @@
         sysctl_linux_parameters
         | ansible.builtin.dict2items
         | selectattr('value', 'ne', none)
-        | rejectattr('value', 'equalto', '')
+        | ansible.builtin.rejectattr('value', 'equalto', '')
         | ansible.builtin.map(attribute='key')
         | ansible.builtin.map('regex_escape')
         | ansible.builtin.list
