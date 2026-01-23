@@ -8,7 +8,7 @@
     state: "absent"
   when:
     - __sysctl_linux_packages_uninstall is defined
-    - (__sysctl_linux_packages_uninstall | length) > 0
+    - (__sysctl_linux_packages_uninstall | ansible.builtin.length) > 0
 
 
 - name: "Setup | Uninstall | Remove managed drop-in sysctl config file(s) (if any)"

@@ -85,10 +85,10 @@
     # human-friendly output like "item=net.ipv4.ip_forward=1"
     label: "{{ item['key'] }}={{ item['value'] }}"
   when:
-    - __sysctl_linux_effective_parameters | length > 0
+    - __sysctl_linux_effective_parameters | ansible.builtin.length > 0
     # none (Python / Ansible) == null (YAML)
     - item['value'] is not none
-    - item['value'] | string | length > 0
+    - item['value'] | string | ansible.builtin.length > 0
   notify:
     - "sysctl_linux: reload"
 
@@ -126,7 +126,7 @@
     # human-friendly output like "item=net.ipv4.ip_forward (remove)"
     label: "{{ item }} (remove)"
   when:
-    - __sysctl_linux_parameters_remove | length > 0
+    - __sysctl_linux_parameters_remove | ansible.builtin.length > 0
   notify:
     - "sysctl_linux: reload"
 
@@ -177,6 +177,6 @@
     replace: '#\1\2\3'
   when:
     - __sysctl_linux_config_file_stat['stat']['exists'] | default(false)
-    - __sysctl_linux_parameters_comment | length > 0
+    - __sysctl_linux_parameters_comment | ansible.builtin.length > 0
   notify:
     - "sysctl_linux: reload"

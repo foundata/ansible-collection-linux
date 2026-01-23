@@ -35,7 +35,7 @@
       ansible_facts['distribution'] is not defined or
       ansible_facts['distribution_version'] is not defined or
       ansible_facts['distribution_major_version'] is not defined or
-      (__sysctl_linux_supported_platforms | length) < 1
+      (__sysctl_linux_supported_platforms | ansible.builtin.length) < 1
 
 
 - name: "Init | Warn when platform is unsupported"
@@ -45,12 +45,12 @@
       with versions '{{ ansible_facts['distribution_major_version'] }}', '{{ ansible_facts['distribution_version'] }}',
       or 'all' is in the list of supported platforms from vars/main.yml: {{ __sysctl_linux_supported_platforms }}
   when:
-    - (__sysctl_linux_supported_platforms | length) > 0
+    - (__sysctl_linux_supported_platforms | ansible.builtin.length) > 0
     - (__sysctl_linux_supported_platforms
        | selectattr('name', 'match', '^(' ~ ansible_facts['distribution'] ~ '|' ~ ansible_facts['os_family'] ~ ')$', ignorecase=true)
        | map(attribute='versions') | flatten
        | select('match', '^(' ~ ansible_facts['distribution_major_version'] ~ '|' ~ ansible_facts['distribution_version'] ~ '|all)$', ignorecase=true)
-       | ansible.builtin.list | length) < 1
+       | ansible.builtin.list | ansible.builtin.length) < 1
   ignore_errors: true # noqa: ignore-errors
 
 
@@ -90,7 +90,7 @@
   ansible.builtin.include_vars:
     file: "{{ role_path }}/vars/profile/{{ sysctl_linux_profile }}.yml"
   when:
-    - sysctl_linux_profile | length > 0
+    - sysctl_linux_profile | ansible.builtin.length > 0
 
 
 - name: "Init | Merge profile and user parameters (user takes precedence)"

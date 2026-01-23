@@ -8,7 +8,7 @@
     state: "absent"
   when:
     - __sysctl_linux_packages_removal is defined
-    - (__sysctl_linux_packages_removal | length) > 0
+    - (__sysctl_linux_packages_removal | ansible.builtin.length) > 0
 
 
 - name: "Setup | Install | Default | Install or upgrade packages"
@@ -17,7 +17,7 @@
     state: "{{ 'latest' if sysctl_linux_autoupgrade else 'present' }}"
   when:
     - __sysctl_linux_packages_install is defined
-    - (__sysctl_linux_packages_install | length) > 0
+    - (__sysctl_linux_packages_install | ansible.builtin.length) > 0
 
 
 - name: "Setup | Install | Default | Remove unwanted files and directories (e.g., to prevent conflicts or resolve incompatibilities)"
@@ -26,5 +26,5 @@
     state: "absent"
   when:
     - __sysctl_linux_paths_removal is defined
-    - (__sysctl_linux_paths_removal | length) > 0
+    - (__sysctl_linux_paths_removal | ansible.builtin.length) > 0
   loop: "{{ __sysctl_linux_paths_removal }}"
