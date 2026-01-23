@@ -88,7 +88,7 @@
     - __sysctl_linux_effective_parameters | ansible.builtin.length > 0
     # none (Python / Ansible) == null (YAML)
     - item['value'] is not none
-    - item['value'] | string | ansible.builtin.length > 0
+    - item['value'] | ansible.builtin.string | ansible.builtin.length > 0
   notify:
     - "sysctl_linux: reload"
 
