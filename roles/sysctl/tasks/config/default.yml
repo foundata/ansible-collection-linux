@@ -101,7 +101,7 @@
       {{
         (
           __sysctl_linux_existing_parameters
-          | difference(__sysctl_linux_effective_parameters.keys() | ansible.builtin.list)
+          | ansible.builtin.difference(__sysctl_linux_effective_parameters.keys() | ansible.builtin.list)
         ) + (
           __sysctl_linux_effective_parameters
           | ansible.builtin.dict2items
