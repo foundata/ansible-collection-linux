@@ -56,7 +56,7 @@
 
 - name: "Molecule | Verify | Assert sysctl drop-in configuration file contains expected parameters"
   vars:
-    __testing_file_content: "{{ __testing_dropin_content['content'] | b64decode }}"
+    __testing_file_content: "{{ __testing_dropin_content['content'] | ansible.builtin.b64decode }}"
   ansible.builtin.assert:
     that:
       - "'ansible managed' in (__testing_file_content | lower)"
@@ -91,7 +91,7 @@
 
 - name: "Molecule | Verify | Assert only managed parameters are commented out in sysctl main configuration file (to ensure precedence)"
   vars:
-    __testing_file_content: "{{ __testing_main_config_content['content'] | b64decode }}"
+    __testing_file_content: "{{ __testing_main_config_content['content'] | ansible.builtin.b64decode }}"
   ansible.builtin.assert:
     that:
       # (?m) enables multiline mode so ^ matches start of each line, not just start of string

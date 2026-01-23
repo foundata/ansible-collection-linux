@@ -57,7 +57,7 @@
   ansible.builtin.set_fact:
     __sysctl_linux_existing_parameters: >-
       {{
-        (__sysctl_linux_dropin_file_content['content'] | default('') | b64decode)
+        (__sysctl_linux_dropin_file_content['content'] | default('') | ansible.builtin.b64decode)
         .split('\n')
         | reject('match', '^\s*#')
         | reject('match', '^\s*$')
