@@ -98,7 +98,7 @@
     __sysctl_linux_effective_parameters: >-
       {{
         (__sysctl_linux_profile_parameters | default({}))
-        | combine(sysctl_linux_parameters | default({}))
+        | ansible.builtin.combine(sysctl_linux_parameters | default({}))
       }}
 
 
