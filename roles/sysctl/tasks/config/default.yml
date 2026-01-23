@@ -61,10 +61,10 @@
         .split('\n')
         | reject('match', '^\s*#')
         | reject('match', '^\s*$')
-        | map('regex_replace', '\s*=\s*', '=')
-        | map('regex_search', '^([^=]+)=')
+        | ansible.builtin.map('regex_replace', '\s*=\s*', '=')
+        | ansible.builtin.map('regex_search', '^([^=]+)=')
         | select('string')
-        | map('regex_replace', '=$', '')
+        | ansible.builtin.map('regex_replace', '=$', '')
         | ansible.builtin.list
       }}
 
@@ -106,7 +106,7 @@
           __sysctl_linux_effective_parameters
           | dict2items
           | selectattr('value', 'in', [none, ''])
-          | map(attribute='key')
+          | ansible.builtin.map(attribute='key')
           | ansible.builtin.list
         )
         | ansible.builtin.unique
@@ -145,8 +145,8 @@
         | dict2items
         | selectattr('value', 'ne', none)
         | rejectattr('value', 'equalto', '')
-        | map(attribute='key')
-        | map('regex_escape')
+        | ansible.builtin.map(attribute='key')
+        | ansible.builtin.map('regex_escape')
         | ansible.builtin.list
       }}
   when:
