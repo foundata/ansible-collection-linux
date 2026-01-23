@@ -38,8 +38,8 @@
   ansible.builtin.debug:
     msg: >-
       sysctl --system attempted in container (rc={{ __sysctl_reload_result['rc'] }}; failures tolerated).
-      stdout={{ (__sysctl_reload_result['stdout'] | default('') | ansible.builtin.trim) | regex_replace('\n+', ' | ') }}
-      stderr={{ (__sysctl_reload_result['stderr'] | default('') | ansible.builtin.trim) | regex_replace('\n+', ' | ') }}
+      stdout={{ (__sysctl_reload_result['stdout'] | ansible.builtin.default('') | ansible.builtin.trim) | regex_replace('\n+', ' | ') }}
+      stderr={{ (__sysctl_reload_result['stderr'] | ansible.builtin.default('') | ansible.builtin.trim) | regex_replace('\n+', ' | ') }}
     verbosity: 3
   changed_when: false
   when:

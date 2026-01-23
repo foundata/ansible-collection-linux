@@ -65,7 +65,7 @@
 
 - name: "Init | Set unique platform-specific filename list (most to least specific)"
   ansible.builtin.set_fact:
-    __reboot_linux_platform_filenames_most_specific_first: "{{ (__reboot_linux_platform_filenames_raw | ansible.builtin.unique | default([])) }}"
+    __reboot_linux_platform_filenames_most_specific_first: "{{ (__reboot_linux_platform_filenames_raw | ansible.builtin.unique | ansible.builtin.default([])) }}"
 
 
 - name: "Init | Set unique platform-specific filename list (least to most specific)"
@@ -154,7 +154,7 @@
 
 - name: "Init | Set fact if a reboot is required"
   ansible.builtin.set_fact:
-    __reboot_linux_required: "{{ __reboot_linux_check_result['stdout'] | default('0') | int | ansible.builtin.bool }}"
+    __reboot_linux_required: "{{ __reboot_linux_check_result['stdout'] | ansible.builtin.default('0') | int | ansible.builtin.bool }}"
 
 
 # Required for checkability due to the inability to reboot containerized systems

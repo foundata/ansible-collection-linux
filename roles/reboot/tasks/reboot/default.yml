@@ -20,6 +20,6 @@
     # Remember to update the fact task in handlers/main.yaml if this changes
     reboot_linux_result:
       # seconds that elapsed waiting for the system to be rebooted
-      elapsed: "{{ __reboot_linux_reboot_result['elapsed'] | default(false) }}"
+      elapsed: "{{ __reboot_linux_reboot_result['elapsed'] | ansible.builtin.default(false) }}"
       # true if the machine was rebooted
-      rebooted: "{{ __reboot_linux_reboot_result['rebooted'] | default(0) }}"
+      rebooted: "{{ __reboot_linux_reboot_result['rebooted'] | ansible.builtin.default(0) }}"

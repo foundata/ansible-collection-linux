@@ -65,7 +65,7 @@
 
 - name: "Init | Set unique platform-specific filename list (most to least specific)"
   ansible.builtin.set_fact:
-    __sysctl_linux_platform_filenames_most_specific_first: "{{ (__sysctl_linux_platform_filenames_raw | ansible.builtin.unique | default([])) }}"
+    __sysctl_linux_platform_filenames_most_specific_first: "{{ (__sysctl_linux_platform_filenames_raw | ansible.builtin.unique | ansible.builtin.default([])) }}"
 
 
 - name: "Init | Set unique platform-specific filename list (least to most specific)"
@@ -97,8 +97,8 @@
   ansible.builtin.set_fact:
     __sysctl_linux_effective_parameters: >-
       {{
-        (__sysctl_linux_profile_parameters | default({}))
-        | ansible.builtin.combine(sysctl_linux_parameters | default({}))
+        (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
+        | ansible.builtin.combine(sysctl_linux_parameters | ansible.builtin.default({}))
       }}
 
 

@@ -57,7 +57,7 @@
   ansible.builtin.set_fact:
     __sysctl_linux_existing_parameters: >-
       {{
-        (__sysctl_linux_dropin_file_content['content'] | default('') | ansible.builtin.b64decode)
+        (__sysctl_linux_dropin_file_content['content'] | ansible.builtin.default('') | ansible.builtin.b64decode)
         .split('\n')
         | reject('match', '^\s*#')
         | reject('match', '^\s*$')
@@ -76,10 +76,10 @@
     state: "present"
     sysctl_file: "{{ __sysctl_linux_config_dropin_file_path }}"
     # fail if parameter is invalid or read-only
-    sysctl_set: "{{ sysctl_linux_verify | default(omit) }}"
+    sysctl_set: "{{ sysctl_linux_verify | ansible.builtin.default(omit) }}"
     # reloading will be done by handler, following precedence
     reload: false
-    ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | default(omit) }}"
+    ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | ansible.builtin.default(omit) }}"
   loop: "{{ __sysctl_linux_effective_parameters | dict2items }}"
   loop_control:
     # human-friendly output like "item=net.ipv4.ip_forward=1"
@@ -120,7 +120,7 @@
     sysctl_file: "{{ __sysctl_linux_config_dropin_file_path }}"
     # reloading will be done by handler, following precedence
     reload: false
-    ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | default(omit) }}"
+    ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | ansible.builtin.default(omit) }}"
   loop: "{{ __sysctl_linux_parameters_remove }}"
   loop_control:
     # human-friendly output like "item=net.ipv4.ip_forward (remove)"
@@ -150,7 +150,7 @@
         | ansible.builtin.list
       }}
   when:
-    - __sysctl_linux_config_file_stat['stat']['exists'] | default(false)
+    - __sysctl_linux_config_file_stat['stat']['exists'] | ansible.builtin.default(false)
 
 
 # Remember: It is possible to overwrite values, last occurrence wins.
@@ -176,7 +176,7 @@
       ^(?![\t ]*#)([\t ]*)({{ __sysctl_linux_parameters_comment | select | join('|') }})(?=\s*(?:=|\s|$))(.*)
     replace: '#\1\2\3'
   when:
-    - __sysctl_linux_config_file_stat['stat']['exists'] | default(false)
+    - __sysctl_linux_config_file_stat['stat']['exists'] | ansible.builtin.default(false)
     - __sysctl_linux_parameters_comment | ansible.builtin.length > 0
   notify:
     - "sysctl_linux: reload"
