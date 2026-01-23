@@ -59,7 +59,7 @@
     __testing_file_content: "{{ __testing_dropin_content['content'] | ansible.builtin.b64decode }}"
   ansible.builtin.assert:
     that:
-      - "'ansible managed' in (__testing_file_content | lower)"
+      - "'ansible managed' in (__testing_file_content | ansible.builtin.lower)"
       - '__testing_file_content is regex("net\.ipv4\.tcp_syncookies\s*=\s*0")'
       - '__testing_file_content is regex("net\.ipv4\.tcp_timestamps\s*=\s*1")'
       - '__testing_file_content is regex("net\.core\.somaxconn\s*=\s*12288")'
