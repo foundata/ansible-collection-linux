@@ -116,7 +116,7 @@
         if [ -d '/boot' ]; then
           __kernel_installed="$(
             find /boot -maxdepth 1 -name 'vmlinuz-*' -printf '%f\n' \
-            | sort -V \
+            | ansible.builtin.sort -V \
             | tail -n 1
           )"
         fi
