@@ -65,7 +65,7 @@
         | map('regex_search', '^([^=]+)=')
         | select('string')
         | map('regex_replace', '=$', '')
-        | list
+        | ansible.builtin.list
       }}
 
 
@@ -101,13 +101,13 @@
       {{
         (
           __sysctl_linux_existing_parameters
-          | difference(__sysctl_linux_effective_parameters.keys() | list)
+          | difference(__sysctl_linux_effective_parameters.keys() | ansible.builtin.list)
         ) + (
           __sysctl_linux_effective_parameters
           | dict2items
           | selectattr('value', 'in', [none, ''])
           | map(attribute='key')
-          | list
+          | ansible.builtin.list
         )
         | unique
       }}
@@ -147,7 +147,7 @@
         | rejectattr('value', 'equalto', '')
         | map(attribute='key')
         | map('regex_escape')
-        | list
+        | ansible.builtin.list
       }}
   when:
     - __sysctl_linux_config_file_stat['stat']['exists'] | default(false)
