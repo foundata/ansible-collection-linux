@@ -22,4 +22,4 @@
       "net.ipv4.tcp_syncookies": "1" # Managed during the converge stage; must be commented out
       "net.ipv4.tcp_mtu_probing": "1" # Unmanaged; must NOT be commented out
       "net.ipv4.tcp_timestamps": "0" # Managed during the converge stage; must be commented out
-  loop: "{{ __testing_sysctl_values_to_comment | dict2items }}"
+  loop: "{{ __testing_sysctl_values_to_comment | ansible.builtin.dict2items }}"

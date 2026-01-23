@@ -80,7 +80,7 @@
     # reloading will be done by handler, following precedence
     reload: false
     ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | ansible.builtin.default(omit) }}"
-  loop: "{{ __sysctl_linux_effective_parameters | dict2items }}"
+  loop: "{{ __sysctl_linux_effective_parameters | ansible.builtin.dict2items }}"
   loop_control:
     # human-friendly output like "item=net.ipv4.ip_forward=1"
     label: "{{ item['key'] }}={{ item['value'] }}"
@@ -104,7 +104,7 @@
           | difference(__sysctl_linux_effective_parameters.keys() | ansible.builtin.list)
         ) + (
           __sysctl_linux_effective_parameters
-          | dict2items
+          | ansible.builtin.dict2items
           | selectattr('value', 'in', [none, ''])
           | ansible.builtin.map(attribute='key')
           | ansible.builtin.list
@@ -142,7 +142,7 @@
     __sysctl_linux_parameters_comment: >-
       {{
         sysctl_linux_parameters
-        | dict2items
+        | ansible.builtin.dict2items
         | selectattr('value', 'ne', none)
         | rejectattr('value', 'equalto', '')
         | ansible.builtin.map(attribute='key')
