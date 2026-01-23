@@ -79,7 +79,7 @@
   vars:
     __sysctl_linux_vars_file: "{{ role_path }}/vars/{{ item }}"
   when:
-    - __sysctl_linux_vars_file is file
+    - __sysctl_linux_vars_file is ansible.builtin.file
   loop: "{{ __sysctl_linux_platform_filenames_most_specific_last }}"
 
 

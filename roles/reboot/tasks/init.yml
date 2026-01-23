@@ -79,7 +79,7 @@
   vars:
     __reboot_linux_vars_file: "{{ role_path }}/vars/{{ item }}"
   when:
-    - __reboot_linux_vars_file is file
+    - __reboot_linux_vars_file is ansible.builtin.file
   loop: "{{ __reboot_linux_platform_filenames_most_specific_last }}"
 
 
