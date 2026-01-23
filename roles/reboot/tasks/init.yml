@@ -154,7 +154,7 @@
 
 - name: "Init | Set fact if a reboot is required"
   ansible.builtin.set_fact:
-    __reboot_linux_required: "{{ __reboot_linux_check_result['stdout'] | default('0') | int | bool }}"
+    __reboot_linux_required: "{{ __reboot_linux_check_result['stdout'] | default('0') | int | ansible.builtin.bool }}"
 
 
 # Required for checkability due to the inability to reboot containerized systems
