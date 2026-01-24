@@ -68,8 +68,7 @@ __reboot_linux_supported_platforms:
 
 # List of package names to be installed when reboot_linux_state is
 # set to "present".
-__reboot_linux_packages_install:
-  [] # Remove the "[]" when adding values to this list.
+__reboot_linux_packages_install: []
 
 
 # List of package names to be uninstalled when reboot_linux_state is
@@ -84,16 +83,14 @@ __reboot_linux_packages_uninstall: "{{ reboot_linux_packages_install }}"
 
 # List of package names to be removed unconditionally before installation
 # (e.g., to prevent conflicts or resolve incompatibilities).
-__reboot_linux_packages_removal:
-  [] # Remove the "[]" when adding values to this list.
+__reboot_linux_packages_removal: []
 
 
 # List of paths of files and directories to be removed unconditionally after
 # installation. This is useful for removing default configuration resources
 # that would otherwise create confusion or conflict with custom configurations
 # managed by this role.
-__reboot_linux_paths_removal:
-  [] # Remove the "[]" when adding values to this list.
+__reboot_linux_paths_removal: []
 
 
 ### Override defaults of dependencies used by this role (if any).
