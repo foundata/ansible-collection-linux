@@ -97,7 +97,7 @@ argument_specs:
           The drop-in configuration file is fully declarative: any parameter in the
           file that is not present in the effective configuration (profile + this
           dictionary) will be automatically removed. This ensures the file always
-          reflects exactly what is defined in your Ansible configuration.
+          reflects exactly what is ansible.builtin.defined in your Ansible configuration.
 
           To explicitly prevent a profile parameter from being set (e.g., to use the
           kernel default instead), set its value to `null` or an empty string. This

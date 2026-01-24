@@ -7,7 +7,7 @@
     name: "{{ __sysctl_linux_packages_uninstall }}"
     state: "absent"
   when:
-    - __sysctl_linux_packages_uninstall is defined
+    - __sysctl_linux_packages_uninstall is ansible.builtin.defined
     - (__sysctl_linux_packages_uninstall | ansible.builtin.length) > 0
 
 

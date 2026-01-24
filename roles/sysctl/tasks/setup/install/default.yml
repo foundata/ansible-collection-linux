@@ -7,7 +7,7 @@
     name: "{{ __sysctl_linux_packages_removal }}"
     state: "absent"
   when:
-    - __sysctl_linux_packages_removal is defined
+    - __sysctl_linux_packages_removal is ansible.builtin.defined
     - (__sysctl_linux_packages_removal | ansible.builtin.length) > 0
 
 
@@ -16,7 +16,7 @@
     name: "{{ __sysctl_linux_packages_install }}"
     state: "{{ 'latest' if sysctl_linux_autoupgrade else 'present' }}"
   when:
-    - __sysctl_linux_packages_install is defined
+    - __sysctl_linux_packages_install is ansible.builtin.defined
     - (__sysctl_linux_packages_install | ansible.builtin.length) > 0
 
 
@@ -25,6 +25,6 @@
     path: "{{ item }}"
     state: "absent"
   when:
-    - __sysctl_linux_paths_removal is defined
+    - __sysctl_linux_paths_removal is ansible.builtin.defined
     - (__sysctl_linux_paths_removal | ansible.builtin.length) > 0
   loop: "{{ __sysctl_linux_paths_removal }}"

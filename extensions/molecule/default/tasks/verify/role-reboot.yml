@@ -5,9 +5,9 @@
     name: "foundata.linux.reboot"
 
 
-- name: "Molecule | Verify | Assert reboot result fact is defined"
+- name: "Molecule | Verify | Assert reboot result fact is ansible.builtin.defined"
   ansible.builtin.assert:
     that:
-      - reboot_linux_result is defined
-    fail_msg: "The fact 'reboot_linux_result' is not defined. Role initialization may have failed."
-    success_msg: "The fact 'reboot_linux_result' is defined (value: {{ reboot_linux_result }})."
+      - reboot_linux_result is ansible.builtin.defined
+    fail_msg: "The fact 'reboot_linux_result' is not ansible.builtin.defined. Role initialization may have failed."
+    success_msg: "The fact 'reboot_linux_result' is ansible.builtin.defined (value: {{ reboot_linux_result }})."

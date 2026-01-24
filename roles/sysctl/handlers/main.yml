@@ -45,7 +45,7 @@
   when:
     - sysctl_linux_reload
     - __sysctl_linux_is_container
-    - __sysctl_reload_result is defined
+    - __sysctl_reload_result is ansible.builtin.defined
     - __sysctl_reload_result['rc'] != 0 # comparing rc; failure test masked in containers in the previous handle
   listen:
     - "sysctl_linux: reload"

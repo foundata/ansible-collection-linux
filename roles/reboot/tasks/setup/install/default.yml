@@ -7,7 +7,7 @@
     name: "{{ __reboot_linux_packages_removal }}"
     state: "absent"
   when:
-    - __reboot_linux_packages_removal is defined
+    - __reboot_linux_packages_removal is ansible.builtin.defined
     - (__reboot_linux_packages_removal | ansible.builtin.length) > 0
 
 
@@ -16,7 +16,7 @@
     name: "{{ __reboot_linux_packages_install }}"
     state: "{{ 'latest' if reboot_linux_autoupgrade else 'present' }}"
   when:
-    - __reboot_linux_packages_install is defined
+    - __reboot_linux_packages_install is ansible.builtin.defined
     - (__reboot_linux_packages_install | ansible.builtin.length) > 0
 
 
@@ -25,6 +25,6 @@
     path: "{{ item }}"
     state: "absent"
   when:
-    - __reboot_linux_paths_removal is defined
+    - __reboot_linux_paths_removal is ansible.builtin.defined
     - (__reboot_linux_paths_removal | ansible.builtin.length) > 0
   loop: "{{ __reboot_linux_paths_removal }}"

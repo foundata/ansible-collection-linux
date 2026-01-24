@@ -10,8 +10,8 @@
       - "virtualization_role"
       - "virtualization_type"
   when:
-    - ansible_facts['virtualization_role'] is not defined or
-      ansible_facts['virtualization_type'] is not defined
+    - ansible_facts['virtualization_role'] is not ansible.builtin.defined or
+      ansible_facts['virtualization_type'] is not ansible.builtin.defined
 
 
 # Required for checkability due to read-only kernel parameters in containerized systems
