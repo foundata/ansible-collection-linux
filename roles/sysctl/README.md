@@ -9,8 +9,9 @@ Choose a profile for your workload (web server, database, file server, virtualiz
 
 - [Features](#features)
 - [Example playbooks, using this role](#examples)
-- [Supported tags](#tags)
+- [Supported tags](#tags)<!-- ANSIBLE DOCSMITH TOC START -->
 - [Role variables](#variables)
+<!-- ANSIBLE DOCSMITH TOC END -->
 - [Dependencies](#dependencies)
 - [Compatibility](#compatibility)
 - [External requirements](#requirements)
@@ -124,6 +125,7 @@ There are also tags usually not meant to be called directly but listed for the s
 - `sysctl_linux_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
 
 
+<!-- ANSIBLE DOCSMITH MAIN START -->
 
 ## Role variables<a id="variables"></a>
 
@@ -133,7 +135,7 @@ Additionally, there are variables read from other roles and/or the global scope 
 
 - None right now.
 
-
+<!-- ANSIBLE DOCSMITH MAIN END -->
 
 ## Dependencies<a id="dependencies"></a>
 
