@@ -25,7 +25,8 @@
     - sysctl_linux_reload
   # There is no sane way to check for changes when loading all values. However,
   # this is acceptable as this handler only get's triggered on change.
-  changed_when: false # FIXME noqa ansible lint
+  changed_when:
+    - false # noqa: no-changed-when
   failed_when:
     - __sysctl_reload_result is failure
     - not __sysctl_linux_is_container # best effort in containers
@@ -41,7 +42,8 @@
       stdout={{ (__sysctl_reload_result['stdout'] | ansible.builtin.default('') | ansible.builtin.trim) | ansible.builtin.regex_replace('\n+', ' | ') }}
       stderr={{ (__sysctl_reload_result['stderr'] | ansible.builtin.default('') | ansible.builtin.trim) | ansible.builtin.regex_replace('\n+', ' | ') }}
     verbosity: 3
-  changed_when: false
+  changed_when:
+    - false # noqa: no-changed-when
   when:
     - sysctl_linux_reload
     - __sysctl_linux_is_container

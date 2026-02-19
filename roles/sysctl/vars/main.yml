@@ -94,16 +94,16 @@ __sysctl_linux_packages_removal: []
 __sysctl_linux_paths_removal: []
 
 
-# Configuration file paths, ownership, and permissions for the Postfix daemon.
-# These variables define the different locations of configuration files, the
-# include directory, and the Ansible-managed configuration file, ensuring
-# consistent file handling across distributions.
+# Configuration file paths, ownership, and permissions. These variables define
+# the different locations of configuration files, include directories, and
+# Ansible-managed files, ensuring consistent file handling across distributions.
 __sysctl_linux_config_file_path: "/etc/sysctl.conf"
 __sysctl_linux_config_file_owner: "root"
 __sysctl_linux_config_file_group: "root"
 __sysctl_linux_config_file_mode: "u=rw,g=r,o=r" # 0644
 
-# path variable is not user-configurable because the sysctl drop-in path is fixed (cf. sysctl(8)).
+# The path is not a user-configurable variable because the sysctl drop-in path
+# is fixed (cf. sysctl(8)).
 __sysctl_linux_config_dropin_dir_path: "/etc/sysctl.d"
 __sysctl_linux_config_dropin_dir_owner: "root"
 __sysctl_linux_config_dropin_dir_group: "root"

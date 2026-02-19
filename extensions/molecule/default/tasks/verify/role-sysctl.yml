@@ -125,7 +125,8 @@
         - "net.ipv4.tcp_timestamps"
         - "net.core.somaxconn"
       register: __testing_active_params
-      changed_when: false
+      changed_when:
+        - false
 
     - name: "Molecule | Verify | Assert active kernel parameters have expected values (skipped in containers due to read-only system params)"
       ansible.builtin.assert:

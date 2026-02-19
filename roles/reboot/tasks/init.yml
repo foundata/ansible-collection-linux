@@ -192,7 +192,8 @@
 
       printf '%s' "${__reboot_required}"
     executable: "/bin/bash"
-  changed_when: false
+  changed_when:
+    - false
   register: __reboot_linux_check_result
 
 
