@@ -1,4 +1,4 @@
-# Tasks for the Molecule verify stage: Check collection role "reboot" outcomes.
+# Check collection role "reboot" outcomes.
 
 - name: "Molecule | Verify | Initialize the foundata.linux.reboot role (without actually running it; get and expose variables)"
   ansible.builtin.include_role:
@@ -9,5 +9,7 @@
   ansible.builtin.assert:
     that:
       - reboot_linux_result is ansible.builtin.defined
-    fail_msg: "The fact 'reboot_linux_result' is not ansible.builtin.defined. Role initialization may have failed."
-    success_msg: "The fact 'reboot_linux_result' is ansible.builtin.defined (value: {{ reboot_linux_result }})."
+    fail_msg: >
+      The fact 'reboot_linux_result' is not ansible.builtin.defined. Role initialization may have failed.
+    success_msg: >
+      The fact 'reboot_linux_result' is ansible.builtin.defined (value: {{ reboot_linux_result }}).

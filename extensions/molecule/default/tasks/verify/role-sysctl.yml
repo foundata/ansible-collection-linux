@@ -1,4 +1,4 @@
-# Tasks for the Molecule verify stage: Check collection role "sysctl" outcomes.
+# Check collection role "sysctl" outcomes.
 
 - name: "Molecule | Verify | Initialize the foundata.linux.sysctl role (without actually running it; get and expose variables)"
   ansible.builtin.include_role:
@@ -7,10 +7,22 @@
     public: true
 
 
-- name: "Molecule | Verify | Set / overwrite some expected configuration data "
+## Preparation
+
+- name: "Molecule | Verify | Set sysctl_linux_* parameters as facts from __testing_state"
   ansible.builtin.set_fact:
-    # values have to be in sync with the config set in ../converge/sysctl-role.yml
-    sysctl_linux_config_dropin_file_name: "90-custom-dropin.conf"
+    "{{ item['key'] }}": "{{ item['value'] }}"
+  loop: >-
+    {{
+      (__testing_state | default({}, true))
+      | ansible.builtin.dict2items
+      | ansible.builtin.selectattr('key', 'match', '^sysctl_linux_')
+      | ansible.builtin.list
+    }}
+
+
+- name: "Molecule | Verify | Set other expected or needed facts"
+  ansible.builtin.set_fact:
     __sysctl_linux_config_dropin_file_path: "{{ __sysctl_linux_config_dropin_dir_path }}/90-custom-dropin.conf"
 
 

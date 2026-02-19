@@ -1,9 +1,10 @@
-# Tasks for the Molecule converge stage: Execute the collection role "sysctl"
-# against all driver-created instances.
+# Execute the collection role "sysctl" against all driver-created instances.
 
-# This prevents testing whether the role itself verifies these facts'
-# availability but it avoids fragile workarounds (like parsing container
-# names) if additional platform specific preparations are needed.
+# The following task avoids fragile workarounds (like parsing container names)
+# if additional platform specific preparations are needed. But it prevents
+# testing whether the role itself verifies these facts' availability (this
+# disadvantage had to be accepted; however, it was verified that the role really
+# does reload the facts when needed)
 - name: "Molecule | Converge | Gather playbook-specific facts"
   ansible.builtin.setup:
     gather_subset:
@@ -26,13 +27,34 @@
       }}
 
 
+- name: "Molecule | Converge | Store sysctl_linux_* role parameters in __testing_state"
+  ansible.builtin.include_tasks:
+    file: "../tasks/state_update.yml"
+  vars:
+    __testing_state_update:
+      sysctl_linux_verify: "{{ (not __testing_is_container) }}"
+      sysctl_linux_parameters:
+        "net.ipv4.tcp_syncookies": 0
+        "net.ipv4.tcp_timestamps": 1
+        "net.core.somaxconn": 12288
+      sysctl_linux_config_dropin_file_name: "90-custom-dropin.conf"
+
+
+- name: "Molecule | Converge | Set sysctl_linux_* parameters as facts from __testing_state"
+  ansible.builtin.set_fact:
+    "{{ item['key'] }}": "{{ item['value'] }}"
+  loop: >-
+    {{
+      (__testing_state | default({}, true))
+      | ansible.builtin.dict2items
+      | ansible.builtin.selectattr('key', 'match', '^sysctl_linux_')
+      | ansible.builtin.list
+    }}
+
 - name: "Molecule | Converge | Include the foundata.linux.sysctl role"
   ansible.builtin.include_role:
     name: "foundata.linux.sysctl"
-  vars:
-    sysctl_linux_verify: "{{ (not __testing_is_container) }}"
-    sysctl_linux_parameters:
-      "net.ipv4.tcp_syncookies": 0
-      "net.ipv4.tcp_timestamps": 1
-      "net.core.somaxconn": 12288
-    sysctl_linux_config_dropin_file_name: "90-custom-dropin.conf"
+  # vars: All sysctl_linux_* variables are set as facts and passed this way to
+  #       the role. This enables persisting the values in __testing_state
+  #       and restoring them in later stages (e.g. verify) without manually
+  #       duplicating data across playbooks.
