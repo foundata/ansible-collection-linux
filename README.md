@@ -31,13 +31,13 @@ It provides resources to manage common Linux system components and configuration
 
 ### Role: `foundata.linux.reboot`
 
-See the [role's `README.md`](./roles/reboot/README.md) for more information and usage examples.
+The resource in this collection to reboot systems when needed. See the [role's `README.md`](./roles/reboot/README.md) for more information and usage examples.
 
 
 
 ### Role: `foundata.linux.sysctl`
 
-See the [role's `README.md`](./roles/sysctl/README.md) for more information and usage examples.
+The resource in this collection to configure and maintain Kernel settings. See the [role's `README.md`](./roles/sysctl/README.md) for more information and usage examples.
 
 
 
