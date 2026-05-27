@@ -9,14 +9,14 @@
 
 ## Preparation
 
-- name: "Molecule | Verify | Set sysctl_linux_* parameters as facts from __testing_state"
+- name: "Molecule | Verify | Set sysctl_linux_* and __testing_* parameters as facts from __testing_state"
   ansible.builtin.set_fact:
     "{{ item['key'] }}": "{{ item['value'] }}"
   loop: >-
     {{
       (__testing_state | default({}, true))
       | ansible.builtin.dict2items
-      | ansible.builtin.selectattr('key', 'match', '^sysctl_linux_')
+      | ansible.builtin.selectattr('key', 'match', '^(sysctl_linux_|__testing_)')
       | ansible.builtin.list
     }}
 
@@ -25,6 +25,8 @@
   ansible.builtin.set_fact:
     __sysctl_linux_config_dropin_file_path: "{{ __sysctl_linux_config_dropin_dir_path }}/90-custom-dropin.conf"
 
+
+## Drop-in config file
 
 - name: "Molecule | Verify | Check if sysctl drop-in configuration file exists"
   ansible.builtin.stat:
@@ -78,6 +80,8 @@
     fail_msg: "The sysctl drop-in configuration file does not contain the expected parameters."
     success_msg: "The sysctl drop-in configuration file contains all expected parameters."
 
+
+## Main configuration
 
 - name: "Molecule | Verify | Check sysctl main configuration file exists (created by 'prepare' molecule stage)"
   ansible.builtin.stat:
