@@ -1,0 +1,127 @@
+# Initialization: Manage internal role setup and the Ansible environment.
+
+---
+
+- name: "Init | Gather role-specific facts"
+  ansible.builtin.setup:
+    gather_subset: "{{ __auto_update_linux_used_facts }}"
+  when:
+    - not (__auto_update_linux_used_facts is subset(ansible_facts.keys()))
+
+
+- name: "Init | Include role meta data"
+  ansible.builtin.include_vars:
+    file: "../meta/main.yml"
+    name: "__auto_update_linux_meta"
+
+
+- name: "Init | Check Ansible version requirement and fail if unmet"
+  ansible.builtin.fail:
+    msg: >
+      This role requires Ansible {{ __auto_update_linux_meta['galaxy_info']['min_ansible_version'] }}
+      or higher. You are currently running Ansible {{ ansible_version['full'] }} .
+  when:
+    - ansible_version['full'] is version_compare(__auto_update_linux_meta['galaxy_info']['min_ansible_version'], '<')
+
+
+- name: "Init | Notify when platform support check is not possible"
+  ansible.builtin.debug:
+    msg: >
+      The list of supported platforms cannot be checked as it is either empty
+      or distribution facts are missing.
+    verbosity: 1
+  when:
+    - ansible_facts['os_family'] is not ansible.builtin.defined or
+      ansible_facts['distribution'] is not ansible.builtin.defined or
+      ansible_facts['distribution_version'] is not ansible.builtin.defined or
+      ansible_facts['distribution_major_version'] is not ansible.builtin.defined or
+      ((__auto_update_linux_supported_platforms | ansible.builtin.length) == 0)
+
+
+- name: "Init | Warn when platform is unsupported"
+  ansible.builtin.fail:
+    msg: >
+      Neither {{ ansible_facts['distribution'] }} (distribution) nor {{ ansible_facts['os_family'] }} (os_family)
+      with versions '{{ ansible_facts['distribution_major_version'] }}', '{{ ansible_facts['distribution_version'] }}',
+      or 'all' is in the list of supported platforms from vars/main.yml: {{ __auto_update_linux_supported_platforms }}
+  vars:
+    __auto_update_linux_platform_names_regex: >-
+      ^({{ ansible_facts['distribution'] }}|{{ ansible_facts['os_family'] }})$
+    __auto_update_linux_platform_versions_regex: >-
+      ^({{ ansible_facts['distribution_major_version'] }}|{{ ansible_facts['distribution_version'] }}|all)$
+    __auto_update_linux_matched_versions: >-
+      {{
+        __auto_update_linux_supported_platforms
+        | ansible.builtin.selectattr('name', 'match', __auto_update_linux_platform_names_regex, ignorecase=true)
+        | ansible.builtin.map(attribute='versions')
+        | ansible.builtin.flatten
+        | ansible.builtin.select('match', __auto_update_linux_platform_versions_regex, ignorecase=true)
+        | ansible.builtin.list
+      }}
+  when:
+    - (__auto_update_linux_supported_platforms | ansible.builtin.length) > 0
+    - (__auto_update_linux_matched_versions | ansible.builtin.length) == 0
+  ignore_errors: true # noqa: ignore-errors
+
+
+- name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
+  ansible.builtin.set_fact:
+    __auto_update_linux_platform_filenames_raw:
+      - "{{ __auto_update_linux_dist }}_{{ __auto_update_linux_dist_ver }}.yml"
+      - "{{ __auto_update_linux_dist }}_{{ __auto_update_linux_dist_major }}.yml"
+      - "{{ __auto_update_linux_dist }}.yml"
+      - "{{ __auto_update_linux_os_family }}.yml"
+  vars:
+    __auto_update_linux_dist: >-
+      {{
+        ansible_facts['distribution']
+        | ansible.builtin.regex_replace(' ', '_')
+        | ansible.builtin.lower
+      }}
+    __auto_update_linux_dist_ver: >-
+      {{
+        ansible_facts['distribution_version']
+        | ansible.builtin.regex_replace(' ', '_')
+        | ansible.builtin.lower
+      }}
+    __auto_update_linux_dist_major: >-
+      {{
+        ansible_facts['distribution_major_version']
+        | ansible.builtin.regex_replace(' ', '_')
+        | ansible.builtin.lower
+      }}
+    __auto_update_linux_os_family: >-
+      {{
+        ansible_facts['os_family']
+        | ansible.builtin.regex_replace(' ', '_')
+        | ansible.builtin.lower
+      }}
+
+
+- name: "Init | Set unique platform-specific filename list (most to least specific)"
+  ansible.builtin.set_fact:
+    __auto_update_linux_platform_filenames_most_specific_first: >-
+      {{
+        (__auto_update_linux_platform_filenames_raw
+        | ansible.builtin.unique
+        | ansible.builtin.default([]))
+      }}
+
+
+- name: "Init | Set unique platform-specific filename list (least to most specific)"
+  ansible.builtin.set_fact:
+    __auto_update_linux_platform_filenames_most_specific_last: >-
+      {{
+        __auto_update_linux_platform_filenames_most_specific_first
+        | ansible.builtin.reverse
+      }}
+
+
+- name: "Init | Include platform-specific variables (if any), overwrite values with more specific ones"
+  ansible.builtin.include_vars:
+    file: "{{ __auto_update_linux_vars_file }}"
+  vars:
+    __auto_update_linux_vars_file: "{{ role_path }}/vars/{{ item }}"
+  when:
+    - __auto_update_linux_vars_file is ansible.builtin.file
+  loop: "{{ __auto_update_linux_platform_filenames_most_specific_last }}"

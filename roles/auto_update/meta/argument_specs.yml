@@ -1,0 +1,33 @@
+# Role argument validation.
+#
+# For information on the argument_specs.yml, see the official documentation:
+# https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_reuse_roles.html#role-argument-validation
+
+---
+
+argument_specs:
+
+  # foundata.linux/roles/run/tasks/main.yml entry point
+  main:
+    short_description: "Main entry point for the foundata.linux.run role"
+    options:
+
+      auto_update_linux_state:
+        type: "str"
+        required: true
+        choices:
+          - "present"
+          - "absent"
+
+      auto_update_linux_autoupgrade:
+        type: "bool"
+        required: true
+
+      auto_update_linux_service_state:
+        type: "str"
+        required: true
+        choices:
+          - "enabled"
+          - "disabled"
+          - "running"
+          - "unmanaged"
