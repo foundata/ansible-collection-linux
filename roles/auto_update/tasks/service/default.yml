@@ -1,5 +1,20 @@
 # Services and daemons: Manage their state, configure, or create them.
+#
+# The "service" managed here is the systemd timer that triggers the unattended
+# update run. Its unit name is platform-specific (see vars/<platform>.yml).
 
 ---
 
-# none right now
+- name: "Service | Default | Apply pending systemd changes before managing the timer"
+  ansible.builtin.meta: "flush_handlers"
+
+
+- name: "Service | Default | Ensure timer state: {{ __auto_update_linux_systemd_timer_unit_name }}"
+  ansible.builtin.systemd_service:
+    name: "{{ __auto_update_linux_systemd_timer_unit_name }}"
+    state: "{{ 'started' if auto_update_linux_service_state in ['enabled', 'running'] else 'stopped' if auto_update_linux_service_state == 'disabled' }}"
+    enabled: "{{ true if auto_update_linux_service_state == 'enabled' else false if auto_update_linux_service_state in ['disabled', 'running'] }}"
+  when:
+    - auto_update_linux_service_state != 'unmanaged'
+    - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
+    - (__auto_update_linux_systemd_timer_unit_name | ansible.builtin.length) > 0

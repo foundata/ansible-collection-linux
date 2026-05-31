@@ -2,6 +2,31 @@
 
 ---
 
+- name: "Setup | Uninstall | Remove managed systemd timer drop-in"
+  ansible.builtin.file:
+    path: "{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}"
+    state: "absent"
+  when:
+    - (__auto_update_linux_systemd_timer_unit_name | ansible.builtin.length) > 0
+  notify:
+    - "auto_update_linux: systemd daemon-reload"
+
+
+- name: "Setup | Uninstall | Remove managed apt configuration files (Debian/Ubuntu)"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: "absent"
+  when:
+    - __auto_update_linux_apt_config_file_path is ansible.builtin.defined
+  loop:
+    - "{{ __auto_update_linux_apt_periodic_file_path }}"
+    - "{{ __auto_update_linux_apt_config_file_path }}"
+  loop_control:
+    label: "{{ item }}"
+
+
+# The dnf automatic.conf and os-update.conf files are owned by their respective
+# packages and are removed together with the package below.
 - name: "Setup | Uninstall | Remove packages"
   ansible.builtin.package:
     name: "{{ __auto_update_linux_packages_uninstall }}"

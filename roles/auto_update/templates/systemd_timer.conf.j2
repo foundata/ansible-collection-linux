@@ -1,0 +1,16 @@
+{#-
+  Render systemd timer [Timer] directives to a drop-in override file.
+
+  Input variable: tpl_timer_settings (dict)
+
+  Rules:
+  - Always renders a "[Timer]" section header.
+  - Keys are written as "Directive=Value".
+  - If a value is boolean, it is rendered as "true" or "false".
+  - All other value types are rendered as-is (stringified by Jinja).
+-#}
+# {{ ansible_managed }}
+[Timer]
+{% for key, value in (tpl_timer_settings | default({})).items() %}
+{{ key }}={{ value | ternary('true', 'false') if value is ansible.builtin.boolean else value }}
+{% endfor %}

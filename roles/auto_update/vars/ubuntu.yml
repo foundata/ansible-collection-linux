@@ -1,0 +1,17 @@
+# Internal role variables specific to: Ubuntu (os_family or distribution)
+#
+# Ubuntu has os_family "Debian" but distribution "Ubuntu", so this file is
+# loaded after (and overrides) vars/debian.yml. Only the apt Origins-Pattern
+# differs from Debian; package, backend and timer unit are inherited.
+
+---
+
+# Origins-Pattern entries for Unattended-Upgrade on Ubuntu. The ${distro_id} and
+# ${distro_codename} placeholders are resolved by unattended-upgrades itself at
+# runtime.
+__auto_update_linux_apt_origins_security:
+  - "${distro_id}:${distro_codename}-security"
+  - "${distro_id}ESMApps:${distro_codename}-apps-security"
+  - "${distro_id}ESM:${distro_codename}-infra-security"
+__auto_update_linux_apt_origins_all_extra:
+  - "${distro_id}:${distro_codename}-updates"

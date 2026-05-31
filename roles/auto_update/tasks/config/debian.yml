@@ -1,0 +1,30 @@
+# Configuration: Manage settings (Debian/Ubuntu, unattended-upgrades).
+
+---
+
+- name: "Config | Debian | Notice: 'notify' apply mode is approximated as download-only"
+  ansible.builtin.debug:
+    msg: >-
+      unattended-upgrades has no dedicated notify-only mode. With
+      auto_update_linux_apply set to 'notify', updates are downloaded but not
+      installed (download-only), optionally combined with email reports.
+  when:
+    - auto_update_linux_apply == 'notify'
+
+
+- name: "Config | Debian | Enable periodic apt maintenance (unattended upgrades)"
+  ansible.builtin.template:
+    src: "apt_auto_upgrades.j2"
+    dest: "{{ __auto_update_linux_apt_periodic_file_path }}"
+    owner: "root"
+    group: "root"
+    mode: "u=rw,g=r,o=r" # 0644
+
+
+- name: "Config | Debian | Create managed unattended-upgrades configuration"
+  ansible.builtin.template:
+    src: "apt_unattended_upgrades.j2"
+    dest: "{{ __auto_update_linux_apt_config_file_path }}"
+    owner: "root"
+    group: "root"
+    mode: "u=rw,g=r,o=r" # 0644

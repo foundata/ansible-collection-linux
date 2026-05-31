@@ -5,4 +5,38 @@
 
 ---
 
-# none right now
+# Backend identifier. Matches the top-level key used in
+# auto_update_linux_extra_config for this platform.
+__auto_update_linux_backend: "unattended-upgrades"
+
+
+# List of package names to be installed when auto_update_linux_state is
+# set to "present".
+__auto_update_linux_packages_install:
+  - "unattended-upgrades"
+
+
+# Name of the systemd timer unit that triggers the unattended update run.
+__auto_update_linux_systemd_timer_unit_name: "apt-daily-upgrade.timer"
+
+
+# apt configuration files managed by this role.
+#
+# - The "periodic" file enables the periodic apt maintenance (list update and
+#   the unattended upgrade itself).
+# - The role's own drop-in (high number to win over the distribution default
+#   "50unattended-upgrades") carries the settings derived from this role's
+#   parameters. See https://wiki.debian.org/PeriodicUpdates for details.
+__auto_update_linux_apt_periodic_file_path: "/etc/apt/apt.conf.d/20auto-upgrades"
+__auto_update_linux_apt_config_file_path: "/etc/apt/apt.conf.d/52unattended-upgrades-local"
+
+
+# Origins-Pattern entries for Unattended-Upgrade. The security entries are
+# always used; the "all extra" entries are added when auto_update_linux_type is
+# "all". The ${distro_codename} placeholder is resolved by unattended-upgrades
+# itself at runtime.
+__auto_update_linux_apt_origins_security:
+  - "origin=Debian,codename=${distro_codename},label=Debian-Security"
+__auto_update_linux_apt_origins_all_extra:
+  - "origin=Debian,codename=${distro_codename}-updates"
+  - "origin=Debian,codename=${distro_codename}-proposed-updates"

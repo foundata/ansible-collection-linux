@@ -203,7 +203,7 @@ auto_update_linux_exclude: []
 #
 # - Type: str
 # - Required: No
-# - Default: 
+# - Default:
 auto_update_linux_notify_email: ""
 
 # Additional, backend-native configuration written verbatim into the

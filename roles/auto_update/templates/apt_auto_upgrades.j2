@@ -1,0 +1,7 @@
+{#-
+  Enable periodic apt maintenance so that unattended-upgrades runs on the
+  apt-daily(-upgrade) systemd timers.
+-#}
+# {{ ansible_managed }}
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";

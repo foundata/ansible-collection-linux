@@ -125,3 +125,18 @@
   when:
     - __auto_update_linux_vars_file is ansible.builtin.file
   loop: "{{ __auto_update_linux_platform_filenames_most_specific_last }}"
+
+
+### auto_update specific
+
+
+- name: "Init | Merge user and default timer settings"
+  ansible.builtin.set_fact:
+    # systemd directives are case-sensitive. Since Ansible dict keys are also
+    # case-sensitive, a simple dict_a | ansible.builtin.combine(dict_b) correctly
+    # allows user settings to override defaults without extra handling.
+    __auto_update_linux_effective_timer_settings: >-
+      {{
+        __auto_update_linux_timer_settings_defaults
+        | ansible.builtin.combine(auto_update_linux_timer_settings)
+      }}

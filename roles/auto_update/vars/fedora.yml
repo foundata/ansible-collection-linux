@@ -1,0 +1,18 @@
+# Internal role variables specific to: Fedora (os_family or distribution)
+#
+# Fedora has os_family "RedHat" but distribution "Fedora", so this file is
+# loaded after (and overrides) vars/redhat.yml. Fedora ships dnf5, which uses
+# the "dnf5-plugin-automatic" package and the "dnf5-automatic.timer" unit. The
+# configuration file (/etc/dnf/automatic.conf) and backend identifier are
+# identical to dnf4 and therefore inherited from vars/redhat.yml.
+
+---
+
+# List of package names to be installed when auto_update_linux_state is
+# set to "present".
+__auto_update_linux_packages_install:
+  - "dnf5-plugin-automatic"
+
+
+# Name of the systemd timer unit that triggers the unattended update run.
+__auto_update_linux_systemd_timer_unit_name: "dnf5-automatic.timer"

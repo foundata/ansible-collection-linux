@@ -1,0 +1,28 @@
+# Internal role variables specific to: Suse (os_family or distribution)
+#
+# Only values specific to the platform and its functionality should be included
+# here. Variables in this file override those defined in vars/main.yml.
+
+---
+
+# Backend identifier. Matches the top-level key used in
+# auto_update_linux_extra_config for this platform.
+__auto_update_linux_backend: "os-update"
+
+
+# List of package names to be installed when auto_update_linux_state is
+# set to "present".
+__auto_update_linux_packages_install:
+  - "os-update"
+
+
+# Name of the systemd timer unit that triggers the unattended update run.
+__auto_update_linux_systemd_timer_unit_name: "os-update.timer"
+
+
+# os-update configuration file managed by this role. Vendor defaults live in
+# /usr/share/os-update/os-update.conf; only admin overrides go to /etc.
+__auto_update_linux_osupdate_config_file_path: "/etc/os-update.conf"
+__auto_update_linux_osupdate_config_file_owner: "root"
+__auto_update_linux_osupdate_config_file_group: "root"
+__auto_update_linux_osupdate_config_file_mode: "u=rw,g=r,o=r" # 0644

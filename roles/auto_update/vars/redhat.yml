@@ -2,7 +2,30 @@
 #
 # Only values specific to the platform and its functionality should be included
 # here. Variables in this file override those defined in vars/main.yml.
+#
+# Note: This file also applies to Fedora (os_family "RedHat"). Fedora uses dnf5
+# and therefore overrides the package and timer unit name in vars/fedora.yml,
+# but the configuration file format and backend identifier are identical.
 
 ---
 
-# none right now
+# Backend identifier. Matches the top-level key used in
+# auto_update_linux_extra_config for this platform.
+__auto_update_linux_backend: "dnf-automatic"
+
+
+# List of package names to be installed when auto_update_linux_state is
+# set to "present".
+__auto_update_linux_packages_install:
+  - "dnf-automatic"
+
+
+# Name of the systemd timer unit that triggers the unattended update run.
+__auto_update_linux_systemd_timer_unit_name: "dnf-automatic.timer"
+
+
+# dnf-automatic configuration file managed by this role.
+__auto_update_linux_dnf_config_file_path: "/etc/dnf/automatic.conf"
+__auto_update_linux_dnf_config_file_owner: "root"
+__auto_update_linux_dnf_config_file_group: "root"
+__auto_update_linux_dnf_config_file_mode: "u=rw,g=r,o=r" # 0644

@@ -1,0 +1,38 @@
+{#-
+  Managed dnf-automatic / dnf5 automatic configuration (/etc/dnf/automatic.conf)
+  derived from this role's parameters.
+
+  Section dictionaries are built from the dedicated parameters first, then the
+  user's auto_update_linux_extra_config['dnf-automatic'] (keyed by section) is
+  merged on top so it takes precedence.
+-#}
+# {{ ansible_managed }}
+{% set extra = auto_update_linux_extra_config['dnf-automatic'] | default({}) %}
+{% set emit_via = 'email' if (auto_update_linux_notify_email | length) > 0
+   else ('motd' if auto_update_linux_apply == 'notify' else 'stdio') %}
+{% set sections = {
+     'commands': {
+       'upgrade_type': ('security' if auto_update_linux_type == 'security' else 'default'),
+       'download_updates': ('yes' if auto_update_linux_apply in ['install', 'download'] else 'no'),
+       'apply_updates': ('yes' if auto_update_linux_apply == 'install' else 'no'),
+       'reboot': auto_update_linux_reboot,
+     },
+     'emitters': {
+       'emit_via': emit_via,
+     },
+   } %}
+{% if (auto_update_linux_exclude | length) > 0 %}
+{%   set sections = sections | ansible.builtin.combine({'base': {'exclude': auto_update_linux_exclude | join(' ')}}) %}
+{% endif %}
+{% if (auto_update_linux_notify_email | length) > 0 %}
+{%   set sections = sections | ansible.builtin.combine({'email': {'email_from': 'root', 'email_to': auto_update_linux_notify_email}}) %}
+{% endif %}
+{% set section_names = ((sections.keys() | list) + (extra.keys() | list)) | unique %}
+{% for section in section_names %}
+[{{ section }}]
+{% set merged = (sections[section] | default({})) | ansible.builtin.combine(extra[section] | default({})) %}
+{% for key, value in merged.items() %}
+{{ key }} = {{ value }}
+{% endfor %}
+
+{% endfor %}

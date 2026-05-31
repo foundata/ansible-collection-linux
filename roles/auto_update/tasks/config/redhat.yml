@@ -1,0 +1,16 @@
+# Configuration: Manage settings (RHEL/Fedora, dnf / dnf5 automatic).
+#
+# Serves both RHEL (dnf4, dnf-automatic) and Fedora (dnf5, dnf5-plugin-automatic)
+# as the configuration file format (/etc/dnf/automatic.conf) is identical. The
+# package name and timer unit differ and are set in vars/redhat.yml respectively
+# vars/fedora.yml.
+
+---
+
+- name: "Config | RedHat | Create dnf automatic configuration"
+  ansible.builtin.template:
+    src: "dnf_automatic.conf.j2"
+    dest: "{{ __auto_update_linux_dnf_config_file_path }}"
+    owner: "{{ __auto_update_linux_dnf_config_file_owner }}"
+    group: "{{ __auto_update_linux_dnf_config_file_group }}"
+    mode: "{{ __auto_update_linux_dnf_config_file_mode }}"

@@ -1,0 +1,43 @@
+{#-
+  Managed unattended-upgrades configuration derived from this role's parameters.
+  Loaded after the distribution default (50unattended-upgrades) due to the
+  higher numeric prefix of the destination file.
+
+  Note: apt list directives (e.g. Origins-Pattern, Package-Blacklist) are
+  additive across apt.conf.d files. The security origins therefore extend the
+  distribution default; the "-updates" origins are only added for type "all".
+-#}
+# {{ ansible_managed }}
+
+Unattended-Upgrade::Origins-Pattern {
+{% for origin in __auto_update_linux_apt_origins_security | default([]) %}
+    "{{ origin }}";
+{% endfor %}
+{% if auto_update_linux_type == 'all' %}
+{% for origin in __auto_update_linux_apt_origins_all_extra | default([]) %}
+    "{{ origin }}";
+{% endfor %}
+{% endif %}
+};
+
+{% if (auto_update_linux_exclude | length) > 0 %}
+Unattended-Upgrade::Package-Blacklist {
+{% for pkg in auto_update_linux_exclude %}
+    "{{ pkg }}";
+{% endfor %}
+};
+{% endif %}
+Unattended-Upgrade::Download-Only "{{ 'true' if auto_update_linux_apply in ['download', 'notify'] else 'false' }}";
+Unattended-Upgrade::Automatic-Reboot "{{ 'true' if auto_update_linux_reboot == 'when-needed' else 'false' }}";
+{% if (auto_update_linux_notify_email | length) > 0 %}
+Unattended-Upgrade::Mail "{{ auto_update_linux_notify_email }}";
+Unattended-Upgrade::MailReport "on-change";
+{% endif %}
+{% set _extra = auto_update_linux_extra_config['unattended-upgrades'] | default({}) %}
+{% if (_extra | length) > 0 %}
+
+// Additional options from auto_update_linux_extra_config['unattended-upgrades']
+{% for key, value in _extra.items() %}
+{{ key }} "{{ value }}";
+{% endfor %}
+{% endif %}

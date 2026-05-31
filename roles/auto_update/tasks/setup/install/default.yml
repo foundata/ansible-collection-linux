@@ -34,10 +34,10 @@
   ansible.builtin.copy:
     dest: "{{ item['key'] }}"
     content: |
-      {{ item['value'] }} Managed by Ansible (foundata.linux.run)
+      {{ item['value'] }} Managed by Ansible (foundata.linux.auto_update)
       {{ item['value'] }}
       {{ item['value'] }} Content intentionally cleared. The original distribution file conflicted
-      {{ item['value'] }} with configuration managed by the foundata.linux.run role.
+      {{ item['value'] }} with configuration managed by the foundata.linux.auto_update role.
       {{ item['value'] }}
       {{ item['value'] }} To restore the original file content, reinstall the owning package:
       {% if (ansible_facts['os_family'] | ansible.builtin.lower) == 'debian' %}
