@@ -117,6 +117,44 @@ __auto_update_linux_systemd_timer_unit_dropin_file_group: "root"
 __auto_update_linux_systemd_timer_unit_dropin_file_mode: "u=rw,g=r,o=r" # 0644
 
 
+### Scheduled reboot timer (used when auto_update_linux_reboot is "scheduled").
+#
+# Unlike the update timer above (a vendor-provided unit we only drop-in), the
+# scheduled reboot uses our own systemd units plus a "reboot if needed" helper
+# script. These are cross-platform (systemd) and therefore not platform-specific.
+
+# Internal default configuration for the reboot timer. User values from
+# auto_update_linux_reboot_timer_settings are merged on top of these in
+# tasks/init.yml. See auto_update_linux_reboot_timer_settings in
+# defaults/main.yml for a detailed description of the structure.
+__auto_update_linux_reboot_timer_settings_defaults:
+  OnCalendar: "*-*-* 04:00:00"
+  RandomizedDelaySec: "30m"
+  Persistent: true
+
+
+# Helper script that checks whether a reboot is required and, if so, reboots.
+# Run out-of-band by the oneshot reboot service below.
+__auto_update_linux_reboot_script_path: "/usr/local/sbin/reboot-if-needed"
+__auto_update_linux_reboot_script_owner: "root"
+__auto_update_linux_reboot_script_group: "root"
+__auto_update_linux_reboot_script_mode: "u=rwx,g=rx,o=rx" # 0755
+
+
+# Role-managed systemd units (full units, not drop-ins) for the scheduled
+# reboot. The service is a oneshot wrapper around the helper script; the timer
+# triggers it on the configured schedule.
+__auto_update_linux_reboot_unit_dir_path: "/etc/systemd/system"
+__auto_update_linux_reboot_unit_file_owner: "root"
+__auto_update_linux_reboot_unit_file_group: "root"
+__auto_update_linux_reboot_unit_file_mode: "u=rw,g=r,o=r" # 0644
+
+__auto_update_linux_reboot_service_unit_name: "auto-update-reboot.service"
+__auto_update_linux_reboot_timer_unit_name: "auto-update-reboot.timer"
+__auto_update_linux_reboot_service_unit_path: "{{ __auto_update_linux_reboot_unit_dir_path }}/{{ __auto_update_linux_reboot_service_unit_name }}"
+__auto_update_linux_reboot_timer_unit_path: "{{ __auto_update_linux_reboot_unit_dir_path }}/{{ __auto_update_linux_reboot_timer_unit_name }}"
+
+
 ### Override defaults of dependencies used by this role (if any).
 
 # nothing right now

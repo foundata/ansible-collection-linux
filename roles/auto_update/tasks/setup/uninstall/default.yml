@@ -25,6 +25,39 @@
     label: "{{ item }}"
 
 
+# Scheduled reboot timer resources (only present when auto_update_linux_reboot
+# was "scheduled"). Disable the timer before removing its unit files to avoid
+# leaving a dangling enablement symlink.
+- name: "Setup | Uninstall | Check whether the scheduled reboot timer unit exists"
+  ansible.builtin.stat:
+    path: "{{ __auto_update_linux_reboot_timer_unit_path }}"
+  register: __auto_update_linux_reboot_timer_unit_stat
+
+
+- name: "Setup | Uninstall | Disable and stop the scheduled reboot timer (if present)"
+  ansible.builtin.systemd_service:
+    name: "{{ __auto_update_linux_reboot_timer_unit_name }}"
+    enabled: false
+    state: "stopped"
+  when:
+    - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
+    - __auto_update_linux_reboot_timer_unit_stat['stat']['exists'] | ansible.builtin.default(false)
+
+
+- name: "Setup | Uninstall | Remove scheduled reboot timer units and helper script"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: "absent"
+  loop:
+    - "{{ __auto_update_linux_reboot_timer_unit_path }}"
+    - "{{ __auto_update_linux_reboot_service_unit_path }}"
+    - "{{ __auto_update_linux_reboot_script_path }}"
+  loop_control:
+    label: "{{ item }}"
+  notify:
+    - "auto_update_linux: systemd daemon-reload"
+
+
 # The dnf automatic.conf and os-update.conf files are owned by their respective
 # packages and are removed together with the package below.
 - name: "Setup | Uninstall | Remove packages"

@@ -1,0 +1,17 @@
+{#-
+  Full systemd timer unit (not a drop-in) for the scheduled "reboot if needed"
+  check. The [Timer] directives come from tpl_reboot_timer_settings (the merged
+  effective settings). Boolean values are rendered as "true"/"false".
+-#}
+# {{ ansible_managed }}
+[Unit]
+Description=Scheduled reboot-if-needed check (foundata.linux.auto_update)
+Documentation=https://foundata.com/en/projects/ansible-collection-linux/
+
+[Timer]
+{% for key, value in (tpl_reboot_timer_settings | default({})).items() %}
+{{ key }}={{ value | ternary('true', 'false') if value is ansible.builtin.boolean else value }}
+{% endfor %}
+
+[Install]
+WantedBy=timers.target

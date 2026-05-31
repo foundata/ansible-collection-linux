@@ -28,7 +28,7 @@ Unattended-Upgrade::Package-Blacklist {
 };
 {% endif %}
 Unattended-Upgrade::Download-Only "{{ 'true' if auto_update_linux_apply in ['download', 'notify'] else 'false' }}";
-Unattended-Upgrade::Automatic-Reboot "{{ 'true' if auto_update_linux_reboot == 'when-needed' else 'false' }}";
+Unattended-Upgrade::Automatic-Reboot "{{ 'true' if auto_update_linux_reboot == 'immediate' else 'false' }}";
 {% if (auto_update_linux_notify_email | length) > 0 %}
 Unattended-Upgrade::Mail "{{ auto_update_linux_notify_email }}";
 Unattended-Upgrade::MailReport "on-change";

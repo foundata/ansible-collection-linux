@@ -151,29 +151,63 @@ argument_specs:
 
       auto_update_linux_reboot:
         description: |
-          Controls whether the system reboots automatically after unattended updates were
-          applied. Because automatic updates run out-of-band (triggered by a timer, while
-          no Ansible run is active), this reboot is performed by the platform's native
-          mechanism, not by the `foundata.linux.reboot` role. Possible values:
+          Controls whether and when the system reboots automatically after unattended
+          updates. Automatic updates run out-of-band (triggered by a timer, while no
+          Ansible run is active), so any reboot is likewise performed out-of-band and not
+          by the `foundata.linux.reboot` role. Possible values:
 
-          - `never`: Never reboot automatically after updates.
-          - `when-needed`: Reboot automatically only when a reboot is required to apply
-            the updates (e.g., after a kernel, glibc or systemd upgrade).
+          - `never`: Never reboot automatically.
+          - `immediate`: Reboot immediately after the unattended update run, using the
+            platform's native mechanism (`unattended-upgrades` `Automatic-Reboot`,
+            `dnf`/`dnf5` automatic `reboot = when-needed`, `os-update` `REBOOT_CMD=auto`).
+            The timing is uncontrolled: the reboot rides on the update timer and its
+            `RandomizedDelaySec`, so it can happen at an unpredictable moment.
+          - `scheduled`: Reboot at a controlled time via a role-managed systemd timer
+            (`auto-update-reboot.timer`) that runs a "reboot if needed" check on the
+            schedule from `auto_update_linux_reboot_timer_settings`. The platform's native
+            reboot is forced off so the system only reboots in this window.
 
-          Supported on all platforms.
-
-          Note: A `when-needed` reboot happens immediately after the timer-triggered
-          update run. Combined with a `RandomizedDelaySec` in
-          `auto_update_linux_timer_settings`, the reboot therefore occurs at an
-          unpredictable time, which is often unacceptable. If immediate reboots are not
-          acceptable, keep this at `never` and reboot in a controlled way by scheduling
-          the `foundata.linux.reboot` role separately (a dedicated reboot timer that
-          reboots only when needed is planned for that role).
+          Both `immediate` and `scheduled` reboot **only when a reboot is actually
+          required** (e.g. after a kernel, glibc or systemd upgrade); an up-to-date system
+          is never rebooted. Reboots require a systemd-managed host.
         type: "str"
         default: "never"
         choices:
           - "never"
-          - "when-needed"
+          - "immediate"
+          - "scheduled"
+
+      auto_update_linux_reboot_timer_settings:
+        description: |
+          Configuration for the role-managed systemd timer that performs the scheduled
+          "reboot if needed" check. This dictionary controls when that check runs.
+
+          Only effective when `auto_update_linux_reboot` is `scheduled` (and
+          `auto_update_linux_state` is `present` on a systemd-managed host). The settings
+          map to systemd timer unit directives and override the internal defaults (see
+          `__auto_update_linux_reboot_timer_settings_defaults` in `vars/main.yml`).
+
+          Use standard systemd `[Timer]` directives as keys with their corresponding
+          values.
+
+          Dictionary structure:
+
+          - Keys: Standard systemd `[Timer]` directives.
+          - Values: Corresponding configuration values. Common options include:
+            - `OnCalendar`: When the reboot check runs. Defaults to `*-*-* 04:00:00`.
+              Choose a time after the update window so a reboot triggered by updates is
+              picked up in the same night.
+            - `RandomizedDelaySec`: Random delay before execution to spread reboots across
+              systems. Defaults to `30m`.
+            - `Persistent`: Run a missed check at the next boot if the system was powered
+              off. Defaults to `true`.
+
+          Special cases:
+
+          - For boolean values, use `true`/`false` (these will be converted to strings
+            by the role as needed).
+        type: "dict"
+        default: {} # see __auto_update_linux_reboot_timer_settings_defaults in vars/main.yml for the defaults
 
       auto_update_linux_exclude:
         description: |

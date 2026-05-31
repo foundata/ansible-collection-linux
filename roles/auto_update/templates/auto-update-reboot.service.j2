@@ -1,0 +1,9 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Reboot the system if a reboot is required (foundata.linux.auto_update)
+Documentation=https://foundata.com/en/projects/ansible-collection-linux/
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart={{ __auto_update_linux_reboot_script_path }}

@@ -1,0 +1,68 @@
+#!/bin/sh
+# {{ ansible_managed }}
+#
+# reboot-if-needed: reboot the system if (and only if) a reboot is required.
+#
+# Installed and managed by the foundata.linux.auto_update role and run
+# out-of-band by auto-update-reboot.service (triggered by
+# auto-update-reboot.timer) when auto_update_linux_reboot is "scheduled". The
+# detection mirrors the checks used by the foundata.linux.reboot role and
+# handles tool/OS portability internally, so a single script covers all
+# supported platforms.
+
+set -u
+
+__reboot_required='0'
+
+# Debian-like reboot indicator file.
+if [ "${__reboot_required}" != '1' ] \
+    && [ -f '/var/run/reboot-required' ]; then
+    __reboot_required='1'
+fi
+
+# RedHat-like reboot indicator (needs-restarting -r: exit 1 = reboot required).
+if [ "${__reboot_required}" != '1' ] \
+    && command -v 'needs-restarting' >/dev/null 2>&1 \
+    && ! needs-restarting -r >/dev/null 2>&1; then
+    __reboot_required='1'
+fi
+
+# Running kernel differs from the newest installed kernel.
+if [ "${__reboot_required}" != '1' ] \
+    && [ -d '/boot' ]; then
+    __kernel_installed="$(find /boot -maxdepth 1 -name 'vmlinuz-*' -printf '%f\n' 2>/dev/null \
+        | sort -V \
+        | tail -n 1)"
+    __kernel_current="$(uname -r)"
+    if [ -n "${__kernel_installed}" ] \
+        && ! printf '%s' "${__kernel_installed}" | grep -q -F -e "${__kernel_current}"; then
+        __reboot_required='1'
+    fi
+    unset __kernel_installed __kernel_current
+fi
+
+# SELinux mode changed (requires a reboot to apply).
+if [ "${__reboot_required}" != '1' ] \
+    && command -v 'sestatus' >/dev/null 2>&1; then
+    LC_ALL='C'
+    export LC_ALL
+    __selinux_current="$(sestatus 2>/dev/null | grep -i -E 'current.+mode' \
+        | cut -d':' -f2 | tr '[:upper:]' '[:lower:]' \
+        | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    __selinux_config="$(sestatus 2>/dev/null | grep -i -E 'mode.+file' \
+        | cut -d':' -f2 | tr '[:upper:]' '[:lower:]' \
+        | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    if [ -n "${__selinux_current}" ] \
+        && [ -n "${__selinux_config}" ] \
+        && [ "${__selinux_current}" != "${__selinux_config}" ]; then
+        __reboot_required='1'
+    fi
+    unset __selinux_current __selinux_config
+fi
+
+if [ "${__reboot_required}" = '1' ]; then
+    logger -t 'auto-update-reboot' 'Reboot required; scheduling reboot.' 2>/dev/null || true
+    exec shutdown -r +5 'Reboot required after automatic updates (foundata.linux.auto_update)'
+fi
+
+exit 0

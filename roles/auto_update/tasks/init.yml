@@ -140,3 +140,8 @@
         __auto_update_linux_timer_settings_defaults
         | ansible.builtin.combine(auto_update_linux_timer_settings)
       }}
+    __auto_update_linux_effective_reboot_timer_settings: >-
+      {{
+        __auto_update_linux_reboot_timer_settings_defaults
+        | ansible.builtin.combine(auto_update_linux_reboot_timer_settings)
+      }}

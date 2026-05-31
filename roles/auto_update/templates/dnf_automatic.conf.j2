@@ -15,7 +15,7 @@
        'upgrade_type': ('security' if auto_update_linux_type == 'security' else 'default'),
        'download_updates': ('yes' if auto_update_linux_apply in ['install', 'download'] else 'no'),
        'apply_updates': ('yes' if auto_update_linux_apply == 'install' else 'no'),
-       'reboot': auto_update_linux_reboot,
+       'reboot': ('when-needed' if auto_update_linux_reboot == 'immediate' else 'never'),
      },
      'emitters': {
        'emit_via': emit_via,

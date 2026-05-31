@@ -94,7 +94,8 @@
     success_msg: "Found '{{ __testing_needle }}' in '{{ __auto_update_linux_apt_config_file_path }}'."
   loop:
     - "Unattended-Upgrade::Origins-Pattern"
-    - 'Unattended-Upgrade::Automatic-Reboot "true"'
+    # reboot == scheduled forces the backend-native reboot off
+    - 'Unattended-Upgrade::Automatic-Reboot "false"'
     - 'Unattended-Upgrade::Download-Only "false"'
     - '"vim"'
   loop_control:
@@ -123,7 +124,8 @@
     - "upgrade_type = security"
     - "download_updates = yes"
     - "apply_updates = yes"
-    - "reboot = when-needed"
+    # reboot == scheduled forces the backend-native reboot off
+    - "reboot = never"
     - "exclude = vim"
   loop_control:
     loop_var: "__testing_needle"
@@ -149,8 +151,91 @@
     success_msg: "Found '{{ __testing_needle }}' in '{{ __auto_update_linux_osupdate_config_file_path }}'."
   loop:
     - 'UPDATE_CMD="security"'
-    - 'REBOOT_CMD="auto"'
+    # reboot == scheduled forces the backend-native reboot off
+    - 'REBOOT_CMD="none"'
   loop_control:
     loop_var: "__testing_needle"
   when:
     - __auto_update_linux_backend == 'os-update'
+
+
+## Scheduled reboot timer (auto_update_linux_reboot == "scheduled")
+
+- name: "Molecule | Verify | Stat the reboot-if-needed helper script"
+  ansible.builtin.stat:
+    path: "{{ __auto_update_linux_reboot_script_path }}"
+  register: __testing_reboot_script
+
+
+- name: "Molecule | Verify | Assert the reboot-if-needed script exists and is executable (0755)"
+  ansible.builtin.assert:
+    that:
+      - __testing_reboot_script['stat']['exists']
+      - __testing_reboot_script['stat']['mode'] == '0755'
+    fail_msg: "The reboot helper '{{ __auto_update_linux_reboot_script_path }}' is missing or not mode 0755."
+    success_msg: "The reboot helper '{{ __auto_update_linux_reboot_script_path }}' exists and is mode 0755."
+
+
+- name: "Molecule | Verify | Stat the scheduled reboot service and timer units"
+  ansible.builtin.stat:
+    path: "{{ __testing_unit_path }}"
+  loop:
+    - "{{ __auto_update_linux_reboot_service_unit_path }}"
+    - "{{ __auto_update_linux_reboot_timer_unit_path }}"
+  loop_control:
+    loop_var: "__testing_unit_path"
+    label: "{{ __testing_unit_path }}"
+  register: __testing_reboot_units
+
+
+- name: "Molecule | Verify | Assert the scheduled reboot units exist"
+  ansible.builtin.assert:
+    that:
+      - __testing_unit_stat['stat']['exists']
+    fail_msg: "Scheduled reboot unit '{{ __testing_unit_stat['__testing_unit_path'] }}' does not exist."
+    success_msg: "Scheduled reboot unit '{{ __testing_unit_stat['__testing_unit_path'] }}' exists."
+  loop: "{{ __testing_reboot_units['results'] }}"
+  loop_control:
+    loop_var: "__testing_unit_stat"
+    label: "{{ __testing_unit_stat['__testing_unit_path'] }}"
+
+
+- name: "Molecule | Verify | Read the scheduled reboot timer unit content"
+  ansible.builtin.slurp:
+    src: "{{ __auto_update_linux_reboot_timer_unit_path }}"
+  register: __testing_reboot_timer_content
+
+
+- name: "Molecule | Verify | Assert the reboot timer unit contains the configured schedule"
+  ansible.builtin.assert:
+    that:
+      - "__testing_needle in (__testing_reboot_timer_content['content'] | ansible.builtin.b64decode)"
+    fail_msg: "Expected '{{ __testing_needle }}' not found in the reboot timer unit."
+    success_msg: "Found '{{ __testing_needle }}' in the reboot timer unit."
+  loop:
+    - "[Timer]"
+    - "OnCalendar=*-*-* 04:30:00"
+    - "RandomizedDelaySec=45m"
+  loop_control:
+    loop_var: "__testing_needle"
+
+
+- name: "Molecule | Verify | Get enablement state of the scheduled reboot timer"
+  ansible.builtin.command:
+    argv:
+      - "systemctl"
+      - "is-enabled"
+      - "{{ __auto_update_linux_reboot_timer_unit_name }}"
+  register: __testing_reboot_timer_enabled
+  changed_when:
+    - false
+  failed_when:
+    - false
+
+
+- name: "Molecule | Verify | Assert the scheduled reboot timer is enabled"
+  ansible.builtin.assert:
+    that:
+      - "'enabled' in __testing_reboot_timer_enabled['stdout']"
+    fail_msg: "The reboot timer '{{ __auto_update_linux_reboot_timer_unit_name }}' is not enabled (got '{{ __testing_reboot_timer_enabled['stdout'] }}')."
+    success_msg: "The reboot timer '{{ __auto_update_linux_reboot_timer_unit_name }}' is enabled."

@@ -1,11 +1,12 @@
-# Ansible role: `foundata.linux.run`
+# Ansible role: `foundata.linux.auto_update`
 
-The `foundata.linux.run` Ansible role (part of the `foundata.linux` Ansible collection).
+The `foundata.linux.auto_update` Ansible role (part of the `foundata.linux` Ansible collection).
 
 
 
 ## Table of contents<a id="toc"></a>
 
+- [Features](#features)
 - [Example playbooks, using this role](#examples)
 - [Supported tags](#tags)<!-- ANSIBLE DOCSMITH TOC START -->
 - [Role variables](#variables)
@@ -16,6 +17,7 @@ The `foundata.linux.run` Ansible role (part of the `foundata.linux` Ansible coll
   - [`auto_update_linux_apply`](#variable-auto_update_linux_apply)
   - [`auto_update_linux_timer_settings`](#variable-auto_update_linux_timer_settings)
   - [`auto_update_linux_reboot`](#variable-auto_update_linux_reboot)
+  - [`auto_update_linux_reboot_timer_settings`](#variable-auto_update_linux_reboot_timer_settings)
   - [`auto_update_linux_exclude`](#variable-auto_update_linux_exclude)
   - [`auto_update_linux_notify_email`](#variable-auto_update_linux_notify_email)
   - [`auto_update_linux_extra_config`](#variable-auto_update_linux_extra_config)
@@ -29,38 +31,120 @@ The `foundata.linux.run` Ansible role (part of the `foundata.linux` Ansible coll
 
 
 
+## Features<a id="features"></a>
+
+* **Cross-platform, one interface**: configures the native unattended-update mechanism of each platform behind a single set of variables — `unattended-upgrades` (Debian/Ubuntu), `dnf-automatic` / `dnf5-plugin-automatic` (RHEL/Fedora) and `os-update` (openSUSE Leap).
+* **Security-only by default**: [`auto_update_linux_type`](#variable-auto_update_linux_type) defaults to `security`; set it to `all` to apply every available update.
+* **Selectable apply mode**: install, download-only or notify-only via [`auto_update_linux_apply`](#variable-auto_update_linux_apply) (backend support varies; an unsupported mode emits a notice and falls back to `install`).
+* **Controlled schedule**: tune the update timer with standard systemd `[Timer]` directives via [`auto_update_linux_timer_settings`](#variable-auto_update_linux_timer_settings).
+* **Flexible reboot handling** via [`auto_update_linux_reboot`](#variable-auto_update_linux_reboot):
+  * `never`: never reboot automatically.
+  * `immediate`: let the backend reboot right after the update run (only when a reboot is required); timing rides the update timer's randomized delay.
+  * `scheduled`: reboot only when required, at a controlled time, via a role-managed cross-platform systemd reboot timer (see [`auto_update_linux_reboot_timer_settings`](#variable-auto_update_linux_reboot_timer_settings)).
+* **Package hold-backs and notifications**: exclude packages with [`auto_update_linux_exclude`](#variable-auto_update_linux_exclude) and receive reports via [`auto_update_linux_notify_email`](#variable-auto_update_linux_notify_email) (where the backend supports it).
+* **Escape hatch**: pass backend-native settings verbatim through [`auto_update_linux_extra_config`](#variable-auto_update_linux_extra_config).
+* **Idempotent and reversible**: manage the update timer's state with [`auto_update_linux_service_state`](#variable-auto_update_linux_service_state) and revert everything with `auto_update_linux_state: "absent"`.
+
+
+
 ## Example playbooks, using this role<a id="examples"></a>
 
-Installation with automatic upgrade:
+Automatic **security** updates every night, **without** rebooting (safe baseline):
 
 ```yaml
 ---
 
-- name: "Initialize the foundata.linux.run role"
-  hosts: localhost
+- name: "Manage automatic updates"
+  hosts: "all"
   gather_facts: false
   tasks:
 
-    - name: "Trigger invocation of the foundata.linux.run role"
+    - name: "Enable nightly automatic security updates"
       ansible.builtin.include_role:
-        name: "foundata.linux.run"
+        name: "foundata.linux.auto_update"
       vars:
-        auto_update_linux_autoupgrade: true
+        auto_update_linux_type: "security"
+        auto_update_linux_timer_settings:
+          OnCalendar: "*-*-* 02:00:00"
+        auto_update_linux_reboot: "never"
 ```
 
-Uninstall:
+Security updates with a **controlled, cross-platform reboot window** (reboot only when a
+reboot is actually required, at 04:00, regardless of when the update ran):
 
 ```yaml
 ---
 
-- name: "Initialize the foundata.linux.run role"
-  hosts: localhost
+- name: "Manage automatic updates"
+  hosts: "all"
   gather_facts: false
   tasks:
 
-    - name: "Trigger invocation of the foundata.linux.run role"
+    - name: "Automatic security updates with a scheduled reboot window"
       ansible.builtin.include_role:
-        name: "foundata.linux.run"
+        name: "foundata.linux.auto_update"
+      vars:
+        auto_update_linux_type: "security"
+        auto_update_linux_timer_settings:
+          OnCalendar: "*-*-* 02:00:00"
+        auto_update_linux_reboot: "scheduled"
+        auto_update_linux_reboot_timer_settings:
+          OnCalendar: "*-*-* 04:00:00"
+          RandomizedDelaySec: "30m"
+```
+
+**All** updates, **download-only**, with email reports and some packages held back:
+
+```yaml
+---
+
+- name: "Manage automatic updates"
+  hosts: "all"
+  gather_facts: false
+  tasks:
+
+    - name: "Download all updates and report by mail, holding back some packages"
+      ansible.builtin.include_role:
+        name: "foundata.linux.auto_update"
+      vars:
+        auto_update_linux_type: "all"
+        auto_update_linux_apply: "download"
+        auto_update_linux_notify_email: "ops@example.com"
+        auto_update_linux_exclude:
+          - "docker-ce"
+          - "linux-image-*"
+```
+
+Disable automatic updates (keep the mechanism installed, but stop and disable its timer):
+
+```yaml
+---
+
+- name: "Manage automatic updates"
+  hosts: "all"
+  gather_facts: false
+  tasks:
+
+    - name: "Disable automatic updates"
+      ansible.builtin.include_role:
+        name: "foundata.linux.auto_update"
+      vars:
+        auto_update_linux_service_state: "disabled"
+```
+
+Uninstall (remove managed configuration, timers and packages):
+
+```yaml
+---
+
+- name: "Manage automatic updates"
+  hosts: "all"
+  gather_facts: false
+  tasks:
+
+    - name: "Remove automatic updates"
+      ansible.builtin.include_role:
+        name: "foundata.linux.auto_update"
       vars:
         auto_update_linux_state: "absent"
 ```
@@ -94,7 +178,8 @@ The following variables can be configured for this role:
 | `auto_update_linux_type` | `str` | No | `"security"` | Selects which kinds of updates are installed automatically. Possible values:<br><br>- `security`: Only security updates are applied. This is the recommended and safest default for unattended operation. - `all`: All available updates are applied […](#variable-auto_update_linux_type) |
 | `auto_update_linux_apply` | `str` | No | `"install"` | Controls what the automatic update mechanism does when updates are available. Possible values:<br><br>- `install`: Download and install updates automatically. - `download`: Only download updates; do not install them. - `notify`: Only check and notify […](#variable-auto_update_linux_apply) |
 | `auto_update_linux_timer_settings` | `dict` | No | `{}` | Configuration for the systemd timer that triggers the automatic update run. This dictionary controls when and how often updates are checked/applied.<br><br>These settings map to systemd timer unit directives and are applied via a drop-in override […](#variable-auto_update_linux_timer_settings) |
-| `auto_update_linux_reboot` | `str` | No | `"never"` | Controls whether the system reboots automatically after unattended updates were applied. Because automatic updates run out-of-band (triggered by a timer, while no Ansible run is active), this reboot is performed by the platform's native mechanism, […](#variable-auto_update_linux_reboot) |
+| `auto_update_linux_reboot` | `str` | No | `"never"` | Controls whether and when the system reboots automatically after unattended updates. Automatic updates run out-of-band (triggered by a timer, while no Ansible run is active), so any reboot is likewise performed out-of-band and not by the […](#variable-auto_update_linux_reboot) |
+| `auto_update_linux_reboot_timer_settings` | `dict` | No | `{}` | Configuration for the role-managed systemd timer that performs the scheduled "reboot if needed" check. This dictionary controls when that check runs.<br><br>Only effective when `auto_update_linux_reboot` is `scheduled` (and `auto_update_linux_state` […](#variable-auto_update_linux_reboot_timer_settings) |
 | `auto_update_linux_exclude` | `list` | No | `[]` | List of package names (or globs/patterns) to hold back from automatic updates.<br><br>Backend support:<br><br>- Debian/Ubuntu (`unattended-upgrades`): Yes. - RHEL/Fedora (`dnf`/`dnf5` automatic): Yes. - openSUSE Leap (`os-update`): No. A notice is […](#variable-auto_update_linux_exclude) |
 | `auto_update_linux_notify_email` | `str` | No | `""` | Email address that should receive automatic update reports. An empty string (the default) disables email notifications.<br><br>Backend support:<br><br>- Debian/Ubuntu (`unattended-upgrades`): Yes. - RHEL/Fedora (`dnf`/`dnf5` automatic): Yes. - […](#variable-auto_update_linux_notify_email) |
 | `auto_update_linux_extra_config` | `dict` | No | `{}` | Additional, backend-native configuration written verbatim into the configuration of the active update mechanism. This is an escape hatch for advanced options not covered by the dedicated parameters above; values set here take precedence over the […](#variable-auto_update_linux_extra_config) |
@@ -265,29 +350,68 @@ Only effective when `auto_update_linux_state` is `present` and
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Controls whether the system reboots automatically after unattended updates were
-applied. Because automatic updates run out-of-band (triggered by a timer, while
-no Ansible run is active), this reboot is performed by the platform's native
-mechanism, not by the `foundata.linux.reboot` role. Possible values:
+Controls whether and when the system reboots automatically after unattended
+updates. Automatic updates run out-of-band (triggered by a timer, while no
+Ansible run is active), so any reboot is likewise performed out-of-band and not
+by the `foundata.linux.reboot` role. Possible values:
 
-- `never`: Never reboot automatically after updates.
-- `when-needed`: Reboot automatically only when a reboot is required to apply
-  the updates (e.g., after a kernel, glibc or systemd upgrade).
+- `never`: Never reboot automatically.
+- `immediate`: Reboot immediately after the unattended update run, using the
+  platform's native mechanism (`unattended-upgrades` `Automatic-Reboot`,
+  `dnf`/`dnf5` automatic `reboot = when-needed`, `os-update` `REBOOT_CMD=auto`).
+  The timing is uncontrolled: the reboot rides on the update timer and its
+  `RandomizedDelaySec`, so it can happen at an unpredictable moment.
+- `scheduled`: Reboot at a controlled time via a role-managed systemd timer
+  (`auto-update-reboot.timer`) that runs a "reboot if needed" check on the
+  schedule from `auto_update_linux_reboot_timer_settings`. The platform's native
+  reboot is forced off so the system only reboots in this window.
 
-Supported on all platforms.
-
-Note: A `when-needed` reboot happens immediately after the timer-triggered
-update run. Combined with a `RandomizedDelaySec` in
-`auto_update_linux_timer_settings`, the reboot therefore occurs at an
-unpredictable time, which is often unacceptable. If immediate reboots are not
-acceptable, keep this at `never` and reboot in a controlled way by scheduling
-the `foundata.linux.reboot` role separately (a dedicated reboot timer that
-reboots only when needed is planned for that role).
+Both `immediate` and `scheduled` reboot **only when a reboot is actually
+required** (e.g. after a kernel, glibc or systemd upgrade); an up-to-date system
+is never rebooted. Reboots require a systemd-managed host.
 
 - **Type**: `str`
 - **Required**: No
 - **Default**: `"never"`
-- **Choices**: `never`, `when-needed`
+- **Choices**: `never`, `immediate`, `scheduled`
+
+
+
+### `auto_update_linux_reboot_timer_settings`<a id="variable-auto_update_linux_reboot_timer_settings"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+Configuration for the role-managed systemd timer that performs the scheduled
+"reboot if needed" check. This dictionary controls when that check runs.
+
+Only effective when `auto_update_linux_reboot` is `scheduled` (and
+`auto_update_linux_state` is `present` on a systemd-managed host). The settings
+map to systemd timer unit directives and override the internal defaults (see
+`__auto_update_linux_reboot_timer_settings_defaults` in `vars/main.yml`).
+
+Use standard systemd `[Timer]` directives as keys with their corresponding
+values.
+
+Dictionary structure:
+
+- Keys: Standard systemd `[Timer]` directives.
+- Values: Corresponding configuration values. Common options include:
+  - `OnCalendar`: When the reboot check runs. Defaults to `*-*-* 04:00:00`.
+    Choose a time after the update window so a reboot triggered by updates is
+    picked up in the same night.
+  - `RandomizedDelaySec`: Random delay before execution to spread reboots across
+    systems. Defaults to `30m`.
+  - `Persistent`: Run a missed check at the next boot if the system was powered
+    off. Defaults to `true`.
+
+Special cases:
+
+- For boolean values, use `true`/`false` (these will be converted to strings
+  by the role as needed).
+
+- **Type**: `dict`
+- **Required**: No
+- **Default**: `{}`
 
 
 
