@@ -1,9 +1,10 @@
 # Services and daemons: Manage their state, configure, or create them.
-#
+
+---
+
 # The "service" managed here is the systemd timer that triggers the unattended
 # update run. Its unit name is platform-specific (see vars/<platform>.yml).
 
----
 
 - name: "Service | Default | Apply pending systemd changes before managing the timer"
   ansible.builtin.meta: "flush_handlers"
