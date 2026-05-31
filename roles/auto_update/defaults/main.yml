@@ -39,8 +39,16 @@ auto_update_linux_autoupgrade: false
 # status applies to all services if multiple are being managed by this role.
 auto_update_linux_service_state: "enabled"
 
+auto_update_linux_type: "security"
 
-# FIXME Description of a very important example parameter. Do not forget to
-#       update meta/argument_specs.yml if you add new parameters.
-#
-# auto_update_linux_example_parameter_variable: true
+auto_update_linux_apply: "install"
+
+auto_update_linux_timer_settings: {}
+
+auto_update_linux_reboot: "never"
+
+auto_update_linux_exclude: []
+
+auto_update_linux_notify_email: ""
+
+auto_update_linux_extra_config: {}
