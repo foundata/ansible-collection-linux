@@ -3,7 +3,7 @@
 ---
 
 galaxy_info:
-  description: "foundata.linux run role"
+  description: "foundata.linux.reboot role"
   license: "GPL-3.0-or-later" # See https://spdx.org/licenses/ for valid IDs and syntax.
   author: "Andreas Haerter <ah@foundata.com>"
   company: "foundata GmbH"
