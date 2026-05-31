@@ -1,0 +1,37 @@
+# Execute the collection role "auto_update" against all driver-created instances.
+
+- name: "Molecule | Converge | Store auto_update_linux_* role parameters in __testing_state"
+  ansible.builtin.include_tasks:
+    file: "../tasks/state_update.yml"
+  vars:
+    __testing_state_update:
+      auto_update_linux_type: "security"
+      auto_update_linux_apply: "install"
+      auto_update_linux_reboot: "when-needed"
+      auto_update_linux_service_state: "enabled"
+      auto_update_linux_timer_settings:
+        OnCalendar: "*-*-* 03:30:00"
+        RandomizedDelaySec: "30m"
+      auto_update_linux_exclude:
+        - "vim"
+
+
+- name: "Molecule | Converge | Set auto_update_linux_* parameters as facts from __testing_state"
+  ansible.builtin.set_fact:
+    "{{ item['key'] }}": "{{ item['value'] }}"
+  loop: >-
+    {{
+      (__testing_state | ansible.builtin.default({}, true))
+      | ansible.builtin.dict2items
+      | ansible.builtin.selectattr('key', 'match', '^auto_update_linux_')
+      | ansible.builtin.list
+    }}
+
+
+- name: "Molecule | Converge | Include the foundata.linux.auto_update role"
+  ansible.builtin.include_role:
+    name: "foundata.linux.auto_update"
+  # vars: All auto_update_linux_* variables are set as facts and passed this way
+  #       to the role. This enables persisting the values in __testing_state and
+  #       restoring them in later stages (e.g. verify) without manually
+  #       duplicating data across playbooks.

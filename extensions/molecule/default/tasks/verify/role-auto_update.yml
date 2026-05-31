@@ -1,0 +1,156 @@
+# Check collection role "auto_update" outcomes.
+
+- name: "Molecule | Verify | Set auto_update_linux_* and __testing_* parameters as facts from __testing_state"
+  ansible.builtin.set_fact:
+    "{{ item['key'] }}": "{{ item['value'] }}"
+  loop: >-
+    {{
+      (__testing_state | ansible.builtin.default({}, true))
+      | ansible.builtin.dict2items
+      | ansible.builtin.selectattr('key', 'match', '^(auto_update_linux_|__testing_)')
+      | ansible.builtin.list
+    }}
+
+
+- name: "Molecule | Verify | Initialize the foundata.linux.auto_update role (expose internal variables without running it)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.auto_update"
+    tasks_from: "init"
+    public: true
+
+
+## systemd timer drop-in
+
+- name: "Molecule | Verify | Check if the systemd timer drop-in file exists"
+  ansible.builtin.stat:
+    path: "{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}"
+  register: __testing_timer_dropin
+
+
+- name: "Molecule | Verify | Assert the systemd timer drop-in file exists"
+  ansible.builtin.assert:
+    that:
+      - __testing_timer_dropin['stat']['exists']
+    fail_msg: "The systemd timer drop-in '{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}' does not exist."
+    success_msg: "The systemd timer drop-in '{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}' exists."
+
+
+- name: "Molecule | Verify | Read the systemd timer drop-in file content"
+  ansible.builtin.slurp:
+    src: "{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}"
+  register: __testing_timer_dropin_content
+
+
+- name: "Molecule | Verify | Assert the timer drop-in contains the configured schedule"
+  ansible.builtin.assert:
+    that:
+      - "__testing_needle in (__testing_timer_dropin_content['content'] | ansible.builtin.b64decode)"
+    fail_msg: "Expected '{{ __testing_needle }}' not found in the timer drop-in file."
+    success_msg: "Found '{{ __testing_needle }}' in the timer drop-in file."
+  loop:
+    - "[Timer]"
+    - "OnCalendar=*-*-* 03:30:00"
+    - "RandomizedDelaySec=30m"
+  loop_control:
+    loop_var: "__testing_needle"
+
+
+- name: "Molecule | Verify | Get enablement state of the automatic update timer"
+  ansible.builtin.command:
+    argv:
+      - "systemctl"
+      - "is-enabled"
+      - "{{ __auto_update_linux_systemd_timer_unit_name }}"
+  register: __testing_timer_enabled
+  changed_when:
+    - false
+  failed_when:
+    - false
+
+
+- name: "Molecule | Verify | Assert the automatic update timer is enabled"
+  ansible.builtin.assert:
+    that:
+      - "'enabled' in __testing_timer_enabled['stdout']"
+    fail_msg: "The timer '{{ __auto_update_linux_systemd_timer_unit_name }}' is not enabled (is-enabled returned '{{ __testing_timer_enabled['stdout'] }}')."
+    success_msg: "The timer '{{ __auto_update_linux_systemd_timer_unit_name }}' is enabled."
+
+
+## Backend configuration: unattended-upgrades (Debian/Ubuntu)
+
+- name: "Molecule | Verify | unattended-upgrades | Read the managed configuration file"
+  ansible.builtin.slurp:
+    src: "{{ __auto_update_linux_apt_config_file_path }}"
+  register: __testing_apt_config
+  when:
+    - __auto_update_linux_backend == 'unattended-upgrades'
+
+
+- name: "Molecule | Verify | unattended-upgrades | Assert the configuration contains the expected settings"
+  ansible.builtin.assert:
+    that:
+      - "__testing_needle in (__testing_apt_config['content'] | ansible.builtin.b64decode)"
+    fail_msg: "Expected '{{ __testing_needle }}' not found in '{{ __auto_update_linux_apt_config_file_path }}'."
+    success_msg: "Found '{{ __testing_needle }}' in '{{ __auto_update_linux_apt_config_file_path }}'."
+  loop:
+    - "Unattended-Upgrade::Origins-Pattern"
+    - 'Unattended-Upgrade::Automatic-Reboot "true"'
+    - 'Unattended-Upgrade::Download-Only "false"'
+    - '"vim"'
+  loop_control:
+    loop_var: "__testing_needle"
+  when:
+    - __auto_update_linux_backend == 'unattended-upgrades'
+
+
+## Backend configuration: dnf / dnf5 automatic (RHEL/Fedora)
+
+- name: "Molecule | Verify | dnf-automatic | Read the managed configuration file"
+  ansible.builtin.slurp:
+    src: "{{ __auto_update_linux_dnf_config_file_path }}"
+  register: __testing_dnf_config
+  when:
+    - __auto_update_linux_backend == 'dnf-automatic'
+
+
+- name: "Molecule | Verify | dnf-automatic | Assert the configuration contains the expected settings"
+  ansible.builtin.assert:
+    that:
+      - "__testing_needle in (__testing_dnf_config['content'] | ansible.builtin.b64decode)"
+    fail_msg: "Expected '{{ __testing_needle }}' not found in '{{ __auto_update_linux_dnf_config_file_path }}'."
+    success_msg: "Found '{{ __testing_needle }}' in '{{ __auto_update_linux_dnf_config_file_path }}'."
+  loop:
+    - "upgrade_type = security"
+    - "download_updates = yes"
+    - "apply_updates = yes"
+    - "reboot = when-needed"
+    - "exclude = vim"
+  loop_control:
+    loop_var: "__testing_needle"
+  when:
+    - __auto_update_linux_backend == 'dnf-automatic'
+
+
+## Backend configuration: os-update (openSUSE Leap)
+
+- name: "Molecule | Verify | os-update | Read the managed configuration file"
+  ansible.builtin.slurp:
+    src: "{{ __auto_update_linux_osupdate_config_file_path }}"
+  register: __testing_osupdate_config
+  when:
+    - __auto_update_linux_backend == 'os-update'
+
+
+- name: "Molecule | Verify | os-update | Assert the configuration contains the expected settings"
+  ansible.builtin.assert:
+    that:
+      - "__testing_needle in (__testing_osupdate_config['content'] | ansible.builtin.b64decode)"
+    fail_msg: "Expected '{{ __testing_needle }}' not found in '{{ __auto_update_linux_osupdate_config_file_path }}'."
+    success_msg: "Found '{{ __testing_needle }}' in '{{ __auto_update_linux_osupdate_config_file_path }}'."
+  loop:
+    - 'UPDATE_CMD="security"'
+    - 'REBOOT_CMD="auto"'
+  loop_control:
+    loop_var: "__testing_needle"
+  when:
+    - __auto_update_linux_backend == 'os-update'
