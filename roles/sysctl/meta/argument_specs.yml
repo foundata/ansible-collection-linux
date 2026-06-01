@@ -115,7 +115,9 @@ argument_specs:
           ```yaml
           sysctl_linux_profile: "database"
           sysctl_linux_parameters:
-            "vm.swappiness": 1  # override database profile default
+            "vm.swappiness": 1  # override profile default with another value
+            "vm.min_free_kbytes": null  # override profile default, do not manage and use kernel default
+            "net.ipv4.ip_forward": 1 # additional parameter not handled by the profile at all
           ```
         type: "dict"
         required: true

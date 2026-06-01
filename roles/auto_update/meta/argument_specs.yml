@@ -192,7 +192,7 @@ argument_specs:
           - Keys: Standard systemd `[Timer]` directives.
           - Values: Corresponding configuration values. Common options include:
             - `OnCalendar`: When the reboot check runs. Defaults to `*-*-* 04:00:00`
-              (every day at 04:00 am). Choose a time after the update window so a
+              (every day at 04:00 AM). Choose a time after the update window so a
               reboot triggered by updates is picked up on the same day.
             - `RandomizedDelaySec`: Random delay before execution to spread reboots
               across systems. Defaults to `30m`.

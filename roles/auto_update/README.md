@@ -34,22 +34,17 @@ The `foundata.linux.auto_update` Ansible role (part of the `foundata.linux` Ansi
 ## Features<a id="features"></a>
 
 * **Cross-platform, one interface**: configures the native unattended-update mechanism of each platform behind a single set of variables — `unattended-upgrades` (Debian/Ubuntu), `dnf-automatic` / `dnf5-plugin-automatic` (RHEL/Fedora) and `os-update` (openSUSE Leap).
-* **Security-only by default**: [`auto_update_linux_type`](#variable-auto_update_linux_type) defaults to `security`; set it to `all` to apply every available update.
 * **Selectable apply mode**: install, download-only or notify-only via [`auto_update_linux_apply`](#variable-auto_update_linux_apply) (backend support varies; an unsupported mode emits a notice and falls back to `install`).
 * **Controlled schedule**: tune the update timer with standard systemd `[Timer]` directives via [`auto_update_linux_timer_settings`](#variable-auto_update_linux_timer_settings).
 * **Flexible reboot handling** via [`auto_update_linux_reboot`](#variable-auto_update_linux_reboot):
   * `never`: never reboot automatically.
   * `immediate`: let the backend reboot right after the update run (only when a reboot is required); timing rides the update timer's randomized delay.
   * `scheduled`: reboot only when required, at a controlled time, via a role-managed cross-platform systemd reboot timer (see [`auto_update_linux_reboot_timer_settings`](#variable-auto_update_linux_reboot_timer_settings)).
-* **Package hold-backs and notifications**: exclude packages with [`auto_update_linux_exclude`](#variable-auto_update_linux_exclude) and receive reports via [`auto_update_linux_notify_email`](#variable-auto_update_linux_notify_email) (where the backend supports it).
-* **Escape hatch**: pass backend-native settings verbatim through [`auto_update_linux_extra_config`](#variable-auto_update_linux_extra_config).
-* **Idempotent and reversible**: manage the update timer's state with [`auto_update_linux_service_state`](#variable-auto_update_linux_service_state) and revert everything with `auto_update_linux_state: "absent"`.
-
 
 
 ## Example playbooks, using this role<a id="examples"></a>
 
-Automatic **security** updates every night, **without** rebooting (safe baseline):
+Automatic security updates every night, without rebooting (safe operations baseline):
 
 ```yaml
 ---
@@ -69,8 +64,7 @@ Automatic **security** updates every night, **without** rebooting (safe baseline
         auto_update_linux_reboot: "never"
 ```
 
-Security updates with a **controlled, cross-platform reboot window** (reboot only when a
-reboot is actually required, at 04:00, regardless of when the update ran):
+Security updates with a controlled, cross-platform reboot window (reboot only when a reboot is actually required, at 04:00 AM, regardless of when the update ran):
 
 ```yaml
 ---
@@ -86,14 +80,14 @@ reboot is actually required, at 04:00, regardless of when the update ran):
       vars:
         auto_update_linux_type: "security"
         auto_update_linux_timer_settings:
-          OnCalendar: "*-*-* 02:00:00"
+          OnCalendar: "*-*-* 00/6:00:00" # check and install every 6 hours
         auto_update_linux_reboot: "scheduled"
         auto_update_linux_reboot_timer_settings:
           OnCalendar: "*-*-* 04:00:00"
           RandomizedDelaySec: "30m"
 ```
 
-**All** updates, **download-only**, with email reports and some packages held back:
+All updates, download-only, with email reports (needs a configured MTA, [foundata.postfix.run](https://foundata.com/en/projects/ansible-collection-postfix/) may help) and some packages held back:
 
 ```yaml
 ---
@@ -394,7 +388,7 @@ Dictionary structure:
 - Keys: Standard systemd `[Timer]` directives.
 - Values: Corresponding configuration values. Common options include:
   - `OnCalendar`: When the reboot check runs. Defaults to `*-*-* 04:00:00`
-    (every day at 04:00 am). Choose a time after the update window so a
+    (every day at 04:00 AM). Choose a time after the update window so a
     reboot triggered by updates is picked up on the same day.
   - `RandomizedDelaySec`: Random delay before execution to spread reboots
     across systems. Defaults to `30m`.

@@ -62,25 +62,6 @@ Set custom kernel parameters:
           "vm.swappiness": 10
 ```
 
-
-Remove a parameter (and use kernel defaults afterwards)
-
-```yaml
----
-
-- name: "Remove specific sysctl parameter"
-  hosts: "all"
-  tasks:
-
-    - name: "Remove vm.swappiness from managed configuration"
-      ansible.builtin.include_role:
-        name: "foundata.linux.sysctl"
-      vars:
-        sysctl_linux_parameters:
-          "vm.swappiness": null
-```
-
-
 Use a profile for workload-specific tuning:
 
 ```yaml
