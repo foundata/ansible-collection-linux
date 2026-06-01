@@ -137,7 +137,8 @@
   # dedicated Ansible module or fact as an improvement.
   ansible.builtin.shell:
     cmd: |
-      set -u
+      set -u          # no uninitialized vars
+      set -o pipefail # exit on pipeline errors
       __reboot_required='0'
 
       # Check Debian-like OS reboot indicator file
@@ -160,7 +161,7 @@
         if [ -d '/boot' ]; then
           __kernel_installed="$(
             find /boot -maxdepth 1 -name 'vmlinuz-*' -printf '%f\n' \
-            | ansible.builtin.sort -V \
+            | sort -V \
             | tail -n 1
           )"
         fi

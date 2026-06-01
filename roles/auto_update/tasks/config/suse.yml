@@ -5,8 +5,7 @@
 - name: "Config | SUSE | Notice: options not supported by os-update are ignored"
   ansible.builtin.debug:
     msg: >-
-      os-update does not support the following requested option(s); they are
-      ignored on openSUSE Leap:
+      The os-update backuend does not support the following requested option(s):
       {{
         ((['auto_update_linux_apply=' ~ auto_update_linux_apply ~ ' (only install is supported)']
           if auto_update_linux_apply != 'install' else [])

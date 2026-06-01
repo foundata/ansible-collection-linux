@@ -174,15 +174,15 @@ The following variables can be configured for this role:
 |----------|------|----------|---------|------------------------|
 | `auto_update_linux_state` | `str` | No | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-auto_update_linux_state) |
 | `auto_update_linux_autoupgrade` | `bool` | No | `false` | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one).<br><br>Note: This only affects the packages that provide the automatic update […](#variable-auto_update_linux_autoupgrade) |
-| `auto_update_linux_service_state` | `str` | No | `"enabled"` | Defines the status of the service(s) the role needs on the target platform to perform automatic updates. On all currently supported platforms this is just a single systemd timer (such as `apt-daily-upgrade.timer`, `dnf-automatic.timer`, […](#variable-auto_update_linux_service_state) |
-| `auto_update_linux_type` | `str` | No | `"security"` | Selects which kinds of updates are installed automatically. Possible values:<br><br>- `security`: Only security updates are applied. This is the recommended and safest default for unattended operation. - `all`: All available updates are applied […](#variable-auto_update_linux_type) |
-| `auto_update_linux_apply` | `str` | No | `"install"` | Controls what the automatic update mechanism does when updates are available. Possible values:<br><br>- `install`: Download and install updates automatically. - `download`: Only download updates; do not install them. - `notify`: Only check and notify […](#variable-auto_update_linux_apply) |
+| `auto_update_linux_service_state` | `str` | No | `"enabled"` | Defines the status of the service(s).<br><br>`enabled`: Service is running and will start automatically at boot.<br><br>`disabled`: Service is stopped and will not start automatically at boot.<br><br>`running` Service is running but will not start […](#variable-auto_update_linux_service_state) |
+| `auto_update_linux_type` | `str` | No | `"security"` | Selects which kinds of updates are installed automatically. Possible values:<br><br>- `security`: Only security updates are applied. This is the default and safest for unattended operation. - `all`: All available updates are applied (security and […](#variable-auto_update_linux_type) |
+| `auto_update_linux_apply` | `str` | No | `"install"` | Controls what the automatic update mechanism does when new updates are available. Possible values:<br><br>- `install`: Download and install updates automatically. - `download`: Only download updates; do not install them. - `notify`: Only check and […](#variable-auto_update_linux_apply) |
 | `auto_update_linux_timer_settings` | `dict` | No | `{}` | Configuration for the systemd timer that triggers the automatic update run. This dictionary controls when and how often updates are checked/applied.<br><br>These settings map to systemd timer unit directives and are applied via a drop-in override […](#variable-auto_update_linux_timer_settings) |
-| `auto_update_linux_reboot` | `str` | No | `"never"` | Controls whether and when the system reboots automatically after unattended updates. Automatic updates run out-of-band (triggered by a timer, while no Ansible run is active), so any reboot is likewise performed out-of-band and not by the […](#variable-auto_update_linux_reboot) |
-| `auto_update_linux_reboot_timer_settings` | `dict` | No | `{}` | Configuration for the role-managed systemd timer that performs the scheduled "reboot if needed" check. This dictionary controls when that check runs.<br><br>Only effective when `auto_update_linux_reboot` is `scheduled` (and `auto_update_linux_state` […](#variable-auto_update_linux_reboot_timer_settings) |
-| `auto_update_linux_exclude` | `list` | No | `[]` | List of package names (or globs/patterns) to hold back from automatic updates.<br><br>Backend support:<br><br>- Debian/Ubuntu (`unattended-upgrades`): Yes. - RHEL/Fedora (`dnf`/`dnf5` automatic): Yes. - openSUSE Leap (`os-update`): No. A notice is […](#variable-auto_update_linux_exclude) |
+| `auto_update_linux_reboot` | `str` | No | `"never"` | Controls whether and when the system reboots automatically after unattended updates. Automatic updates run out-of-band (triggered by a timer, while no Ansible run is active) and require a systemd-managed host. Possible values:<br><br>- `never`: Never […](#variable-auto_update_linux_reboot) |
+| `auto_update_linux_reboot_timer_settings` | `dict` | No | `{}` | Configuration for the role-managed systemd timer that performs the scheduled "reboot if needed" check. This dictionary controls when that check runs.<br><br>Only effective when `auto_update_linux_reboot` is set to `scheduled`. The settings map to […](#variable-auto_update_linux_reboot_timer_settings) |
+| `auto_update_linux_exclude` | `list` | No | `[]` | List of package names (or globs/patterns) to hold back from automatic updates.<br><br>Backend support:<br><br>- Debian/Ubuntu (`unattended-upgrades`): Yes. - RHEL/Fedora (`dnf`/`dnf5` automatic): Yes. - openSUSE Leap (`os-update`): No. The role emits […](#variable-auto_update_linux_exclude) |
 | `auto_update_linux_notify_email` | `str` | No | `""` | Email address that should receive automatic update reports. An empty string (the default) disables email notifications.<br><br>Backend support:<br><br>- Debian/Ubuntu (`unattended-upgrades`): Yes. - RHEL/Fedora (`dnf`/`dnf5` automatic): Yes. - […](#variable-auto_update_linux_notify_email) |
-| `auto_update_linux_extra_config` | `dict` | No | `{}` | Additional, backend-native configuration written verbatim into the configuration of the active update mechanism. This is an escape hatch for advanced options not covered by the dedicated parameters above; values set here take precedence over the […](#variable-auto_update_linux_extra_config) |
+| `auto_update_linux_extra_config` | `dict` | No | `{}` | Additional, backend-native configuration written verbatim into the configuration of the active update mechanism. This is an escape hatch for advanced options not covered by the dedicated parameters above and should only by used if there is no other […](#variable-auto_update_linux_extra_config) |
 
 ### `auto_update_linux_state`<a id="variable-auto_update_linux_state"></a>
 
@@ -227,30 +227,30 @@ updates applied to the rest of the system; those are governed by
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Defines the status of the service(s) the role needs on the target platform to
-perform automatic updates. On all currently supported platforms this is just a
-single systemd timer (such as `apt-daily-upgrade.timer`, `dnf-automatic.timer`,
-`dnf5-automatic.timer` or `os-update.timer`) that periodically triggers the
-unattended update run. The term "service" is used generically and also covers
-such timer units.
+Defines the status of the service(s).
 
-Possible values:
+`enabled`: Service is running and will start automatically at boot.
 
-- `enabled`: Service is running and will start automatically at boot.
-- `disabled`: Service is stopped and will not start automatically at boot.
-- `running`: Service is running but will not start automatically at boot.
-  This can be used to start a service on the first Ansible run without
-  enabling it for boot.
-- `unmanaged`: Service will not start at boot, and Ansible will not
-  manage its running state. This is primarily useful when services are
-  monitored and managed by systems other than Ansible.
+`disabled`: Service is stopped and will not start automatically at boot.
 
-The singular form ("service") is used for simplicity. However, the defined
+`running` Service is running but will not start automatically at boot.
+This can be used to start a service on the first Ansible run without
+enabling it for boot.
+
+`unmanaged`: Service will not start at boot, and Ansible will not manage
+its running state. This is primarily useful when services are monitored
+and managed by systems other than Ansible.
+
+The singular form (`service`) is used for simplicity. However, the defined
 status applies to all services if multiple are being managed by this role.
 
-Note: Most platforms ship the relevant timer disabled by default, so `enabled`
-is required for unattended updates to actually take place. Only effective when
-`auto_update_linux_state` is `present`.
+On all currently supported platforms this is currently just a systemd timer
+(such as `apt-daily-upgrade.timer`, `dnf-automatic.timer`, `dnf5-automatic.timer`
+or `os-update.timer`) that periodically triggers the unattended update run.
+The term "service" is used generically and also covers  such timer units.
+Most platforms ship the relevant timer disabled by default, so `enabled` (this
+variable's default value) is required for unattended updates to actually take
+place.
 
 - **Type**: `str`
 - **Required**: No
@@ -265,8 +265,8 @@ is required for unattended updates to actually take place. Only effective when
 
 Selects which kinds of updates are installed automatically. Possible values:
 
-- `security`: Only security updates are applied. This is the recommended and
-  safest default for unattended operation.
+- `security`: Only security updates are applied. This is the default and safest
+   for unattended operation.
 - `all`: All available updates are applied (security and non-security).
 
 Supported on all platforms.
@@ -282,21 +282,20 @@ Supported on all platforms.
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Controls what the automatic update mechanism does when updates are available.
+Controls what the automatic update mechanism does when new updates are available.
 Possible values:
 
 - `install`: Download and install updates automatically.
 - `download`: Only download updates; do not install them.
-- `notify`: Only check and notify (e.g., via email/MOTD); do not download or
-  install.
+- `notify`: Only check and notify (e.g., via email/MOTD), no download, no install.
 
 Backend support:
 
 - Debian/Ubuntu (`unattended-upgrades`): `install` and `download`. `notify` is
   best-effort.
 - RHEL/Fedora (`dnf`/`dnf5` automatic): `install`, `download` and `notify`.
-- openSUSE Leap (`os-update`): `install` only. `download` and `notify` emit a
-  notice and fall back to `install`.
+- openSUSE Leap (`os-update`): `install` only. When set to `download` or `notify`
+  the role emits a notice and falls back to `install`.
 
 - **Type**: `str`
 - **Required**: No
@@ -314,8 +313,8 @@ This dictionary controls when and how often updates are checked/applied.
 
 These settings map to systemd timer unit directives and are applied via a
 drop-in override file. They take highest priority, overriding internal defaults
-(see `__auto_update_linux_timer_settings_defaults` in `vars/main.yml`) and
-platform-specific overrides.
+(see `__auto_update_linux_timer_settings_defaults` in `vars/main.yml` or
+platform-specific overrides in the `vars/` directory).
 
 Use standard systemd `[Timer]` directives as keys with their corresponding
 values.
@@ -326,7 +325,7 @@ Dictionary structure:
 - Values: Corresponding configuration values. Common options include:
   - `OnCalendar`: Defines the schedule on which the update timer is triggered.
     Defaults to `daily`. An (at least) daily schedule is recommended for
-    security updates.
+    security updates. Example for everyday every 6 hours: `*-*-* 00/6:00:00`
   - `RandomizedDelaySec`: Adds a random delay before execution to avoid
     simultaneous runs across systems. Defaults to `60m`.
   - `Persistent`: Ensures missed timer runs are executed at the next boot if
@@ -337,8 +336,7 @@ Special cases:
 - For boolean values, use `true`/`false` (these will be converted to strings
   by the role as needed).
 
-Only effective when `auto_update_linux_state` is `present` and
-`auto_update_linux_service_state` is not `unmanaged`.
+Only effective when `auto_update_linux_service_state` is not `unmanaged`.
 
 - **Type**: `dict`
 - **Required**: No
@@ -352,10 +350,9 @@ Only effective when `auto_update_linux_state` is `present` and
 
 Controls whether and when the system reboots automatically after unattended
 updates. Automatic updates run out-of-band (triggered by a timer, while no
-Ansible run is active), so any reboot is likewise performed out-of-band and not
-by the `foundata.linux.reboot` role. Possible values:
+Ansible run is active) and require a systemd-managed host. Possible values:
 
-- `never`: Never reboot automatically.
+- `never`: Never reboot automatically because of unattended updates.
 - `immediate`: Reboot immediately after the unattended update run, using the
   platform's native mechanism (`unattended-upgrades` `Automatic-Reboot`,
   `dnf`/`dnf5` automatic `reboot = when-needed`, `os-update` `REBOOT_CMD=auto`).
@@ -364,11 +361,12 @@ by the `foundata.linux.reboot` role. Possible values:
 - `scheduled`: Reboot at a controlled time via a role-managed systemd timer
   (`auto-update-reboot.timer`) that runs a "reboot if needed" check on the
   schedule from `auto_update_linux_reboot_timer_settings`. The platform's native
-  reboot is forced off so the system only reboots in this window.
+  reboot is forced off so the system only reboots in the role-managed systemd
+  timer window.
 
-Both `immediate` and `scheduled` reboot **only when a reboot is actually
-required** (e.g. after a kernel, glibc or systemd upgrade); an up-to-date system
-is never rebooted. Reboots require a systemd-managed host.
+Both `immediate` and `scheduled` reboot *only* when a reboot is actually required
+(e.g. after a kernel, glibc or systemd upgrade); an up-to-date system is never
+rebooted.
 
 - **Type**: `str`
 - **Required**: No
@@ -384,10 +382,9 @@ is never rebooted. Reboots require a systemd-managed host.
 Configuration for the role-managed systemd timer that performs the scheduled
 "reboot if needed" check. This dictionary controls when that check runs.
 
-Only effective when `auto_update_linux_reboot` is `scheduled` (and
-`auto_update_linux_state` is `present` on a systemd-managed host). The settings
-map to systemd timer unit directives and override the internal defaults (see
-`__auto_update_linux_reboot_timer_settings_defaults` in `vars/main.yml`).
+Only effective when `auto_update_linux_reboot` is set to `scheduled`. The
+settings map to systemd timer unit directives and override the internal defaults
+(see `__auto_update_linux_reboot_timer_settings_defaults` in `vars/main.yml`).
 
 Use standard systemd `[Timer]` directives as keys with their corresponding
 values.
@@ -396,13 +393,13 @@ Dictionary structure:
 
 - Keys: Standard systemd `[Timer]` directives.
 - Values: Corresponding configuration values. Common options include:
-  - `OnCalendar`: When the reboot check runs. Defaults to `*-*-* 04:00:00`.
-    Choose a time after the update window so a reboot triggered by updates is
-    picked up in the same night.
-  - `RandomizedDelaySec`: Random delay before execution to spread reboots across
-    systems. Defaults to `30m`.
-  - `Persistent`: Run a missed check at the next boot if the system was powered
-    off. Defaults to `true`.
+  - `OnCalendar`: When the reboot check runs. Defaults to `*-*-* 04:00:00`
+    (every day at 04:00 am). Choose a time after the update window so a
+    reboot triggered by updates is picked up on the same day.
+  - `RandomizedDelaySec`: Random delay before execution to spread reboots
+    across systems. Defaults to `30m`.
+  - `Persistent`: Run a missed check at the next boot if the system was
+    powered off (even though . Defaults to `true`.
 
 Special cases:
 
@@ -425,7 +422,7 @@ Backend support:
 
 - Debian/Ubuntu (`unattended-upgrades`): Yes.
 - RHEL/Fedora (`dnf`/`dnf5` automatic): Yes.
-- openSUSE Leap (`os-update`): No. A notice is emitted if the list is non-empty.
+- openSUSE Leap (`os-update`): No. The role emits a notice if the list is non-empty.
 
 Example:
 
@@ -453,10 +450,11 @@ Backend support:
 
 - Debian/Ubuntu (`unattended-upgrades`): Yes.
 - RHEL/Fedora (`dnf`/`dnf5` automatic): Yes.
-- openSUSE Leap (`os-update`): No. A notice is emitted if a value is set.
+- openSUSE Leap (`os-update`): No. The role emits a notice a non-empty value is set.
 
 Note: Sending mail requires a working local mail transport (MTA) on the managed
-host; configuring one is out of scope for this role.
+host; configuring one is out of scope for this role. The foundata.postfix.run role
+may help you with that.
 
 - **Type**: `str`
 - **Required**: No
@@ -470,7 +468,8 @@ host; configuring one is out of scope for this role.
 
 Additional, backend-native configuration written verbatim into the configuration
 of the active update mechanism. This is an escape hatch for advanced options not
-covered by the dedicated parameters above; values set here take precedence over
+covered by the dedicated parameters above and should only by used if there is
+no other way to configure what you need; values set here take precedence over
 the values derived from those parameters.
 
 The dictionary is keyed by backend, so the same variable can carry settings for
@@ -479,15 +478,11 @@ applied; the others are ignored.
 
 Top-level keys (backends):
 
-- `apt`: Debian/Ubuntu (`unattended-upgrades`). A flat dictionary; keys are full
-  apt option names, rendered as `KEY "VALUE";` apt configuration lines.
-- `dnf`: RHEL/Fedora (`dnf`/`dnf5` automatic). A dictionary keyed by
-  `automatic.conf` section name (`commands`, `emitters`, `email`, `base`, …);
-  each value is a flat dictionary of that section's `key: value` pairs.
-- `os_update`: openSUSE Leap (`os-update`). A flat dictionary; keys are os-update
-  variable names, rendered as `KEY="VALUE"` lines in `/etc/os-update.conf`.
+- `unattended-upgrades`: Debian/Ubuntu (using `apt`).
+- `dnf-automatic`: RHEL/Fedora (using `dnf`).
+- `os_update`: openSUSE Leap (using `zypper`).
 
-Example:
+See the option value descriptions for their syntax. Example:
 
 ```yaml
 auto_update_linux_extra_config:
@@ -509,9 +504,8 @@ auto_update_linux_extra_config:
 [*⇑ Back to ToC ⇑*](#toc)
 
 Extra `unattended-upgrades` configuration for Debian/Ubuntu. Flat
-dictionary; keys are full apt option names (e.g.
-`Unattended-Upgrade::MinimalSteps`), rendered verbatim as `KEY "VALUE";`
-lines.
+dictionary; keys are full apt option names (e.g. `Unattended-Upgrade::MinimalSteps`),
+rendered verbatim as `KEY "VALUE";` lines.
 
 - **Type**: `dict`
 - **Required**: No
@@ -522,7 +516,7 @@ lines.
 
 Extra `dnf`/`dnf5` automatic configuration for RHEL/Fedora. Dictionary keyed
 by `/etc/dnf/automatic.conf` section name (`commands`, `emitters`, `email`,
-`base`, …); each value is a flat dictionary of `key: value` pairs for that
+`base`, ...); each value is a flat dictionary of `key: value` pairs for that
 section.
 
 - **Type**: `dict`

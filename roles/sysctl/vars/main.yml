@@ -126,7 +126,6 @@ __sysctl_linux_config_dropin_file_group: "{{ __sysctl_linux_config_file_group }}
 __sysctl_linux_config_dropin_file_mode: "{{ __sysctl_linux_config_file_mode }}"
 
 
-
 # Executable paths
 __sysctl_linux_sysctl_executable: "/usr/sbin/sysctl"
 

@@ -29,7 +29,9 @@ __auto_update_linux_systemd_timer_unit_name: "apt-daily-upgrade.timer"
 #   parameters. See https://wiki.debian.org/PeriodicUpdates for details.
 __auto_update_linux_apt_periodic_file_path: "/etc/apt/apt.conf.d/20auto-upgrades"
 __auto_update_linux_apt_config_file_path: "/etc/apt/apt.conf.d/52unattended-upgrades-local"
-
+__auto_update_linux_apt_config_file_owner: "root"
+__auto_update_linux_apt_config_file_group: "root"
+__auto_update_linux_apt_config_file_mode: "u=rw,g=r,o=r" # 0644
 
 # Origins-Pattern entries for Unattended-Upgrade. The security entries are
 # always used; the "all extra" entries are added when auto_update_linux_type is
