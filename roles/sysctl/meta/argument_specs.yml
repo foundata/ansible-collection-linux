@@ -45,9 +45,9 @@ argument_specs:
         description: |
           Selects a predefined set of kernel parameters optimized for a specific workload.
           Each profile provides tuned values for network, memory, I/O, and security settings.
-          Some values are auto-calculated based on system resources (RAM, CPU cores) to
-          fit the target system. All profiles include security best practices such as
-          source validation, ICMP hardening, and filesystem protections.
+          Some values are auto-calculated based on system resources (RAM, CPU cores) to fit
+          the target system. All profiles include security best practices such as source
+          validation, ICMP hardening, and filesystem protections.
 
           Use `sysctl_linux_parameters` to override any profile value if needed for your
           specific use-case.
@@ -55,27 +55,26 @@ argument_specs:
           Possible values:
 
           - '' (empty string): No tuning applied. Only explicit `sysctl_linux_parameters` are set.
-          - `web`: High connection count and throughput. Recommended for web servers,
-            API gateways, load balancers, reverse proxies.
-            See [`web.md`](../vars/profiles/web.md) for details.
-          - `database`: Memory management, shared memory, low swappiness, I/O tuning.
-            Recommended for PostgreSQL, MySQL, Redis, Elasticsearch.
-            See [`database.md`](../vars/profiles/database.md) for details.
-          - `file`: Network throughput and storage I/O. Recommended for fileservers (NFS,
-            Samba, SFTP) backup targets ad their like. See [`file.md`](../vars/profiles/file.md)
+          - `web`: High connection count and throughput. Recommended for web servers, API
+            gateways, load balancers, reverse proxies.  See [`web.md`](../vars/profiles/web.md)
             for details.
-          - `virtualization`: Memory overcommit, scheduler tuning, storage I/O.
-            Recommended for KVM/QEMU hosts, Proxmox.
-            See [`virtualization.md`](../vars/profiles/virtualization.md) for details.
+          - `database`: Memory management, shared memory, low swappiness, I/O tuning. Recommended
+            for PostgreSQL, MySQL, Redis, Elasticsearch and so on. See
+            [`database.md`](../vars/profiles/database.md) for details.
+          - `file`: Network throughput and storage I/O. Recommended for fileservers (NFS,
+            Samba/CIFS, SFTP) backup targets ad their like. See
+            [`file.md`](../vars/profiles/file.md) for details.
+          - `virtualization`: Memory overcommit, scheduler tuning, storage I/O. Recommended for
+            KVM/QEMU hosts, Proxmox. See [`virtualization.md`](../vars/profiles/virtualization.md)
+            for details.
           - `router`: Connection tracking, neighbor tables, IP forwarding (IPv4 + IPv6).
             Recommended for firewalls, NAT gateways, VPN concentrators.
             See [`router.md`](../vars/profiles/router.md) for details.
-          - `router_v4only`: Like `router` but enables IPv4 forwarding only and
-            explicitly disables IPv6 forwarding.
-            See [`router_v4only.md`](../vars/profiles/router_v4only.md) for details.
-          - `router_v6only`: Like `router` but enables IPv6 forwarding only and
-            explicitly disables IPv4 forwarding.
-            See [`router_v6only.md`](../vars/profiles/router_v6only.md) for details.
+          - `router_v4only`: Like `router` but enables IPv4 forwarding only and explicitly disables
+            IPv6 forwarding. See [`router_v4only.md`](../vars/profiles/router_v4only.md) for
+            details.
+          - `router_v6only`: Like `router` but enables IPv6 forwarding only and explicitly disables
+            IPv4 forwarding. See [`router_v6only.md`](../vars/profiles/router_v6only.md) for details.
         type: "str"
         default: ""
         choices:
@@ -95,12 +94,9 @@ argument_specs:
 
           The drop-in configuration file is fully declarative: any parameter in the
           file that is not present in the effective configuration (profile + this
-          dictionary) will be automatically removed. This ensures the file always
-          reflects exactly what is ansible.builtin.defined in your Ansible configuration.
-
-          To explicitly prevent a profile parameter from being set (e.g., to use the
-          kernel default instead), set its value to `null` or an empty string. This
-          removes the parameter from the managed drop-in configuration file.
+          dictionary) will be automatically removed and the kernel default will be used
+          instead. This ensures the file always reflects exactly what is defined in your
+          Ansible configuration.
 
           These parameters take precedence over any values set by `sysctl_linux_profile`
           (if any). This allows using a profile as a baseline while customizing specific
@@ -110,7 +106,7 @@ argument_specs:
 
           ```yaml
           sysctl_linux_parameters:
-            "net.ipv4.ip_forward": null  # use kernel default, remove from config
+            "net.ipv4.ip_forward": 0
             "vm.swappiness": 5
           ```
 
@@ -126,21 +122,21 @@ argument_specs:
 
       sysctl_linux_reload:
         description: |
-          If set to `true`, triggers `sysctl --system` after configuration changes
-          to reload all sysctl configuration files following the proper precedence
-          order. This ensures all drop-in files and possibly existing other sysctl
-          configuration files not managed by this role are applied consistently.
+          If set to `true`, triggers `sysctl --system` after configuration changes to
+          reload all sysctl configuration files following the proper precedence order.
+          This ensures all drop-in files and possibly existing other sysctl configuration
+          files not managed by this role are applied consistently.
 
-          Set to `false` in container environments where `sysctl --system` may fail
-          due to read-only kernel parameters.
+          Set to `false` in container environments where `sysctl --system` may fail due
+          to read-only kernel parameters.
         type: "bool"
         default: true
 
       sysctl_linux_verify:
         description: |
-          If set to `true`, verifies the parameter value using the sysctl command
-          and actively sets it in the running kernel using `sysctl -w` if the
-          current value differs from the desired one.
+          If set to `true`, verifies the parameter value using the sysctl command and
+          actively sets it in the running kernel using `sysctl -w` if the current value
+          differs from the desired one.
 
           When `false`, only writes the parameter to the configuration file without
           verifying or immediately applying it to the running kernel.
@@ -153,8 +149,8 @@ argument_specs:
           parameter keys. This is useful in container environments where certain
           parameters may not exist or be accessible.
 
-          Generally not recommended for bare-metal or VM deployments where all
-          expected parameters should be available.
+          Generally not recommended for bare-metal or VM deployments where all expected
+          parameters should be available.
         type: "bool"
         default: false
 

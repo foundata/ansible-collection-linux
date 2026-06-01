@@ -11,6 +11,14 @@ Choose a profile for your workload (web server, database, file server, virtualiz
 - [Example playbooks, using this role](#examples)
 - [Supported tags](#tags)<!-- ANSIBLE DOCSMITH TOC START -->
 - [Role variables](#variables)
+  - [`sysctl_linux_state`](#variable-sysctl_linux_state)
+  - [`sysctl_linux_autoupgrade`](#variable-sysctl_linux_autoupgrade)
+  - [`sysctl_linux_profile`](#variable-sysctl_linux_profile)
+  - [`sysctl_linux_parameters`](#variable-sysctl_linux_parameters)
+  - [`sysctl_linux_reload`](#variable-sysctl_linux_reload)
+  - [`sysctl_linux_verify`](#variable-sysctl_linux_verify)
+  - [`sysctl_linux_ignore_unknown_key_errors`](#variable-sysctl_linux_ignore_unknown_key_errors)
+  - [`sysctl_linux_config_dropin_file_name`](#variable-sysctl_linux_config_dropin_file_name)
 <!-- ANSIBLE DOCSMITH TOC END -->
 - [Dependencies](#dependencies)
 - [Compatibility](#compatibility)
@@ -129,11 +137,209 @@ There are also tags usually not meant to be called directly but listed for the s
 
 ## Role variables<a id="variables"></a>
 
-See [`defaults/main.yml`](./defaults/main.yml) for all available role parameters and their description. [`vars/main.yml`](./vars/main.yml) contains internal variables you should not override (but their description might be interesting).
+The following variables can be configured for this role:
 
-Additionally, there are variables read from other roles and/or the global scope (for example, host or group vars) as follows:
+| Variable | Type | Required | Default | Description (abstract) |
+|----------|------|----------|---------|------------------------|
+| `sysctl_linux_state` | `str` | No | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-sysctl_linux_state) |
+| `sysctl_linux_autoupgrade` | `bool` | No | `false` | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
+| `sysctl_linux_profile` | `str` | No | `""` | Selects a predefined set of kernel parameters optimized for a specific workload. Each profile provides tuned values for network, memory, I/O, and security settings. Some values are auto-calculated based on system resources (RAM, CPU cores) to fit the […](#variable-sysctl_linux_profile) |
+| `sysctl_linux_parameters` | `dict` | Yes | N/A | Dictionary of kernel parameters to manage via sysctl. Keys are parameter names (e.g., `net.ipv4.ip_forward`), values are the desired settings.<br><br>The drop-in configuration file is fully declarative: any parameter in the file that is not present […](#variable-sysctl_linux_parameters) |
+| `sysctl_linux_reload` | `bool` | No | `true` | If set to `true`, triggers `sysctl --system` after configuration changes to reload all sysctl configuration files following the proper precedence order. This ensures all drop-in files and possibly existing other sysctl configuration files not managed […](#variable-sysctl_linux_reload) |
+| `sysctl_linux_verify` | `bool` | No | `true` | If set to `true`, verifies the parameter value using the sysctl command and actively sets it in the running kernel using `sysctl -w` if the current value differs from the desired one.<br><br>When `false`, only writes the parameter to the […](#variable-sysctl_linux_verify) |
+| `sysctl_linux_ignore_unknown_key_errors` | `bool` | No | `false` | If set to `true`, ignores errors caused by unknown or unsupported kernel parameter keys. This is useful in container environments where certain parameters may not exist or be accessible.<br><br>Generally not recommended for bare-metal or VM […](#variable-sysctl_linux_ignore_unknown_key_errors) |
+| `sysctl_linux_config_dropin_file_name` | `str` | No | `"90-managed.conf"` | Filename of the drop-in configuration file to be placed in `/etc/sysctl.d/`. Defaults to `90-managed.conf`. The `90-` prefix ensures late loading and thus higher precedence over files with lower-numbered prefixes.<br><br>If a non-default filename is […](#variable-sysctl_linux_config_dropin_file_name) |
 
-- None right now.
+### `sysctl_linux_state`<a id="variable-sysctl_linux_state"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+Determines whether the managed resources should be `present` or `absent`.
+
+`present` ensures that required components, such as software packages, are
+installed and configured.
+
+`absent` reverts changes as much as possible, such as removing packages,
+deleting created users, stopping services, restoring modified settings, …
+
+Note: For this role, the required component and package set is minimal. There
+are no users or services to manage and the components needed to set kernel
+parameter are preinstalled even on hardened systems. They also cannot be
+safely removed due to dependencies, so the role rarely modifies the system
+in this regard.
+
+- **Type**: `str`
+- **Required**: No
+- **Default**: `"present"`
+- **Choices**: `present`, `absent`
+
+
+
+### `sysctl_linux_autoupgrade`<a id="variable-sysctl_linux_autoupgrade"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+If set to `true`, all managed packages will be upgraded during each Ansible
+run (e.g., when the package provider detects a newer version than the
+currently installed one).
+
+- **Type**: `bool`
+- **Required**: No
+- **Default**: `false`
+
+
+
+### `sysctl_linux_profile`<a id="variable-sysctl_linux_profile"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+Selects a predefined set of kernel parameters optimized for a specific workload.
+Each profile provides tuned values for network, memory, I/O, and security settings.
+Some values are auto-calculated based on system resources (RAM, CPU cores) to fit
+the target system. All profiles include security best practices such as source
+validation, ICMP hardening, and filesystem protections.
+
+Use `sysctl_linux_parameters` to override any profile value if needed for your
+specific use-case.
+
+Possible values:
+
+- '' (empty string): No tuning applied. Only explicit `sysctl_linux_parameters` are set.
+- `web`: High connection count and throughput. Recommended for web servers, API
+  gateways, load balancers, reverse proxies.  See [`web.md`](../vars/profiles/web.md)
+  for details.
+- `database`: Memory management, shared memory, low swappiness, I/O tuning. Recommended
+  for PostgreSQL, MySQL, Redis, Elasticsearch and so on. See
+  [`database.md`](../vars/profiles/database.md) for details.
+- `file`: Network throughput and storage I/O. Recommended for fileservers (NFS,
+  Samba/CIFS, SFTP) backup targets ad their like. See
+  [`file.md`](../vars/profiles/file.md) for details.
+- `virtualization`: Memory overcommit, scheduler tuning, storage I/O. Recommended for
+  KVM/QEMU hosts, Proxmox. See [`virtualization.md`](../vars/profiles/virtualization.md)
+  for details.
+- `router`: Connection tracking, neighbor tables, IP forwarding (IPv4 + IPv6).
+  Recommended for firewalls, NAT gateways, VPN concentrators.
+  See [`router.md`](../vars/profiles/router.md) for details.
+- `router_v4only`: Like `router` but enables IPv4 forwarding only and explicitly disables
+  IPv6 forwarding. See [`router_v4only.md`](../vars/profiles/router_v4only.md) for
+  details.
+- `router_v6only`: Like `router` but enables IPv6 forwarding only and explicitly disables
+  IPv4 forwarding. See [`router_v6only.md`](../vars/profiles/router_v6only.md) for details.
+
+- **Type**: `str`
+- **Required**: No
+- **Default**: `""`
+- **Choices**: ``, `web`, `database`, `file`, `virtualization`, `router`, `router_v4only`, `router_v6only`
+
+
+
+### `sysctl_linux_parameters`<a id="variable-sysctl_linux_parameters"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+Dictionary of kernel parameters to manage via sysctl. Keys are parameter
+names (e.g., `net.ipv4.ip_forward`), values are the desired settings.
+
+The drop-in configuration file is fully declarative: any parameter in the
+file that is not present in the effective configuration (profile + this
+dictionary) will be automatically removed and the kernel default will be used
+instead. This ensures the file always reflects exactly what is defined in your
+Ansible configuration.
+
+These parameters take precedence over any values set by `sysctl_linux_profile`
+(if any). This allows using a profile as a baseline while customizing specific
+values.
+
+Example:
+
+```yaml
+sysctl_linux_parameters:
+  "net.ipv4.ip_forward": 0
+  "vm.swappiness": 5
+```
+
+Example overriding a profile value:
+
+```yaml
+sysctl_linux_profile: "database"
+sysctl_linux_parameters:
+  "vm.swappiness": 1  # override database profile default
+```
+
+- **Type**: `dict`
+- **Required**: Yes
+
+
+
+### `sysctl_linux_reload`<a id="variable-sysctl_linux_reload"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+If set to `true`, triggers `sysctl --system` after configuration changes to
+reload all sysctl configuration files following the proper precedence order.
+This ensures all drop-in files and possibly existing other sysctl configuration
+files not managed by this role are applied consistently.
+
+Set to `false` in container environments where `sysctl --system` may fail due
+to read-only kernel parameters.
+
+- **Type**: `bool`
+- **Required**: No
+- **Default**: `true`
+
+
+
+### `sysctl_linux_verify`<a id="variable-sysctl_linux_verify"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+If set to `true`, verifies the parameter value using the sysctl command and
+actively sets it in the running kernel using `sysctl -w` if the current value
+differs from the desired one.
+
+When `false`, only writes the parameter to the configuration file without
+verifying or immediately applying it to the running kernel.
+
+- **Type**: `bool`
+- **Required**: No
+- **Default**: `true`
+
+
+
+### `sysctl_linux_ignore_unknown_key_errors`<a id="variable-sysctl_linux_ignore_unknown_key_errors"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+If set to `true`, ignores errors caused by unknown or unsupported kernel
+parameter keys. This is useful in container environments where certain
+parameters may not exist or be accessible.
+
+Generally not recommended for bare-metal or VM deployments where all expected
+parameters should be available.
+
+- **Type**: `bool`
+- **Required**: No
+- **Default**: `false`
+
+
+
+### `sysctl_linux_config_dropin_file_name`<a id="variable-sysctl_linux_config_dropin_file_name"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+Filename of the drop-in configuration file to be placed in `/etc/sysctl.d/`.
+Defaults to `90-managed.conf`. The `90-` prefix ensures late loading and thus
+higher precedence over files with lower-numbered prefixes.
+
+If a non-default filename is used, any existing `/etc/sysctl.d/90-managed.conf`
+from previous Ansible runs will be removed automatically to prevent conflicts.
+
+- **Type**: `str`
+- **Required**: No
+- **Default**: `"90-managed.conf"`
+
+
+
 
 <!-- ANSIBLE DOCSMITH MAIN END -->
 
