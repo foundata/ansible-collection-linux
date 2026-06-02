@@ -1,0 +1,8 @@
+# Internal role variables specific to: Debian (os_family or distribution)
+#
+# Only values specific to the platform and its functionality should be included
+# here. Variables in this file override those defined in vars/main.yml.
+
+---
+
+# none right now
