@@ -43,6 +43,23 @@ __user_linux_used_facts:
 #     - "all"
 __user_linux_supported_platforms: []
 
+# FIXME description
+__user_linux_account_defaults_builtin:
+  state: "present"
+  comment: ""
+  shell: "/bin/bash"
+  umask: "0027"
+  system: false
+  local: false
+  groups_append: true
+  expires: -1
+  home:
+    create: true
+    move: true
+  password:
+    update: "on_create"
+  ssh_authorized_keys_delete_unmanaged: false
+
 
 ### Override defaults of dependencies used by this role (if any).
 

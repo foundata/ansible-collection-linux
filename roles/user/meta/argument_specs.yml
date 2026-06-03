@@ -7,27 +7,406 @@
 
 argument_specs:
 
-  # foundata.linux/roles/run/tasks/main.yml entry point
+  # foundata.linux/roles/user/tasks/main.yml entry point
   main:
     short_description: "Main entry point for the foundata.linux.user role"
     options:
 
-      user_linux_state:
-        type: "str"
-        required: true
-        choices:
-          - "present"
-          - "absent"
+      user_linux_account_defaults:
+        description: |
+          Default values applied to every entry in `user_linux_accounts` that does not
+          set the corresponding key itself. This avoids repeating common  settings
+          (login shell, umask, ...) on each account.
 
-      user_linux_autoupgrade:
+          The keys mirror the per-account keys of the same name (see
+          `user_linux_accounts`). Any value provided here is overridden by an explicit
+          value on the individual account.
+
+          Only the keys you want to change need to be supplied; they are deep-merged
+          over the role's built-in defaults (see
+          `__user_linux_account_defaults_builtin` in `vars/main.yml`). The
+          effective built-in defaults are:
+
+          ```yaml
+          user_linux_account_defaults:
+            state: "present"
+            comment: ""
+            shell: "/bin/bash"
+            umask: "0027"
+            system: false
+            local: false
+            groups_append: true
+            expires: -1
+            home:
+              create: true
+              move: true
+            password:
+              update: "on_create"
+            ssh_authorized_keys_delete_unmanaged: false
+          ```
+
+          Supported keys are all known by `user_linux_accounts`.
+        type: "dict"
+        default: {} # see __user_linux_account_defaults_builtin in vars/main.yml for the defaults
+
+      user_linux_accounts:
+        description: |
+          List of local user accounts to manage. Each entry describes one account
+          as a dictionary; `name` is mandatory, all other keys are optional and
+          fall back to `user_linux_account_defaults` (where noted) or to the underlying platform defaults.
+
+          This role manages local accounts only (entries in `/etc/passwd`); it never
+          creates or modifies identities in a central directory such as LDAP, Active
+          Directory or FreeIPA.
+
+          To remove an account, set its `state` to `absent`: this deletes the user
+          together with its data (home directory and mail spool). There is intentionally
+          no option to keep the data while deleting the account. To disable login while
+          preserving all data, do not delete the account; you could instead set
+          something like `password['lock']: true` and a non-interactive `shell` like
+          `/usr/sbin/nologin`).
+
+          Example:
+          ```yaml
+          user_linux_accounts:
+            - name: "ahaerter"
+              state: "present"
+              comment: "Andreas Haerter (foundata)"
+              groups:
+                - "{{ __user_linux_admin_group }}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
+              password:
+                hash: "{{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }}"
+                update: "always"
+              ssh_authorized_keys:
+                - key: "ssh-ed25519 AAAAC3Nz..."
+            - name: "obsoleteUserToWipe"
+              state: "absent"
+          ```
+        type: "list"
+        default: []
+        elements: "dict"
+        options:
+
+          name:
+            description: |
+              Login name of the account. Must be unique within `user_linux_accounts`.
+              Use only characters accepted by the platform's `useradd`.
+
+              There is no single universal Linux username regex, but the clearest written
+              rules are in `man useradd`,` `man adduser.conf`, and your local
+              `/etc/adduser.conf` (if existing).
+
+              Typically safe are usernames matching the `^[a-z_][a-z0-9_-]*\$?$` regex:
+              lowercase letters, digits, underscores and hyphens, not starting with a
+              hyphen or digit, no dots).
+            type: "str"
+            required: true
+
+          state:
+            description: |
+              Whether the account should be `present` or `absent`. Setting `absent`
+              deletes the user and its data (home directory and mail spool).
+            type: "str"
+            default: "present"
+            choices:
+              - "present"
+              - "absent"
+
+          uid:
+            description: |
+              Numeric user ID (UID) to assign. If unset, the next free UID in the
+              platform's range is chosen automatically.
+            type: "int"
+
+          comment:
+            description: |
+              GECOS field, usually the full name or a description of the account.
+            type: "str"
+
+          shell:
+            description: |
+              Login shell for the account. Falls back to
+              `user_linux_account_defaults['shell']`.
+            type: "str"
+
+          umask:
+            description: |
+              Umask used when the account's home directory is created. Falls back
+              to `user_linux_account_defaults['umask']`. Octal string, e.g. `0027`.
+            type: "str"
+
+          system:
+            description: |
+              If `true`, create the account as a system account (UID below the
+              `UID_MIN` from `/etc/login.defs`). System accounts are never targeted
+              by `user_linux_accounts_delete_unmanaged`.
+            type: "bool"
+
+          local:
+            description: |
+              If `true`, manage the account in the local files only (using
+              `luseradd`/`lusermod`/`luserdel`), bypassing NSS lookups. Relevant
+              only on hosts whose NSS is backed by a directory (SSSD, LDAP, ...),
+              where it prevents collisions with directory users; ignored otherwise.
+              Passed through to `ansible.builtin.user`.
+            type: "bool"
+
+          seuser:
+            description: |
+              SELinux user mapping for the account (the SELinux user the Linux user
+              is confined to, e.g. `staff_u`). Relevant on SELinux-enforcing
+              platforms (RHEL/Fedora), ignored on others. Passed through to `ansible.builtin.user`.
+            type: "str"
+
+          group:
+            description: |
+              Primary group of the account. If unset, the platform creates a
+              user-private group named after the account.
+            type: "str"
+
+          groups:
+            description: |
+              Supplementary, additional groups the account is a member of. The groups
+              must already exist; declare them either in `user_linux_groups` (which is
+              applied before `user_linux_accounts` automatically) or ensure they are
+              present by other means.
+            type: "list"
+            elements: "str"
+
+          groups_append:
+            description: |
+              If `true`, the supplementary `groups` are added to the account's
+              existing memberships. If `false`, `groups` becomes authoritative and
+              memberships not listed are removed. Falls back to
+              `user_linux_account_defaults['groups_append']`.
+            type: "bool"
+
+          expires:
+            description: |
+              Account expiration date as a UNIX timestamp (seconds since the
+              epoch). After this date the account is disabled. Use `-1` to remove
+              an existing expiration. This is the account expiry (`chage -E`), not
+              password aging (see `password.expire_*`).
+            type: "float"
+
+          home:
+            description: |
+              Home directory settings for the account.
+            type: "dict"
+            options:
+              path:
+                description: |
+                  Absolute path of the home directory. Defaults to the platform's
+                  convention (usually `/home/<name>`).
+                type: "str"
+              create:
+                description: |
+                  Whether to create the home directory for new accounts. Falls back
+                  to `user_linux_account_defaults['home']['create']`.
+                type: "bool"
+              move:
+                description: |
+                  If `true` and `path` differs from the account's current home, the
+                  existing home directory is moved to the new location.
+                type: "bool"
+              skeleton:
+                description: |
+                  Skeleton directory whose contents are copied into a newly created
+                  home directory (defaults to the platform's `/etc/skel`).
+                type: "str"
+
+          password:
+            description: |
+              Password and password-aging settings for the account.
+            type: "dict"
+            options:
+              hash:
+                description: |
+                  Pre-hashed password in crypt format (for example a `$6$...`
+                  SHA-512 hash as produced by `ansible.builtin.password_hash` or
+                  `mkpasswd`). Plain-text passwords are rejected by the role.
+                  FIXE Add links to FAQS and a command example
+                type: "str"
+              lock:
+                description: |
+                  If `true`, lock the account's password (the hash is kept but
+                  login via password is disabled).
+                type: "bool"
+              update:
+                description: |
+                  When the password hash is applied: `on_create` only sets it for
+                  new accounts, `always` enforces it on every run. Falls back to
+                  `user_linux_account_defaults['password']['update']`.
+                type: "str"
+                choices:
+                  - "on_create"
+                  - "always"
+              expire_min:
+                description: |
+                  Minimum number of days between password changes (`chage -m`).
+                type: "int"
+              expire_max:
+                description: |
+                  Maximum number of days a password remains valid (`chage -M`).
+                type: "int"
+              expire_warn:
+                description: |
+                  Number of days of warning before a password expires (`chage -W`).
+                type: "int"
+
+          ssh_authorized_keys:
+            description: |
+              SSH public keys to install in the account's `authorized_keys` file.
+              Each entry is a dictionary with the key itself and optional
+              restrictions.
+
+              Whether keys not listed here are removed is controlled by
+              `ssh_authorized_keys_delete_unmanaged`. When that is `true` (the
+              default) the listed keys are authoritative. As a safety measure, an
+              account with an empty or unset `ssh_authorized_keys` is left
+              untouched, so omitting the key list never wipes an existing
+              `authorized_keys`.
+
+              Example:
+              ```yaml
+              ssh_authorized_keys:
+                - key: "ssh-ed25519 AAAAC3Nz... u1337@foundata.com"
+                - key: "ssh-ed25519 AAAAC3Nz... backup@foundata.com"
+                  options: 'restrict,command="/usr/bin/rrsync -ro /srv/backup",from="10.0.0.0/8"'
+              ```
+            type: "list"
+            elements: "dict"
+            options:
+              key:
+                description: |
+                  A single SSH public key, in the usual `authorized_keys` form
+                  (`<type> <base64> [comment]`).
+                type: "str"
+                required: true
+              options:
+                description: |
+                  Optional OpenSSH `authorized_keys` option string prepended to the
+                  key, restricting how it may be used (for example
+                  `from="10.0.0.0/8"`, `command="..."`, `restrict`,
+                  `expiry-time="..."`). See the `AUTHORIZED_KEYS FILE FORMAT`
+                  section of `man sshd` for the full list.
+                type: "str"
+              state:
+                description: |
+                  Whether the key should be `present` or `absent`. Only meaningful
+                  when `ssh_authorized_keys_delete_unmanaged` is `false` (otherwise
+                  unlisted keys are removed regardless).
+                type: "str"
+                default: "present"
+                choices:
+                  - "present"
+                  - "absent"
+
+          ssh_authorized_keys_delete_unmanaged:
+            description: |
+              If `true`, the account's `authorized_keys` is managed
+              authoritatively: keys not present in `ssh_authorized_keys` are
+              removed. If `false`, listed keys are ensured present but other keys
+              are left in place. Falls back to
+              `user_linux_account_defaults['ssh_authorized_keys_delete_unmanaged']`.
+            type: "bool"
+
+      user_linux_groups:
+        description: |
+          List of local groups to manage. Each entry describes one group as a
+          dictionary; `name` is mandatory, all other keys are optional.
+
+          Groups are created before the accounts in `user_linux_accounts` (so they
+          can be referenced as primary or supplementary groups) and groups set to
+          `absent` are removed after the accounts.
+
+          Note: When a user is deleted, its user-private group (a group with the
+          same name as the user, created together with the account) is removed
+          automatically by the platform if no other user still uses it. You only
+          need to list groups here that you want to manage explicitly.
+
+          Example:
+          ```yaml
+          user_linux_groups:
+            - name: "webops"
+              gid: 4200
+            - name: "legacy"
+              state: "absent"
+          ```
+        type: "list"
+        default: []
+        elements: "dict"
+        options:
+          name:
+            description: |
+              Name of the group. Must be unique within `user_linux_groups`.
+            type: "str"
+            required: true
+          state:
+            description: |
+              Whether the group should be `present` or `absent`.
+            type: "str"
+            default: "present"
+            choices:
+              - "present"
+              - "absent"
+          gid:
+            description: |
+              Numeric group ID (GID) to assign. If unset, the next free GID is
+              chosen automatically.
+            type: "int"
+          system:
+            description: |
+              If `true`, create the group as a system group (GID below the
+              platform's range for regular groups).
+            type: "bool"
+
+      user_linux_accounts_delete_unmanaged:
+        description: |
+          If `true`, local user accounts that are not listed in
+          `user_linux_accounts` are removed (together with their data). Only
+          regular accounts are considered: an account is a candidate for removal
+          only if its UID is within the `UID_MIN`..`UID_MAX` range (see
+          `user_linux_uid_min` / `user_linux_uid_max`), so system accounts are
+          never touched.
+
+          The following accounts are always protected, even when not listed in
+          `user_linux_accounts`: `root`, the account Ansible is currently connected
+          as, and every name in `user_linux_accounts_delete_unmanaged_exclude`.
+
+          This is a destructive operation and therefore disabled by default.
         type: "bool"
-        required: true
+        default: false
 
-      user_linux_service_state:
-        type: "str"
-        required: true
-        choices:
-          - "enabled"
-          - "disabled"
-          - "running"
-          - "unmanaged"
+      user_linux_accounts_delete_unmanaged_exclude:
+        description: |
+          List of account names that must never be removed by
+          `user_linux_accounts_delete_unmanaged`, even if they are not declared in
+          `user_linux_accounts` and fall within the regular UID range. Useful for
+          break-glass or automation accounts.
+
+          `root` and the current Ansible connection user are always protected and
+          do not need to be listed here.
+        type: "list"
+        elements: "str"
+        default: []
+
+      user_linux_uid_min:
+        description: |
+          Lower bound (inclusive) of the UID range that
+          `user_linux_accounts_delete_unmanaged` considers to be regular user
+          accounts. An empty string (the default) means the value is read from
+          `UID_MIN` in `/etc/login.defs` (falling back to `1000` if it cannot be
+          determined).
+        type: "raw"
+        default: ""
+
+      user_linux_uid_max:
+        description: |
+          Upper bound (inclusive) of the UID range that
+          `user_linux_accounts_delete_unmanaged` considers to be regular user
+          accounts. An empty string (the default) means the value is read from
+          `UID_MAX` in `/etc/login.defs` (falling back to `60000` if it cannot be
+          determined).
+        type: "raw"
+        default: ""
