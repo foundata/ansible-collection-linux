@@ -73,9 +73,9 @@ argument_specs:
               state: "present"
               comment: "Andreas Haerter (foundata)"
               groups:
-                - "{{ __user_linux_admin_group }}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
+                - "{\{ __user_linux_admin_group }\}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
               password:
-                hash: "{{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }}"
+                hash: "{\{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }\}"
                 update: "always"
               ssh_authorized_keys:
                 - key: "ssh-ed25519 AAAAC3Nz..."
@@ -223,9 +223,13 @@ argument_specs:
               hash:
                 description: |
                   Pre-hashed password in crypt format (for example a `$6$...`
-                  SHA-512 hash as produced by `ansible.builtin.password_hash` or
-                  `mkpasswd`). Plain-text passwords are rejected by the role.
-                  FIXE Add links to FAQS and a command example
+                  SHA-512 hash). Plain-text passwords are rejected by the role.
+
+                  Generate a hash on the command line with
+                  `mkpasswd --method=sha-512` (Debian/Ubuntu: package `whois`;
+                  RHEL/Fedora: `mkpasswd`), or within Ansible via the
+                  `ansible.builtin.password_hash` filter, e.g.
+                  `{\{ 'mysecret' | ansible.builtin.password_hash('sha512') }\}`.
                 type: "str"
               lock:
                 description: |

@@ -125,3 +125,80 @@
   when:
     - __user_linux_vars_file is ansible.builtin.file
   loop: "{{ __user_linux_platform_filenames_most_specific_last }}"
+
+
+## user specific
+
+- name: "Init | Assert account names in user_linux_accounts are unique"
+  ansible.builtin.assert:
+    that:
+      - (__user_linux_account_names | ansible.builtin.length) == (__user_linux_account_names | ansible.builtin.unique | ansible.builtin.length)
+    fail_msg: "Each 'name' in user_linux_accounts must be unique; one or more duplicate account names were found."
+    success_msg: "All account names in user_linux_accounts are unique."
+  vars:
+    __user_linux_account_names: "{{ user_linux_accounts | ansible.builtin.map(attribute='name') | ansible.builtin.list }}"
+
+
+- name: "Init | Assert group names in user_linux_groups are unique"
+  ansible.builtin.assert:
+    that:
+      - (__user_linux_group_names | ansible.builtin.length) == (__user_linux_group_names | ansible.builtin.unique | ansible.builtin.length)
+    fail_msg: "Each 'name' in user_linux_groups must be unique; one or more duplicate group names were found."
+    success_msg: "All group names in user_linux_groups are unique."
+  vars:
+    __user_linux_group_names: "{{ user_linux_groups | ansible.builtin.map(attribute='name') | ansible.builtin.list }}"
+
+
+- name: "Init | Reject plaintext passwords (effective password.hash must be empty or a crypt hash)"
+  ansible.builtin.assert:
+    that:
+      - (__user_linux_pw_hash | ansible.builtin.length) == 0 or __user_linux_pw_hash[:1] == '$'
+    fail_msg: >-
+      Account '{{ __user_linux_pw_item['name'] }}': the effective password.hash is not a crypt hash
+      (e.g. '$6$...'). Plaintext passwords are not accepted; use ansible.builtin.password_hash or mkpasswd.
+    success_msg: "Account '{{ __user_linux_pw_item['name'] }}': password.hash is empty or a crypt hash."
+  vars:
+    __user_linux_pw_effective: >-
+      {{
+        __user_linux_account_defaults_effective
+        | ansible.builtin.combine(__user_linux_pw_item, recursive=true)
+      }}
+    __user_linux_pw_hash: "{{ (__user_linux_pw_effective['password'] | ansible.builtin.default({}, true))['hash'] | ansible.builtin.default('', true) }}"
+  loop: "{{ user_linux_accounts }}"
+  loop_control:
+    loop_var: "__user_linux_pw_item"
+    label: "{{ __user_linux_pw_item['name'] }}"
+
+
+- name: "Init | Read login.defs (only when reaping; tolerate a missing file)"
+  ansible.builtin.slurp:
+    src: "{{ __user_linux_login_defs_path }}"
+  when:
+    - user_linux_accounts_delete_unmanaged | ansible.builtin.bool
+  failed_when: false
+  register: "__user_linux_login_defs_raw"
+
+
+- name: "Init | Derive effective UID_MIN/UID_MAX (public override, else login.defs, else fallback)"
+  ansible.builtin.set_fact:
+    # regex_findall (not regex_search) is used on purpose: its single capture
+    # group returns the number directly, avoiding a "\1" backreference argument
+    # (which Jinja would parse as the octal escape "\x01"). default('') covers a
+    # missing login.defs (the slurp uses failed_when: false), and the
+    # "+ ['<fallback>']" guarantees a value when there is no matching line.
+    __user_linux_uid_min_effective: >-
+      {{
+        (user_linux_uid_min | int)
+        if ((user_linux_uid_min | string | ansible.builtin.length) > 0)
+        else (((__user_linux_login_defs_raw['content'] | ansible.builtin.default('') | ansible.builtin.b64decode
+                | ansible.builtin.regex_findall('(?m)^\s*UID_MIN\s+(\d+)')) + ['1000']) | first | int)
+      }}
+    __user_linux_uid_max_effective: >-
+      {{
+        (user_linux_uid_max | int)
+        if ((user_linux_uid_max | string | ansible.builtin.length) > 0)
+        else (((__user_linux_login_defs_raw['content'] | ansible.builtin.default('') | ansible.builtin.b64decode
+                | ansible.builtin.regex_findall('(?m)^\s*UID_MAX\s+(\d+)')) + ['60000']) | first | int)
+      }}
+  when:
+    - user_linux_accounts_delete_unmanaged | ansible.builtin.bool

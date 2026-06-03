@@ -60,38 +60,55 @@ Manage local user accounts on Linux systems.
 
 ## Example playbooks, using this role<a id="examples"></a>
 
-Installation with automatic upgrade:
+Manage groups and accounts (with a hashed password and SSH keys):
 
 ```yaml
 ---
 
-- name: "Initialize the foundata.linux.user role"
-  hosts: localhost
-  gather_facts: false
+- name: "Manage local users and groups"
+  hosts: all
   tasks:
 
     - name: "Trigger invocation of the foundata.linux.user role"
       ansible.builtin.include_role:
         name: "foundata.linux.user"
       vars:
-        FIXME
+        user_linux_groups:
+          - name: "webops"
+        user_linux_accounts:
+          - name: "ahaerter"
+            comment: "A. Haerter (foundata)"
+            groups:
+              - "{{ __user_linux_admin_group }}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
+              - "webops"
+            password:
+              hash: "{{ 'changeme' | ansible.builtin.password_hash('sha512') }}"
+            ssh_authorized_keys:
+              - key: "ssh-ed25519 AAAAC3Nz... ahaerter@foundata.com"
 ```
 
-Uninstall:
+Remove a specific account and reap any other unmanaged regular accounts (the
+connection user, `root` and system accounts are always protected):
 
 ```yaml
 ---
 
-- name: "Initialize the foundata.linux.user role"
-  hosts: localhost
-  gather_facts: false
+- name: "Remove and reap local users"
+  hosts: all
   tasks:
 
     - name: "Trigger invocation of the foundata.linux.user role"
       ansible.builtin.include_role:
         name: "foundata.linux.user"
       vars:
-        FIXME
+        user_linux_accounts:
+          - name: "ahaerter"
+            # ... kept as above ...
+          - name: "obsolete"
+            state: "absent"
+        user_linux_accounts_delete_unmanaged: true
+        user_linux_accounts_delete_unmanaged_exclude:
+          - "backup"
 ```
 
 
@@ -100,11 +117,9 @@ Uninstall:
 
 It might be useful and faster to only call parts of the role by using tags:
 
-- `user_linux_setup`: Manage basic resources, such as packages or service users.
-- `user_linux_config`: Manage settings, such as adapting or creating configuration files.
-- `user_linux_service`: Manage services and daemons, such as running states and service boot configurations.
+- `user_linux_config`: Manage the local groups, user accounts and SSH `authorized_keys`.
 
-There are also tags usually not meant to be called directly but listed for the sake of completeness** and edge cases:
+There are also tags usually not meant to be called directly but listed for the sake of completeness and edge cases:
 
 - `user_linux_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
 
@@ -194,9 +209,9 @@ user_linux_accounts:
     state: "present"
     comment: "Andreas Haerter (foundata)"
     groups:
-      - "{{ __user_linux_admin_group }}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
+      - "{\{ __user_linux_admin_group }\}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
     password:
-      hash: "{{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }}"
+      hash: "{\{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }\}"
       update: "always"
     ssh_authorized_keys:
       - key: "ssh-ed25519 AAAAC3Nz..."
@@ -424,9 +439,13 @@ Password and password-aging settings for the account.
 [*⇑ Back to ToC ⇑*](#toc)
 
 Pre-hashed password in crypt format (for example a `$6$...`
-SHA-512 hash as produced by `ansible.builtin.password_hash` or
-`mkpasswd`). Plain-text passwords are rejected by the role.
-FIXE Add links to FAQS and a command example
+SHA-512 hash). Plain-text passwords are rejected by the role.
+
+Generate a hash on the command line with
+`mkpasswd --method=sha-512` (Debian/Ubuntu: package `whois`;
+RHEL/Fedora: `mkpasswd`), or within Ansible via the
+`ansible.builtin.password_hash` filter, e.g.
+`{{ 'mysecret' | ansible.builtin.password_hash('sha512') }}`.
 
 - **Type**: `str`
 - **Required**: No

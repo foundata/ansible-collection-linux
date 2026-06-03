@@ -5,4 +5,6 @@
 
 ---
 
-# none right now
+# The administrative group is "sudo" on Debian/Ubuntu (it is "wheel" elsewhere,
+# see vars/main.yml).
+__user_linux_admin_group: "sudo"

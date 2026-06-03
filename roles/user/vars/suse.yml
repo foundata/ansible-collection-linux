@@ -1,0 +1,9 @@
+# Internal role variables specific to: Suse (os_family or distribution)
+#
+# Only values specific to the platform and its functionality should be included
+# here. Variables in this file override those defined in vars/main.yml.
+
+---
+
+# openSUSE Leap (stateless /usr) ships login.defs under /usr/etc, not /etc.
+__user_linux_login_defs_path: "/usr/etc/login.defs"

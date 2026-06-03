@@ -68,9 +68,9 @@ user_linux_account_defaults: {}
 #     state: "present"
 #     comment: "Andreas Haerter (foundata)"
 #     groups:
-#       - "{{ __user_linux_admin_group }}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
+#       - "{\{ __user_linux_admin_group }\}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
 #     password:
-#       hash: "{{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }}"
+#       hash: "{\{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }\}"
 #       update: "always"
 #     ssh_authorized_keys:
 #       - key: "ssh-ed25519 AAAAC3Nz..."
