@@ -130,6 +130,23 @@ __sysctl_linux_config_dropin_file_mode: "{{ __sysctl_linux_config_file_mode }}"
 __sysctl_linux_sysctl_executable: "/usr/sbin/sysctl"
 
 
+# Effective sysctl parameters: the profile parameters (loaded on demand by
+# tasks/init.yml from vars/profile/<profile>.yml into
+# __sysctl_linux_profile_parameters) merged with the user-supplied
+# sysctl_linux_parameters, the latter taking precedence. Both operands are
+# guarded with default({}) so this resolves even when no profile is selected
+# (the profile include_vars is conditional) and when the user sets no
+# parameters.
+#
+# Lazy / late-bound evaluation: Jinja renders this variable on access,
+# after tasks/init.yml loads the platform vars file that sets the inputs.
+__sysctl_linux_effective_parameters: >-
+  {{
+    (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
+    | ansible.builtin.combine(sysctl_linux_parameters | ansible.builtin.default({}))
+  }}
+
+
 ### Override defaults of dependencies used by this role (if any).
 
 # nothing right now

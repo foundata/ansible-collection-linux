@@ -239,3 +239,58 @@
       - "'enabled' in __testing_reboot_timer_enabled['stdout']"
     fail_msg: "The reboot timer '{{ __auto_update_linux_reboot_timer_unit_name }}' is not enabled (got '{{ __testing_reboot_timer_enabled['stdout'] }}')."
     success_msg: "The reboot timer '{{ __auto_update_linux_reboot_timer_unit_name }}' is enabled."
+
+
+## Regression tests: init-only merged variable evaluation
+#
+# Re-run the role's init with controlled inputs and assert the merged timer
+# settings directly. This guards the defaults/user merge (whether materialized
+# in tasks/init.yml or lazily in vars/main.yml): a user value must win,
+# the untouched defaults must survive, and a user-only key must be added.
+#
+# The test inputs are set via set_fact so they stay in scope (and outrank the
+# converge-time facts restored at the top of this file) when the assertions
+# dereference the effective variable. With lazy evaluation the effective
+# variable re-renders on every access, so the inputs must still be visible at
+# assert time; this also matches real role usage, where the public variable is
+# in scope throughout the role run.
+
+- name: "Molecule | Verify | Validate effective timer settings merge (init-only)"
+  block:
+
+    - name: "Molecule | Verify | Set custom timer settings for the merge check"
+      ansible.builtin.set_fact:
+        auto_update_linux_timer_settings:
+          OnCalendar: "Mon *-*-* 02:00:00"
+          FooDirective: "bar"
+        auto_update_linux_reboot_timer_settings:
+          RandomizedDelaySec: "13m"
+          BazDirective: "qux"
+
+    - name: "Molecule | Verify | Re-initialize auto_update with custom timer settings"
+      ansible.builtin.include_role:
+        name: "foundata.linux.auto_update"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert effective timer settings merged correctly"
+      ansible.builtin.assert:
+        that:
+          - __auto_update_linux_effective_timer_settings['OnCalendar'] == "Mon *-*-* 02:00:00"
+          - __auto_update_linux_effective_timer_settings['RandomizedDelaySec'] == "60m"
+          - __auto_update_linux_effective_timer_settings['Persistent'] | ansible.builtin.bool
+          - __auto_update_linux_effective_timer_settings['FooDirective'] == "bar"
+        fail_msg: "__auto_update_linux_effective_timer_settings did not merge defaults and user values as expected."
+        success_msg: "__auto_update_linux_effective_timer_settings merged defaults and user values correctly."
+
+
+    - name: "Molecule | Verify | Assert effective reboot timer settings merged correctly"
+      ansible.builtin.assert:
+        that:
+          - __auto_update_linux_effective_reboot_timer_settings['OnCalendar'] == "*-*-* 04:00:00"
+          - __auto_update_linux_effective_reboot_timer_settings['RandomizedDelaySec'] == "13m"
+          - __auto_update_linux_effective_reboot_timer_settings['Persistent'] | ansible.builtin.bool
+          - __auto_update_linux_effective_reboot_timer_settings['BazDirective'] == "qux"
+        fail_msg: "__auto_update_linux_effective_reboot_timer_settings did not merge defaults and user values as expected."
+        success_msg: "__auto_update_linux_effective_reboot_timer_settings merged defaults and user values correctly."

@@ -130,18 +130,13 @@
 ### auto_update specific
 
 
-- name: "Init | Merge user and default timer settings"
-  ansible.builtin.set_fact:
-    # systemd directives are case-sensitive. Since Ansible dict keys are also
-    # case-sensitive, a simple dict_a | ansible.builtin.combine(dict_b) correctly
-    # allows user settings to override defaults without extra handling.
-    __auto_update_linux_effective_timer_settings: >-
-      {{
-        __auto_update_linux_timer_settings_defaults
-        | ansible.builtin.combine(auto_update_linux_timer_settings)
-      }}
-    __auto_update_linux_effective_reboot_timer_settings: >-
-      {{
-        __auto_update_linux_reboot_timer_settings_defaults
-        | ansible.builtin.combine(auto_update_linux_reboot_timer_settings)
-      }}
+- name: "Init | Show effective merged variables (computed lazily in vars/main.yml)"
+  ansible.builtin.debug:
+    msg: "{{ __auto_update_linux_effective_var }} = {{ lookup('ansible.builtin.vars', __auto_update_linux_effective_var) }}"
+    verbosity: 3
+  loop:
+    - "__auto_update_linux_effective_timer_settings"
+    - "__auto_update_linux_effective_reboot_timer_settings"
+  loop_control:
+    loop_var: "__auto_update_linux_effective_var"
+    label: "{{ __auto_update_linux_effective_var }}"

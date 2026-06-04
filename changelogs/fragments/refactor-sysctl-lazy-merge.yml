@@ -1,0 +1,10 @@
+---
+trivial:
+  - >
+    ``sysctl`` role - Internal refactor: the effective sysctl parameters
+    (``__sysctl_linux_effective_parameters``, the profile parameters merged with
+    the user-supplied ``sysctl_linux_parameters``) are now computed lazily in
+    ``vars/main.yml`` instead of via an ``set_fact`` in ``tasks/init.yml``.
+    The ``default({})`` guards are preserved, so it still resolves when no
+    profile is selected. No user-facing behaviour change. Added a Molecule
+    init-only regression test asserting the merge.

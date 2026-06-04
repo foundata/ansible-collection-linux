@@ -1,0 +1,61 @@
+# Execute the collection role "user" against all driver-created instances.
+
+
+- name: "Molecule | Converge | user | Store user_linux_* role parameters in __testing_state"
+  ansible.builtin.include_tasks:
+    file: "../tasks/state_update.yml"
+  vars:
+    __testing_state_update:
+      user_linux_groups:
+        - name: "molecule_testops"
+          gid: 4321
+        - name: "molecule_testfree"
+        - name: "molecule_legacy_absent"
+          state: "absent"
+      user_linux_accounts:
+        - name: "molecule_testuser1"
+          uid: 4001
+          comment: "Molecule Test User 1"
+          groups:
+            - "molecule_testops"
+          password:
+            hash: "$6$moleculetest$nbNgUKgZym1gtdQmBAwjkcGE/SLsIl7pHLZ/K2w9c8fZdwfqRwvohaOkAE2LbvmO3FqI9fFo5KO6CLw/lESui0"
+          ssh_authorized_keys:
+            - key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILcYoZILzNQaw72LxKdK9he97yaQ02wbnWWntBmrk6ry molecule_1@example.com"
+              options: 'from="10.0.0.0/8"'
+            - key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMULmKMeqE3+4OVsbn6Ec0/sCQDJc8ktt6zfFIYyHzLV molecule_2@example.com"
+          ssh_authorized_keys_delete_unmanaged: true
+        - name: "molecule_testuser2"
+        - name: "molecule_keyuser"
+          ssh_authorized_keys:
+            - key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKR6FdXomFQ1h6RmzQxN4GWmqgV/GXE9RNOBh0iMQgEQ molecule_key@example.com"
+          ssh_authorized_keys_delete_unmanaged: true
+        - name: "molecule_obsolete"
+          state: "absent"
+      user_linux_accounts_delete_unmanaged: true
+      user_linux_accounts_delete_unmanaged_exclude:
+        - "molecule_keepme"
+      # Narrow the reaping window to the test fixtures' UID band so unrelated
+      # accounts shipped in the container images are never touched. UID_MAX is
+      # left to /etc/login.defs to also exercise that derivation path.
+      user_linux_uid_min: 4000
+
+
+- name: "Molecule | Converge | user | Set user_linux_* parameters as facts from __testing_state"
+  ansible.builtin.set_fact:
+    "{{ item['key'] }}": "{{ item['value'] }}"
+  loop: >-
+    {{
+      (__testing_state | ansible.builtin.default({}, true))
+      | ansible.builtin.dict2items
+      | ansible.builtin.selectattr('key', 'match', '^user_linux_')
+      | ansible.builtin.list
+    }}
+
+
+- name: "Molecule | Converge | user | Include the foundata.linux.user role"
+  ansible.builtin.include_role:
+    name: "foundata.linux.user"
+  # vars: All user_linux_* variables are set as facts and passed this way to the
+  #       role, so they can be persisted in __testing_state and restored in later
+  #       stages (e.g. verify) without duplicating data across playbooks.

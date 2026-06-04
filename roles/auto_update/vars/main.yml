@@ -95,6 +95,20 @@ __auto_update_linux_timer_settings_defaults:
   Persistent: true
 
 
+# Effective systemd timer settings: the defaults above with the user-supplied
+# auto_update_linux_timer_settings merged on top. systemd directives are
+# case-sensitive, as are Ansible dict keys, so a plain combine() lets user
+# values override defaults without extra handling.
+#
+# Lazy / late-bound evaluation: Jinja renders this variable on access,
+# after tasks/init.yml loads the platform vars file that sets the inputs.
+__auto_update_linux_effective_timer_settings: >-
+  {{
+    __auto_update_linux_timer_settings_defaults
+    | ansible.builtin.combine(auto_update_linux_timer_settings)
+  }}
+
+
 # Name of the systemd timer unit that triggers the unattended update run. This
 # is platform-specific and therefore set in the matching vars/<platform>.yml
 # file (e.g. "apt-daily-upgrade.timer", "dnf-automatic.timer",
@@ -131,6 +145,18 @@ __auto_update_linux_reboot_timer_settings_defaults:
   OnCalendar: "*-*-* 04:00:00"
   RandomizedDelaySec: "30m"
   Persistent: true
+
+# Effective reboot timer settings: the defaults above with the user-supplied
+# auto_update_linux_reboot_timer_settings merged on top (same case-sensitive
+# combine() rationale as __auto_update_linux_effective_timer_settings).
+#
+# Lazy / late-bound evaluation: Jinja renders this variable on access,
+# after tasks/init.yml loads the platform vars file that sets the inputs.
+__auto_update_linux_effective_reboot_timer_settings: >-
+  {{
+    __auto_update_linux_reboot_timer_settings_defaults
+    | ansible.builtin.combine(auto_update_linux_reboot_timer_settings)
+  }}
 
 
 # Helper script that checks whether a reboot is required and, if so, reboots.

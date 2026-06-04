@@ -129,21 +129,22 @@
 
 ### sysctl specific
 
+- name: "Init | Show effective merged variables (computed lazily in vars/main.yml)"
+  ansible.builtin.debug:
+    msg: "{{ __sysctl_linux_effective_var }} = {{ lookup('ansible.builtin.vars', __sysctl_linux_effective_var) }}"
+    verbosity: 3
+  loop:
+    - "__sysctl_linux_effective_parameters"
+  loop_control:
+    loop_var: "__sysctl_linux_effective_var"
+    label: "{{ __sysctl_linux_effective_var }}"
+
 
 - name: "Init | Include sysctl profile-specific variables (if any)"
   ansible.builtin.include_vars:
-    file: "{{ role_path }}/vars/profile/{{ sysctl_linux_profile }}.yml"
+    file: "{{ role_path }}/vars/profiles/{{ sysctl_linux_profile }}.yml"
   when:
     - sysctl_linux_profile | ansible.builtin.length > 0
-
-
-- name: "Init | Merge profile and user parameters (user takes precedence)"
-  ansible.builtin.set_fact:
-    __sysctl_linux_effective_parameters: >-
-      {{
-        (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
-        | ansible.builtin.combine(sysctl_linux_parameters | ansible.builtin.default({}))
-      }}
 
 
 # Required for checkability due to read-only kernel parameters in containerized systems

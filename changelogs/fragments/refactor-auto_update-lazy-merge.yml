@@ -1,0 +1,9 @@
+---
+trivial:
+  - >
+    ``auto_update`` role - Internal refactor: the effective systemd timer
+    settings (``__auto_update_linux_effective_timer_settings`` and
+    ``__auto_update_linux_effective_reboot_timer_settings``) are now computed
+    lazily in ``vars/main.yml`` instead of via an ``set_fact`` in
+    ``tasks/init.yml``. No user-facing behaviour change. Added a Molecule
+    init-only regression test asserting the defaults/user merge.
