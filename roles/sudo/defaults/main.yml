@@ -7,34 +7,171 @@
 
 ---
 
-# String. Determines whether the managed resources should be "present" or
-# "absent". Defaults to "present". Possible values:
+# Determines whether the managed resources should be `present` or `absent`.
 #
-# - "present": Ensures that required components, such as software packages,
-#   are installed and configured.
-# - "absent": Reverts changes as much as possible, such as removing packages,
-#   deleting created users, stopping services, restoring modified settings, …
+# `present` ensures that `sudo` is installed and that the rules described in
+# `sudo_linux_rules` (and any `sudo_linux_defaults`) are configured as drop-in
+# files below `/etc/sudoers.d/`.
+#
+# `absent` reverts changes as much as possible: the drop-in files this role
+# manages are removed. The `sudo` package itself is intentionally **not**
+# uninstalled, as it is a core component that other tooling and the system
+# itself rely on.
+#
+# - Type: str
+# - Required: No
+# - Default: present
+# - Choices: present, absent
 sudo_linux_state: "present"
 
-
-# Boolean. If set to true, all managed packages will be upgraded during each
-# Ansible run (e.g., when the package provider detects a newer version than
-# the currently installed one). Defaults to false.
+# If set to `true`, all managed packages will be upgraded during each Ansible
+# run (e.g., when the package provider detects a newer version than the
+# currently installed one).
+#
+# This role manages the `sudo` package (it is missing from some minimal
+# installations), so this variable controls whether `sudo` is merely ensured
+# present or upgraded to the latest available version on every run.
+#
+# - Type: bool
+# - Required: No
+# - Default: false
 sudo_linux_autoupgrade: false
 
+# List of sudo rules to manage. Each entry grants one or more users and/or
+# groups the right to run a set of commands, and is rendered into validated
+# drop-in files below `/etc/sudoers.d/` (one file per grantee, as the underlying
+# `community.general.sudoers` module manages a single user or group per file).
+#
+# A rule with `state: present` must specify `commands` and at least one grantee
+# (`users` and/or `groups`); the role fails early otherwise. A rule with
+# `state: absent` only needs its `name` (and the same grantees it was created
+# with) so the corresponding drop-in files can be removed.
+#
+# For options that are not set on an individual rule, the value from
+# `sudo_linux_rule_defaults` applies.
+#
+# Security notes:
+#
+# - Prefer absolute command paths over `ALL`. Granting `commands: ["ALL"]` is
+#   effectively full root access.
+# - `nopassword` defaults to `false` (a password is required). Enable it only
+#   for specific, non-interactive commands.
+#
+# Example:
+#
+# ```yaml
+# sudo_linux_rules:
+#   # Full administrative access for the platform admin group
+#   # ("sudo" on Debian/Ubuntu, "wheel" on RHEL/Fedora/SUSE).
+#   - name: "admins"
+#     groups:
+#       - "wheel"
+#     commands:
+#       - "ALL"
+#     runas: "ALL"
+#   # A deploy user may restart/reload nginx without a password
+#   - name: "deploy-nginx"
+#     users:
+#       - "deploy"
+#     groups:
+#       - "webops"
+#     commands:
+#       - "/usr/bin/systemctl restart nginx"
+#       - "/usr/bin/systemctl reload nginx"
+#     nopassword: true
+#   # Remove a rule created by a previous run
+#   - name: "legacy-rule"
+#     state: "absent"
+# ```
+#
+# - Type: list
+# - Required: No
+# - Default: []
+# - List elements: dict
+sudo_linux_rules: []
 
-# String. Defines the status of the service(s). Defaults to "enabled".
-# Possible values:
+# Default values applied to every entry in `sudo_linux_rules` that does not set
+# the corresponding key itself. The keys mirror the per-rule keys of the same
+# name (see `sudo_linux_rules`). Any value provided here is overridden by an
+# explicit value on the individual rule.
 #
-# - "enabled": Service is running and will start automatically at boot.
-# - "disabled": Service is stopped and will not start automatically at boot.
-# - "running": Service is running but will not start automatically at boot.
-#   This can be used to start a service on the first Ansible run without
-#   enabling it for boot.
-# - "unmanaged": Service will not start at boot, and Ansible will not
-#   manage its running state. This is primarily useful when services are
-#   monitored and managed by systems other than Ansible.
+# Only the keys you want to change need to be supplied; they are merged over the
+# role's built-in defaults (see `__sudo_linux_rule_defaults_builtin` in
+# `vars/main.yml`). The effective built-in defaults are:
 #
-# The singular form ("service") is used for simplicity. However, the defined
-# status applies to all services if multiple are being managed by this role.
-sudo_linux_service_state: "enabled"
+# ```yaml
+# sudo_linux_rule_defaults:
+#   runas: "ALL"
+#   host: "ALL"
+#   nopassword: false   # require a password unless a rule opts out
+#   setenv: false
+#   noexec: false
+# ```
+#
+# Note: the built-in `nopassword: false` deliberately differs from the
+# `community.general.sudoers` module default (`true`), so that passwordless sudo
+# is always an explicit, per-rule opt-in.
+#
+# - Type: dict
+# - Required: No
+# - Default: {}
+sudo_linux_rule_defaults: {}
+
+# Global `Defaults` directives to apply, rendered verbatim (one per line) into a
+# single managed, `visudo` -validated drop-in file. This is the escape hatch for
+# sudo-wide settings that are not tied to a specific rule, since the per-rule
+# mechanism cannot express `Defaults` lines.
+#
+# Provide each directive as it would appear after the `Defaults` keyword in a
+# sudoers file (without the leading `Defaults`).
+#
+# Example:
+#
+# ```yaml
+# sudo_linux_defaults:
+#   - "env_reset"
+#   - "secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\""
+#   - "timestamp_timeout=15"
+#   - "!visiblepw"
+# ```
+#
+# - Type: list
+# - Required: No
+# - Default: []
+# - List elements: str
+sudo_linux_defaults: []
+
+# If `true`, the role manages `/etc/sudoers.d/` authoritatively: every drop-in
+# file that is **not** created by this role is removed, except for
+#
+# - an internal, per-platform protected list (for example the `README` shipped
+#   by the `sudo` package on Debian/Ubuntu), and
+# - the file names listed in `sudo_linux_delete_unmanaged_exclude`.
+#
+# This is a destructive operation and therefore disabled by default.
+#
+# WARNING: On cloud images, the file `/etc/sudoers.d/90-cloud-init-users`
+# typically grants the cloud/admin user passwordless sudo. With this option
+# enabled it would be deleted unless you add it to
+# `sudo_linux_delete_unmanaged_exclude`, which can lock you out of the machine.
+# The same applies to drop-ins shipped by other software (e.g. SSSD/FreeIPA or
+# vendor agents).
+#
+# - Type: bool
+# - Required: No
+# - Default: false
+sudo_linux_delete_unmanaged: false
+
+# List of drop-in file names (basenames, relative to `/etc/sudoers.d/`) that
+# must never be removed by `sudo_linux_delete_unmanaged`, even though they are
+# not managed by this role. Use this for files shipped by the distribution or
+# other software that you want to keep, for example `90-cloud-init-users`.
+#
+# This supplements the role's internal, per-platform protected list; you do not
+# need to repeat entries already protected there.
+#
+# - Type: list
+# - Required: No
+# - Default: []
+# - List elements: str
+sudo_linux_delete_unmanaged_exclude: []
