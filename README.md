@@ -29,15 +29,33 @@ It provides resources to manage common Linux system components and configuration
 
 ## Included content<a id="content"></a>
 
+### Role: `foundata.linux.auto_update`
+
+The resource in this collection to configure and maintain automatic (unattended) updates of installed software. See the [role's `README.md`](./roles/auto_update/README.md) for more information and usage examples.
+
+
+
 ### Role: `foundata.linux.reboot`
 
 The resource in this collection to reboot systems when needed. See the [role's `README.md`](./roles/reboot/README.md) for more information and usage examples.
 
 
 
+### Role: `foundata.linux.sudo`
+
+The resource in this collection to configure and maintain sudo privileges and rules. See the [role's `README.md`](./roles/sudo/README.md) for more information and usage examples.
+
+
+
 ### Role: `foundata.linux.sysctl`
 
 The resource in this collection to configure and maintain Kernel settings. See the [role's `README.md`](./roles/sysctl/README.md) for more information and usage examples.
+
+
+
+### Role: `foundata.linux.user`
+
+The resource in this collection to configure and maintain local user accounts and groups. See the [role's `README.md`](./roles/user/README.md) for more information and usage examples.
 
 
 
