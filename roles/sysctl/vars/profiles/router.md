@@ -1,3 +1,3 @@
 # sysctl profile `router`
 
-FIXME detailled documentation and reasoning for the settings in `router.yml`
+FIXME detailed documentation and reasoning for the settings in `router.yml`
