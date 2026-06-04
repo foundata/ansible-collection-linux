@@ -103,7 +103,7 @@ SSH key restrictions are applied per account):
           - name: "ahaerter"
             comment: "A. Haerter (foundata)"
             groups:
-              - "{{ __user_linux_admin_group }}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
+              - "{{ (ansible_facts['os_family'] == 'Debian') | ternary('sudo', 'wheel') }}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
               - "webops"
             password:
               hash: "{{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }}"
@@ -308,7 +308,7 @@ user_linux_accounts:
     state: "present"
     comment: "Andreas Haerter (foundata)"
     groups:
-      - "{\{ __user_linux_admin_group }\}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
+      - "{\{ (ansible_facts['os_family'] == 'Debian') | ternary('sudo', 'wheel') }\}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
     password:
       hash: "{\{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }\}"
       update: "always"

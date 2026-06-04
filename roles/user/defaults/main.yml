@@ -68,7 +68,7 @@ user_linux_account_defaults: {}
 #     state: "present"
 #     comment: "Andreas Haerter (foundata)"
 #     groups:
-#       - "{\{ __user_linux_admin_group }\}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
+#       - "{\{ (ansible_facts['os_family'] == 'Debian') | ternary('sudo', 'wheel') }\}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
 #     password:
 #       hash: "{\{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }\}"
 #       update: "always"
