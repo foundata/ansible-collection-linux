@@ -7,6 +7,7 @@ Manage local user accounts on Linux systems.
 
 ## Table of contents<a id="toc"></a>
 
+- [Features](#features)
 - [Example playbooks, using this role](#examples)
 - [Supported tags](#tags)<!-- ANSIBLE DOCSMITH TOC START -->
 - [Role variables](#variables)
@@ -58,9 +59,22 @@ Manage local user accounts on Linux systems.
 
 
 
+## Features<a id="features"></a>
+
+* **Local accounts and groups in one place**: declare groups via [`user_linux_groups`](#variable-user_linux_groups) and accounts via [`user_linux_accounts`](#variable-user_linux_accounts); groups are always created before accounts so they can be used as primary or supplementary groups in the same run.
+* **Defaults instead of repetition**: set login shell, umask, group-append behaviour, password update policy and more once in [`user_linux_account_defaults`](#variable-user_linux_account_defaults); every account inherits them unless it overrides the individual key.
+* **Home directory handling** via [`home`](#variable-user_linux_accounts-sub-home): choose the `path`, decide whether to `create` it, `move` it when the path changes, and pick the `skeleton` used to populate it.
+* **Safe password management** via [`password`](#variable-user_linux_accounts-sub-password): only pre-hashed crypt strings are accepted (plain-text is rejected), with `lock`, an `on_create`-vs-`always` `update` policy, and password aging (`expire_min`/`expire_max`/`expire_warn`).
+* **SSH `authorized_keys` management** via [`ssh_authorized_keys`](#variable-user_linux_accounts-sub-ssh_authorized_keys): install keys with optional per-key OpenSSH `options` (e.g. `from=`, `command=`, `restrict`), managed either authoritatively or additively via [`ssh_authorized_keys_delete_unmanaged`](#variable-user_linux_accounts-sub-ssh_authorized_keys_delete_unmanaged). An empty/unset key list never wipes an existing `authorized_keys`.
+* **Optional reaping of unmanaged accounts** via [`user_linux_accounts_delete_unmanaged`](#variable-user_linux_accounts_delete_unmanaged): off by default and guarded — only regular accounts inside the `UID_MIN`..`UID_MAX` range are candidates, while `root`, the current Ansible connection user, system accounts and every name in [`user_linux_accounts_delete_unmanaged_exclude`](#variable-user_linux_accounts_delete_unmanaged_exclude) are always protected.
+
+
 ## Example playbooks, using this role<a id="examples"></a>
 
-Manage groups and accounts (with a hashed password and SSH keys):
+Use `user_linux_account_defaults` to set a common policy once, then declare a
+small admin team. Each account inherits the defaults and only specifies what is
+unique to it (note how the password hashes come from a vault, password aging and
+SSH key restrictions are applied per account):
 
 ```yaml
 ---
@@ -73,8 +87,18 @@ Manage groups and accounts (with a hashed password and SSH keys):
       ansible.builtin.include_role:
         name: "foundata.linux.user"
       vars:
+        # Applied to every account below unless it overrides the key.
+        user_linux_account_defaults:
+          shell: "/bin/bash"
+          umask: "0027"
+          groups_append: true
+          password:
+            update: "on_create"
+            expire_max: 365
+            expire_warn: 14
         user_linux_groups:
           - name: "webops"
+            gid: 4200
         user_linux_accounts:
           - name: "ahaerter"
             comment: "A. Haerter (foundata)"
@@ -82,9 +106,82 @@ Manage groups and accounts (with a hashed password and SSH keys):
               - "{{ __user_linux_admin_group }}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
               - "webops"
             password:
-              hash: "{{ 'changeme' | ansible.builtin.password_hash('sha512') }}"
+              hash: "{{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }}"
             ssh_authorized_keys:
-              - key: "ssh-ed25519 AAAAC3Nz... ahaerter@foundata.com"
+              - key: "ssh-ed25519 AAAAC3Nz... foo@example.com"
+          - name: "jdoe"
+            comment: "J. Doe"
+            groups:
+              - "webops"
+            password:
+              hash: "{{ lookup('ansible.builtin.unvault', 'secrets/jdoe-hash.vault') | trim }}"
+            ssh_authorized_keys:
+              # Only allow this key from the office network.
+              - key: "ssh-ed25519 AAAAC3Nz... jdoe@example.com"
+                options: 'from="10.0.0.0/8"'
+```
+
+Create a non-login service account with a fixed UID, a custom home and a
+restricted, command-forced backup key (the account has no usable password and
+cannot open an interactive shell):
+
+```yaml
+---
+
+- name: "Manage a backup service account"
+  hosts: all
+  tasks:
+
+    - name: "Trigger invocation of the foundata.linux.user role"
+      ansible.builtin.include_role:
+        name: "foundata.linux.user"
+      vars:
+        user_linux_accounts:
+          - name: "backup"
+            comment: "Restic backup runner"
+            uid: 6000
+            shell: "/usr/sbin/nologin"
+            home:
+              path: "/srv/backup"
+              create: true
+            password:
+              lock: true
+            ssh_authorized_keys:
+              - key: "ssh-ed25519 AAAAC3Nz... backup@example.com"
+                options: 'restrict,command="/usr/bin/rrsync -ro /srv/backup",from="10.0.0.0/8"'
+```
+
+Disable an account without losing its data: lock the password, switch to a
+non-interactive shell, make `groups` authoritative so stale memberships are
+dropped, and revoke SSH access by replacing the listed key with `state: absent`
+(needed because an empty `ssh_authorized_keys` list is intentionally left
+untouched and would not remove existing keys):
+
+```yaml
+---
+
+- name: "Disable a leaver without deleting data"
+  hosts: all
+  tasks:
+
+    - name: "Trigger invocation of the foundata.linux.user role"
+      ansible.builtin.include_role:
+        name: "foundata.linux.user"
+      vars:
+        user_linux_accounts:
+          - name: "jack"
+            comment: "Former employee (disabled)"
+            shell: "/usr/sbin/nologin"
+            groups: [] # authoritative: remove all supplementary memberships
+            groups_append: false
+            password:
+              lock: true
+            # Authoritatively drop every key not listed; the explicit
+            # 'absent' entry makes the intent (revoke this key) clear.
+            ssh_authorized_keys:
+              - key: "ssh-ed25519 AAAAC3Nz... jack@example.com"
+                state: "absent"
+            ssh_authorized_keys_delete_unmanaged: true
 ```
 
 Remove a specific account and reap any other unmanaged regular accounts (the
@@ -103,6 +200,8 @@ connection user, `root` and system accounts are always protected):
       vars:
         user_linux_accounts:
           - name: "ahaerter"
+            # ... kept as above ...
+          - name: "jdoe"
             # ... kept as above ...
           - name: "obsolete"
             state: "absent"
@@ -445,7 +544,7 @@ Generate a hash on the command line with
 `mkpasswd --method=sha-512` (Debian/Ubuntu: package `whois`;
 RHEL/Fedora: `mkpasswd`), or within Ansible via the
 `ansible.builtin.password_hash` filter, e.g.
-`{{ 'mysecret' | ansible.builtin.password_hash('sha512') }}`.
+`{\{ 'mysecret' | ansible.builtin.password_hash('sha512') }\}`.
 
 - **Type**: `str`
 - **Required**: No
