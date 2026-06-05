@@ -96,9 +96,11 @@ SSH key restrictions are applied per account):
             update: "on_create"
             expire_max: 365
             expire_warn: 14
+
         user_linux_groups:
           - name: "webops"
             gid: 4200
+
         user_linux_accounts:
           - name: "ahaerter"
             comment: "A. Haerter (foundata)"
@@ -109,6 +111,7 @@ SSH key restrictions are applied per account):
               hash: "{{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }}"
             ssh_authorized_keys:
               - key: "ssh-ed25519 AAAAC3Nz... foo@example.com"
+
           - name: "jdoe"
             comment: "J. Doe"
             groups:

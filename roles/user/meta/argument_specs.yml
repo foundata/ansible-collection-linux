@@ -315,6 +315,27 @@ argument_specs:
               `user_linux_account_defaults['ssh_authorized_keys_delete_unmanaged']`.
             type: "bool"
 
+      user_linux_group_defaults:
+        description: |
+          Default values applied to every entry in `user_linux_groups` that does not
+          set the corresponding key itself. The keys mirror the per-group keys of the
+          same name (see `user_linux_groups`); any value provided here is overridden by
+          an explicit value on the individual group.
+
+          Only the keys you want to change need to be supplied; they are deep-merged
+          over the role's built-in defaults (see `__user_linux_group_defaults_builtin`
+          in `vars/main.yml`). The effective built-in defaults are:
+
+          ```yaml
+          user_linux_group_defaults:
+            state: "present"
+            system: false
+          ```
+
+          Supported keys are all known by `user_linux_groups`.
+        type: "dict"
+        default: {} # see __user_linux_group_defaults_builtin in vars/main.yml for the defaults
+
       user_linux_groups:
         description: |
           List of local groups to manage. Each entry describes one group as a

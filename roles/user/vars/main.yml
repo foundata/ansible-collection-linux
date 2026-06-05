@@ -104,6 +104,29 @@ __user_linux_account_defaults_effective: >-
   }}
 
 
+# Built-in default values applied to every entry in "user_linux_groups" that
+# does not set the corresponding key itself. The public "user_linux_group_defaults"
+# is deep-merged over this dict (see __user_linux_group_defaults_effective below),
+# and an individual group overrides both.
+#
+# Groups have few parameters, but this mirrors the "user_linux_accounts" defaults
+# mechanism above so groups and accounts share the same merge pattern in code and API.
+__user_linux_group_defaults_builtin:
+  state: "present"
+  system: false
+
+
+# Effective per-group defaults: the built-in defaults deep-merged with the public
+# "user_linux_group_defaults". Evaluated lazily on first dereference, by which point
+# tasks/init.yml has loaded any platform-specific vars. Each group in
+# "user_linux_groups" is in turn merged over this in tasks/config/default.yml.
+__user_linux_group_defaults_effective: >-
+  {{
+    __user_linux_group_defaults_builtin
+    | ansible.builtin.combine(user_linux_group_defaults, recursive=true)
+  }}
+
+
 # Path to the login.defs file from which UID_MIN/UID_MAX are read when reaping
 # unmanaged accounts. Defaults to the traditional /etc location; openSUSE Leap
 # (stateless /usr) overrides this to /usr/etc/login.defs in vars/suse.yml. A

@@ -3,23 +3,33 @@
 ---
 
 # Order matters:
-#   1. groups present  -> primary/supplementary groups must exist before accounts
+#   1. groups present -> primary/supplementary groups must exist before accounts
 #   2. accounts present/update
 #   3. authorized_keys -> after the account (and its home directory) exists
 #   4. accounts absent -> remove users before removing now-unmanaged groups
-#   5. reap unmanaged accounts (UID range only; never root, the connection user
-#      or system accounts)
+#   5. reap unmanaged accounts (UID range only; never root, never Ansible's
+#      connection user or system accounts)
 #   6. groups absent   -> last, so no still-present account references them
 
 
 - name: "Config | Default | Create or update groups"
   ansible.builtin.group:
-    name: "{{ __user_linux_group_item['name'] }}"
-    gid: "{{ __user_linux_group_item['gid'] | ansible.builtin.default(omit) }}"
-    system: "{{ __user_linux_group_item['system'] | ansible.builtin.default(false) }}"
+    name: "{{ __user_linux_group_item_effective['name'] }}"
     state: "present"
+    gid: "{{ __user_linux_group_item_effective['gid'] | ansible.builtin.default(omit) }}"
+    system: "{{ __user_linux_group_item_effective['system'] }}"
+  vars:
+    # Merge the internal and external defaults (= __user_linux_group_defaults_effective)
+    # with the loop item's data, which has higher precedence and overrides the defaults.
+    __user_linux_group_item_effective: >-
+      {{
+        __user_linux_group_defaults_effective
+        | ansible.builtin.combine(__user_linux_group_item, recursive=true)
+      }}
   when:
-    - (__user_linux_group_item['state'] | ansible.builtin.default('present')) == 'present'
+    # 'state' is always populated from the internal defaults (and should raise an error if
+    # missing.as it indicates broken defaults)
+    - __user_linux_group_item_effective['state'] == 'present'
   loop: "{{ user_linux_groups }}"
   loop_control:
     loop_var: "__user_linux_group_item"
@@ -28,39 +38,48 @@
 
 - name: "Config | Default | Create or update accounts"
   ansible.builtin.user:
-    name: "{{ __user_linux_account_item['name'] }}"
-    uid: "{{ __user_linux_acc['uid'] | ansible.builtin.default(omit) }}"
-    comment: "{{ __user_linux_acc['comment'] }}"
-    group: "{{ __user_linux_acc['group'] | ansible.builtin.default(omit) }}"
-    groups: "{{ __user_linux_acc['groups'] | ansible.builtin.default(omit) }}"
+    name: "{{ __user_linux_account_item_effective['name'] }}"
+    state: "present"
+    uid: "{{ __user_linux_account_item_effective['uid'] | ansible.builtin.default(omit) }}"
+    comment: "{{ __user_linux_account_item_effective['comment'] }}"
+    group: "{{ __user_linux_account_item_effective['group'] | ansible.builtin.default(omit) }}"
+    groups: "{{ __user_linux_account_item_effective['groups'] | ansible.builtin.default(omit) }}"
     # "append" is only meaningful together with "groups"; omit it otherwise to
     # avoid the module's "append is set, but no groups are specified" warning.
-    append: "{{ __user_linux_acc['groups_append'] if (__user_linux_acc['groups'] | ansible.builtin.default([]) | ansible.builtin.length) > 0 else omit }}"
-    shell: "{{ __user_linux_acc['shell'] }}"
-    home: "{{ __user_linux_acc['home']['path'] | ansible.builtin.default(omit) }}"
-    create_home: "{{ __user_linux_acc['home']['create'] }}"
-    move_home: "{{ __user_linux_acc['home']['move'] }}"
-    skeleton: "{{ __user_linux_acc['home']['skeleton'] | ansible.builtin.default(omit) }}"
-    umask: "{{ __user_linux_acc['umask'] }}"
-    system: "{{ __user_linux_acc['system'] }}"
-    local: "{{ __user_linux_acc['local'] }}"
-    seuser: "{{ __user_linux_acc['seuser'] | ansible.builtin.default(omit) }}"
-    expires: "{{ __user_linux_acc['expires'] }}"
-    password: "{{ __user_linux_acc['password']['hash'] | ansible.builtin.default(omit) }}"
-    password_lock: "{{ __user_linux_acc['password']['lock'] | ansible.builtin.default(omit) }}"
-    update_password: "{{ __user_linux_acc['password']['update'] }}"
-    password_expire_min: "{{ __user_linux_acc['password']['expire_min'] | ansible.builtin.default(omit) }}"
-    password_expire_max: "{{ __user_linux_acc['password']['expire_max'] | ansible.builtin.default(omit) }}"
-    password_expire_warn: "{{ __user_linux_acc['password']['expire_warn'] | ansible.builtin.default(omit) }}"
-    state: "present"
+    append: >-
+      {{
+        __user_linux_account_item_effective['groups_append']
+        if (__user_linux_account_item_effective['groups'] | ansible.builtin.default([]) | ansible.builtin.length) > 0
+        else omit
+      }}
+    shell: "{{ __user_linux_account_item_effective['shell'] }}"
+    home: "{{ __user_linux_account_item_effective['home']['path'] | ansible.builtin.default(omit) }}"
+    create_home: "{{ __user_linux_account_item_effective['home']['create'] }}"
+    move_home: "{{ __user_linux_account_item_effective['home']['move'] }}"
+    skeleton: "{{ __user_linux_account_item_effective['home']['skeleton'] | ansible.builtin.default(omit) }}"
+    umask: "{{ __user_linux_account_item_effective['umask'] }}"
+    system: "{{ __user_linux_account_item_effective['system'] }}"
+    local: "{{ __user_linux_account_item_effective['local'] }}"
+    seuser: "{{ __user_linux_account_item_effective['seuser'] | ansible.builtin.default(omit) }}"
+    expires: "{{ __user_linux_account_item_effective['expires'] }}"
+    password: "{{ __user_linux_account_item_effective['password']['hash'] | ansible.builtin.default(omit) }}"
+    password_lock: "{{ __user_linux_account_item_effective['password']['lock'] | ansible.builtin.default(omit) }}"
+    update_password: "{{ __user_linux_account_item_effective['password']['update'] }}"
+    password_expire_min: "{{ __user_linux_account_item_effective['password']['expire_min'] | ansible.builtin.default(omit) }}"
+    password_expire_max: "{{ __user_linux_account_item_effective['password']['expire_max'] | ansible.builtin.default(omit) }}"
+    password_expire_warn: "{{ __user_linux_account_item_effective['password']['expire_warn'] | ansible.builtin.default(omit) }}"
   vars:
-    __user_linux_acc: >-
+    # Merge the internal and external defaults (= __user_linux_account_defaults_effective)
+    # with the loop item's data, which has higher precedence and overrides the defaults.
+    __user_linux_account_item_effective: >-
       {{
         __user_linux_account_defaults_effective
         | ansible.builtin.combine(__user_linux_account_item, recursive=true)
       }}
   when:
-    - (__user_linux_account_item['state'] | ansible.builtin.default('present')) == 'present'
+    # 'state' is always populated from the internal defaults (and should raise an error if
+    # missing.as it indicates broken defaults)
+    - __user_linux_account_item_effective['state'] == 'present'
   loop: "{{ user_linux_accounts }}"
   loop_control:
     loop_var: "__user_linux_account_item"
@@ -68,14 +87,21 @@
   no_log: true # an account's password hash must not be leaked into the task output
 
 
-- name: "Config | Default | Set authorized_keys (present accounts with a non-empty key list)"
+- name: "Config | Default | Set authorized_keys for present accounts"
   ansible.posix.authorized_key:
-    user: "{{ __user_linux_account_item['name'] }}"
+    user: "{{ __user_linux_account_item_effective['name'] }}"
+    # From the module's documentation:
+    # > Multiple keys can be specified in a single key string value by separating
+    # > them by newlines. This option is not loop aware, [...] If you want
+    # > multiple keys in the file you need to pass them all to key in a single
+    # > batch.
     key: "{{ __user_linux_ssh_blob }}"
-    exclusive: "{{ __user_linux_acc['ssh_authorized_keys_delete_unmanaged'] | ansible.builtin.bool }}"
+    exclusive: "{{ __user_linux_account_item_effective['ssh_authorized_keys_delete_unmanaged'] | ansible.builtin.bool }}"
     state: "present"
   vars:
-    __user_linux_acc: >-
+    # Merge the internal and external defaults (= __user_linux_account_defaults_effective)
+    # with the loop item's data, which has higher precedence and overrides the defaults.
+    __user_linux_account_item_effective: >-
       {{
         __user_linux_account_defaults_effective
         | ansible.builtin.combine(__user_linux_account_item, recursive=true)
@@ -85,7 +111,7 @@
     # so "exclusive" can manage the whole set authoritatively.
     __user_linux_ssh_blob: >-
       {%- set __ns = namespace(lines=[]) -%}
-      {%- for __e in (__user_linux_acc['ssh_authorized_keys'] | ansible.builtin.default([])) -%}
+      {%- for __e in (__user_linux_account_item_effective['ssh_authorized_keys'] | ansible.builtin.default([])) -%}
       {%-   if (__e['state'] | ansible.builtin.default('present')) == 'present' -%}
       {%-     set __opt = __e['options'] | ansible.builtin.default('') -%}
       {%-     set _ = __ns.lines.append(((__opt ~ ' ') if (__opt | ansible.builtin.length) > 0 else '') ~ __e['key']) -%}
@@ -93,93 +119,127 @@
       {%- endfor -%}
       {{ __ns.lines | ansible.builtin.join('\n') }}
   when:
-    - (__user_linux_account_item['state'] | ansible.builtin.default('present')) == 'present'
-    - (__user_linux_acc['ssh_authorized_keys'] | ansible.builtin.default([]) | ansible.builtin.length) > 0
+    # 'state' is always populated from the internal defaults (and should raise an error if
+    # missing.as it indicates broken defaults)
+    - __user_linux_account_item_effective['state'] == 'present'
+    - (__user_linux_account_item_effective['ssh_authorized_keys'] | ansible.builtin.default([]) | ansible.builtin.length) > 0
   loop: "{{ user_linux_accounts }}"
   loop_control:
     loop_var: "__user_linux_account_item"
     label: "{{ __user_linux_account_item['name'] }}"
 
 
-- name: "Config | Default | Remove individual authorized_keys (when not exclusive)"
+- name: "Config | Default | Remove individual authorized_keys"
   ansible.posix.authorized_key:
     user: "{{ __user_linux_sshkey_item[0]['name'] }}"
     key: "{{ __user_linux_sshkey_item[1]['key'] }}"
     state: "absent"
   vars:
-    __user_linux_acc: >-
+    # Merge the internal and external defaults (= __user_linux_account_defaults_effective)
+    # with the loop item's data, which has higher precedence and overrides the defaults.
+    __user_linux_account_item_effective: >-
       {{
         __user_linux_account_defaults_effective
         | ansible.builtin.combine(__user_linux_sshkey_item[0], recursive=true)
       }}
   when:
-    - (__user_linux_sshkey_item[0]['state'] | ansible.builtin.default('present')) == 'present'
+    # 'state' is always populated from the internal defaults (and should raise an error if
+    # missing.as it indicates broken defaults)
+    - __user_linux_account_item_effective['state'] == 'present'
     - (__user_linux_sshkey_item[1]['state'] | ansible.builtin.default('present')) == 'absent'
-    - not (__user_linux_acc['ssh_authorized_keys_delete_unmanaged'] | ansible.builtin.bool)
+    # Fo not delete individueal SSH keys individually if they get all cleaned up later
+    # by a global repaing of unmanaged authorized SSH keys of the user
+    - not (__user_linux_account_item_effective['ssh_authorized_keys_delete_unmanaged'] | ansible.builtin.bool)
   loop: "{{ user_linux_accounts | ansible.builtin.subelements('ssh_authorized_keys', skip_missing=true) }}"
   loop_control:
+    # Each __user_linux_sshkey_item loop iteration is a 2-element list because of
+    # ansible.builtin.subelements:
+    # - [0]: The whole parent account dict (name, comment, groups, ssh_authorized_keys, ...).
+    # - [1]: A single(!) entry from that account's `ssh_authorized_keys` list (key, options,
+    #        state). So if a user has multiple keys, there will be multiple loop iterations.
     loop_var: "__user_linux_sshkey_item"
     label: "{{ __user_linux_sshkey_item[0]['name'] }}"
 
 
 - name: "Config | Default | Remove accounts including their data (home directory and mail spool)"
   ansible.builtin.user:
-    name: "{{ __user_linux_account_item['name'] }}"
+    name: "{{ __user_linux_account_item_effective['name'] }}"
     state: "absent"
     remove: true
     force: true
+  vars:
+    # Merge the internal and external defaults (= __user_linux_account_defaults_effective)
+    # with the loop item's data, which has higher precedence and overrides the defaults.
+    __user_linux_account_item_effective: >-
+      {{
+        __user_linux_account_defaults_effective
+        | ansible.builtin.combine(__user_linux_account_item, recursive=true)
+      }}
   when:
-    - (__user_linux_account_item['state'] | ansible.builtin.default('present')) == 'absent'
+    # 'state' is always populated from the internal defaults (and should raise an error if
+    # missing.as it indicates broken defaults)
+    - __user_linux_account_item_effective['state'] == 'absent'
   loop: "{{ user_linux_accounts }}"
   loop_control:
     loop_var: "__user_linux_account_item"
     label: "{{ __user_linux_account_item['name'] }}"
 
 
-- name: "Config | Default | Gather local passwd database (only when reaping unmanaged accounts)"
-  ansible.builtin.getent:
-    database: "passwd"
+- name: "Config | Default | Delete / reap unmanaged user accounts"
   when:
     - user_linux_accounts_delete_unmanaged | ansible.builtin.bool
+  block:
+
+    - name: "Config | Default | Gather local passwd database"
+      ansible.builtin.getent:
+        database: "passwd"
 
 
-- name: "Config | Default | Remove unmanaged accounts within the UID range (never: root, system accounts or the Ansible connection's user)"
-  ansible.builtin.user:
-    name: "{{ __user_linux_reap_item }}"
-    state: "absent"
-    remove: true
-    force: true
-  vars:
-    __user_linux_reap_managed: "{{ user_linux_accounts | ansible.builtin.map(attribute='name') | ansible.builtin.list }}"
-    __user_linux_reap_protected: >-
-      {{
-        (['root', ansible_facts['user_id'] | ansible.builtin.default('')] | ansible.builtin.select | ansible.builtin.list)
-        + __user_linux_reap_managed
-        + (user_linux_accounts_delete_unmanaged_exclude | ansible.builtin.default([]))
-      }}
-    __user_linux_reap_candidates: >-
-      {%- set __ns = namespace(names=[]) -%}
-      {%- for __pw in (ansible_facts['getent_passwd'] | ansible.builtin.default({}) | ansible.builtin.dict2items) -%}
-      {%-   if ((__pw['value'][1] | int) >= (__user_linux_uid_min_effective | int))
-               and ((__pw['value'][1] | int) <= (__user_linux_uid_max_effective | int))
-               and (__pw['key'] not in __user_linux_reap_protected) -%}
-      {%-     set _ = __ns.names.append(__pw['key']) -%}
-      {%-   endif -%}
-      {%- endfor -%}
-      {{ __ns.names }}
-  when:
-    - user_linux_accounts_delete_unmanaged | ansible.builtin.bool
-  loop: "{{ __user_linux_reap_candidates }}"
-  loop_control:
-    loop_var: "__user_linux_reap_item"
+    - name: "Config | Default | Remove unmanaged accounts within the UID range (never: root, system accounts or the Ansible connection's user)"
+      ansible.builtin.user:
+        name: "{{ __user_linux_reap_item }}"
+        state: "absent"
+        remove: true
+        force: true
+      vars:
+        __user_linux_reap_managed: "{{ user_linux_accounts | ansible.builtin.map(attribute='name') | ansible.builtin.list }}"
+        __user_linux_reap_protected: >-
+          {{
+            (['root', ansible_facts['user_id'] | ansible.builtin.default('')] | ansible.builtin.select | ansible.builtin.list)
+            + __user_linux_reap_managed
+            + (user_linux_accounts_delete_unmanaged_exclude | ansible.builtin.default([]))
+          }}
+        __user_linux_reap_candidates: >-
+          {%- set __ns = namespace(names=[]) -%}
+          {%- for __pw in (ansible_facts['getent_passwd'] | ansible.builtin.default({}) | ansible.builtin.dict2items) -%}
+          {%-   if ((__pw['value'][1] | int) >= (__user_linux_uid_min_effective | int))
+                  and ((__pw['value'][1] | int) <= (__user_linux_uid_max_effective | int))
+                  and (__pw['key'] not in __user_linux_reap_protected) -%}
+          {%-     set _ = __ns.names.append(__pw['key']) -%}
+          {%-   endif -%}
+          {%- endfor -%}
+          {{ __ns.names }}
+      loop: "{{ __user_linux_reap_candidates }}"
+      loop_control:
+        loop_var: "__user_linux_reap_item"
 
 
-- name: "Config | Default | Remove groups "
+- name: "Config | Default | Remove groups"
   ansible.builtin.group:
-    name: "{{ __user_linux_group_item['name'] }}"
+    name: "{{ __user_linux_group_item_effective['name'] }}"
     state: "absent"
+  vars:
+    # Merge the internal and external defaults (= __user_linux_group_defaults_effective)
+    # with the loop item's data, which has higher precedence and overrides the defaults.
+    __user_linux_group_item_effective: >-
+      {{
+        __user_linux_group_defaults_effective
+        | ansible.builtin.combine(__user_linux_group_item, recursive=true)
+      }}
   when:
-    - (__user_linux_group_item['state'] | ansible.builtin.default('present')) == 'absent'
+    # 'state' is always populated from the internal defaults (and should raise an error if
+    # missing.as it indicates broken defaults)
+    - __user_linux_group_item_effective['state'] == 'absent'
   loop: "{{ user_linux_groups }}"
   loop_control:
     loop_var: "__user_linux_group_item"

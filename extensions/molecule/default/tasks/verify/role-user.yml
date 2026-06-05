@@ -1,6 +1,5 @@
 # Check collection role "user" outcomes.
 
-
 - name: "Molecule | Verify | user | Initialize the foundata.linux.user role (expose internal vars without running it)"
   ansible.builtin.include_role:
     name: "foundata.linux.user"
