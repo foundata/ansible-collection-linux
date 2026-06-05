@@ -43,6 +43,7 @@ Manage local user accounts on Linux systems.
       - [`user_linux_accounts['ssh_authorized_keys']['options']`](#variable-user_linux_accounts-sub-ssh_authorized_keys-sub-options)
       - [`user_linux_accounts['ssh_authorized_keys']['state']`](#variable-user_linux_accounts-sub-ssh_authorized_keys-sub-state)
     - [`user_linux_accounts['ssh_authorized_keys_delete_unmanaged']`](#variable-user_linux_accounts-sub-ssh_authorized_keys_delete_unmanaged)
+  - [`user_linux_group_defaults`](#variable-user_linux_group_defaults)
   - [`user_linux_groups`](#variable-user_linux_groups)
     - [`user_linux_groups['name']`](#variable-user_linux_groups-sub-name)
     - [`user_linux_groups['state']`](#variable-user_linux_groups-sub-state)
@@ -235,7 +236,8 @@ The following variables can be configured for this role:
 | Variable | Type | Required | Default | Description (abstract) |
 |----------|------|----------|---------|------------------------|
 | `user_linux_account_defaults` | `dict` | No | `{}` | Default values applied to every entry in `user_linux_accounts` that does not set the corresponding key itself. This avoids repeating common settings (login shell, umask, ...) on each account.<br><br>The keys mirror the per-account keys of the same […](#variable-user_linux_account_defaults) |
-| `user_linux_accounts` | `list` | No | `[]` | List of local user accounts to manage. Each entry describes one account as a dictionary; `name` is mandatory, all other keys are optional and fall back to `user_linux_account_defaults` (where noted) or to the underlying platform defaults.<br><br>This […](#variable-user_linux_accounts) |
+| `user_linux_accounts` | `list` | No | `[]` | List of local user accounts to manage. Each entry describes one account as a dictionary; `name` is mandatory, all other keys are optional and fall back to `user_linux_account_defaults` (where noted) or to the underlying platform defaults (when […](#variable-user_linux_accounts) |
+| `user_linux_group_defaults` | `dict` | No | `{}` | Default values applied to every entry in `user_linux_groups` that does not set the corresponding key itself. The keys mirror the per-group keys of the same name (see `user_linux_groups`); any value provided here is overridden by an explicit value on […](#variable-user_linux_group_defaults) |
 | `user_linux_groups` | `list` | No | `[]` | List of local groups to manage. Each entry describes one group as a dictionary; `name` is mandatory, all other keys are optional.<br><br>Groups are created before the accounts in `user_linux_accounts` (so they can be referenced as primary or […](#variable-user_linux_groups) |
 | `user_linux_accounts_delete_unmanaged` | `bool` | No | `false` | If `true`, local user accounts that are not listed in `user_linux_accounts` are removed (together with their data). Only regular accounts are considered: an account is a candidate for removal only if its UID is within the `UID_MIN`..`UID_MAX` range […](#variable-user_linux_accounts_delete_unmanaged) |
 | `user_linux_accounts_delete_unmanaged_exclude` | `list` | No | `[]` | List of account names that must never be removed by `user_linux_accounts_delete_unmanaged`, even if they are not declared in `user_linux_accounts` and fall within the regular UID range. Useful for break-glass or automation accounts.<br><br>`root` and […](#variable-user_linux_accounts_delete_unmanaged_exclude) |
@@ -291,11 +293,8 @@ Supported keys are all known by `user_linux_accounts`.
 
 List of local user accounts to manage. Each entry describes one account
 as a dictionary; `name` is mandatory, all other keys are optional and
-fall back to `user_linux_account_defaults` (where noted) or to the underlying platform defaults.
-
-This role manages local accounts only (entries in `/etc/passwd`); it never
-creates or modifies identities in a central directory such as LDAP, Active
-Directory or FreeIPA.
+fall back to `user_linux_account_defaults` (where noted) or to the
+underlying platform defaults (when completely undefined).
 
 To remove an account, set its `state` to `absent`: this deletes the user
 together with its data (home directory and mail spool). There is intentionally
@@ -424,8 +423,8 @@ Passed through to `ansible.builtin.user`.
 [*⇑ Back to ToC ⇑*](#toc)
 
 SELinux user mapping for the account (the SELinux user the Linux user
-is confined to, e.g. `staff_u`). Relevant on SELinux-enforcing
-platforms (RHEL/Fedora), ignored on others. Passed through to `ansible.builtin.user`.
+is confined to, e.g. `staff_u`). Relevant on SELinux-enforcing platforms
+(RHEL/Fedora), ignored on others. Passed through to `ansible.builtin.user`.
 
 - **Type**: `str`
 - **Required**: No
@@ -444,10 +443,10 @@ user-private group named after the account.
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Supplementary, additional groups the account is a member of. The groups
-must already exist; declare them either in `user_linux_groups` (which is
-applied before `user_linux_accounts` automatically) or ensure they are
-present by other means.
+Supplementary, additional groups the account is a member of. As groups
+must already exist: declare them either in `user_linux_groups` (which is
+applied before `user_linux_accounts` automatically so you do not have to
+care about the order) or ensure they are present by other means.
 
 - **Type**: `list`
 - **Required**: No
@@ -459,8 +458,7 @@ present by other means.
 
 If `true`, the supplementary `groups` are added to the account's
 existing memberships. If `false`, `groups` becomes authoritative and
-memberships not listed are removed. Falls back to
-`user_linux_account_defaults['groups_append']`.
+memberships not listed are removed.
 
 - **Type**: `bool`
 - **Required**: No
@@ -540,8 +538,8 @@ Password and password-aging settings for the account.
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Pre-hashed password in crypt format (for example a `$6$...`
-SHA-512 hash). Plain-text passwords are rejected by the role.
+Pre-hashed password in crypt format (for example a `$6$...` SHA-512
+hash). Plain-text passwords are rejected by the role.
 
 Generate a hash on the command line with
 `mkpasswd --method=sha-512` (Debian/Ubuntu: package `whois`;
@@ -556,8 +554,8 @@ RHEL/Fedora: `mkpasswd`), or within Ansible via the
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-If `true`, lock the account's password (the hash is kept but
-login via password is disabled).
+If `true`, lock the account's password (the hash is kept but login via
+password is disabled).
 
 - **Type**: `bool`
 - **Required**: No
@@ -566,8 +564,8 @@ login via password is disabled).
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-When the password hash is applied: `on_create` only sets it for
-new accounts, `always` enforces it on every run. Falls back to
+When the password hash is applied: `on_create` only sets it for new
+accounts, `always` enforces it on every run. Falls back to
 `user_linux_account_defaults['password']['update']`.
 
 - **Type**: `str`
@@ -606,16 +604,14 @@ Number of days of warning before a password expires (`chage -W`).
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-SSH public keys to install in the account's `authorized_keys` file.
-Each entry is a dictionary with the key itself and optional
-restrictions.
+SSH public keys to install in the account's `authorized_keys` file. Each
+entry is a dictionary with the key itself and optional restrictions.
 
 Whether keys not listed here are removed is controlled by
-`ssh_authorized_keys_delete_unmanaged`. When that is `true` (the
-default) the listed keys are authoritative. As a safety measure, an
-account with an empty or unset `ssh_authorized_keys` is left
-untouched, so omitting the key list never wipes an existing
-`authorized_keys`.
+`ssh_authorized_keys_delete_unmanaged`. When that is `true` (the default)
+the listed keys are authoritative. As a safety measure, an account with an
+empty or unset `ssh_authorized_keys` is left untouched, so omitting the
+key list never wipes an existing `authorized_keys`.
 
 Example:
 ```yaml
@@ -643,11 +639,10 @@ A single SSH public key, in the usual `authorized_keys` form
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Optional OpenSSH `authorized_keys` option string prepended to the
-key, restricting how it may be used (for example
-`from="10.0.0.0/8"`, `command="..."`, `restrict`,
-`expiry-time="..."`). See the `AUTHORIZED_KEYS FILE FORMAT`
-section of `man sshd` for the full list.
+Optional OpenSSH `authorized_keys` option string prepended to the key,
+restricting how it may be used (for example `from="10.0.0.0/8"`,
+`command="..."`, `restrict`, `expiry-time="..."`). See the
+`AUTHORIZED_KEYS FILE FORMAT` section of `man sshd` for the full list.
 
 - **Type**: `str`
 - **Required**: No
@@ -656,9 +651,9 @@ section of `man sshd` for the full list.
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Whether the key should be `present` or `absent`. Only meaningful
-when `ssh_authorized_keys_delete_unmanaged` is `false` (otherwise
-unlisted keys are removed regardless).
+Whether the key should be `present` or `absent`. Only meaningful when
+`ssh_authorized_keys_delete_unmanaged` is `false` (otherwise unlisted
+keys are removed regardless).
 
 - **Type**: `str`
 - **Required**: No
@@ -670,14 +665,40 @@ unlisted keys are removed regardless).
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-If `true`, the account's `authorized_keys` is managed
-authoritatively: keys not present in `ssh_authorized_keys` are
-removed. If `false`, listed keys are ensured present but other keys
-are left in place. Falls back to
+If `true`, the account's `authorized_keys` is managed authoritatively:
+keys not present in `ssh_authorized_keys` are removed. If `false`, listed
+keys are ensured present but other keys are left in place. Falls back to
 `user_linux_account_defaults['ssh_authorized_keys_delete_unmanaged']`.
 
 - **Type**: `bool`
 - **Required**: No
+
+
+
+### `user_linux_group_defaults`<a id="variable-user_linux_group_defaults"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+Default values applied to every entry in `user_linux_groups` that does not
+set the corresponding key itself. The keys mirror the per-group keys of the
+same name (see `user_linux_groups`); any value provided here is overridden by
+an explicit value on the individual group.
+
+Only the keys you want to change need to be supplied; they are deep-merged
+over the role's built-in defaults (see `__user_linux_group_defaults_builtin`
+in `vars/main.yml`). The effective built-in defaults are:
+
+```yaml
+user_linux_group_defaults:
+  state: "present"
+  system: false
+```
+
+Supported keys are all known by `user_linux_groups`.
+
+- **Type**: `dict`
+- **Required**: No
+- **Default**: `{}`
 
 
 
@@ -758,15 +779,14 @@ platform's range for regular groups).
 [*⇑ Back to ToC ⇑*](#toc)
 
 If `true`, local user accounts that are not listed in
-`user_linux_accounts` are removed (together with their data). Only
-regular accounts are considered: an account is a candidate for removal
-only if its UID is within the `UID_MIN`..`UID_MAX` range (see
-`user_linux_uid_min` / `user_linux_uid_max`), so system accounts are
-never touched.
+`user_linux_accounts` are removed (together with their data). Only regular
+accounts are considered: an account is a candidate for removal only if its UID
+is within the `UID_MIN`..`UID_MAX` range (see `user_linux_uid_min` /
+`user_linux_uid_max`), so system accounts are never touched.
 
 The following accounts are always protected, even when not listed in
-`user_linux_accounts`: `root`, the account Ansible is currently connected
-as, and every name in `user_linux_accounts_delete_unmanaged_exclude`.
+`user_linux_accounts`: `root`, the account Ansible is currently connected as,
+and every name in `user_linux_accounts_delete_unmanaged_exclude`.
 
 This is a destructive operation and therefore disabled by default.
 
@@ -785,8 +805,8 @@ List of account names that must never be removed by
 `user_linux_accounts` and fall within the regular UID range. Useful for
 break-glass or automation accounts.
 
-`root` and the current Ansible connection user are always protected and
-do not need to be listed here.
+`root` and the current Ansible connection user are always protected and do not
+need to be listed here.
 
 - **Type**: `list`
 - **Required**: No
@@ -800,10 +820,9 @@ do not need to be listed here.
 [*⇑ Back to ToC ⇑*](#toc)
 
 Lower bound (inclusive) of the UID range that
-`user_linux_accounts_delete_unmanaged` considers to be regular user
-accounts. An empty string (the default) means the value is read from
-`UID_MIN` in `/etc/login.defs` (falling back to `1000` if it cannot be
-determined).
+`user_linux_accounts_delete_unmanaged` considers to be regular user accounts.
+An empty string (the default) means the value is read from `UID_MIN` in
+`/etc/login.defs` (falling back to `1000` if it cannot be determined).
 
 - **Type**: `raw`
 - **Required**: No

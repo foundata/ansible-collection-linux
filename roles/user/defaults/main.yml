@@ -47,11 +47,7 @@ user_linux_account_defaults: {}
 # List of local user accounts to manage. Each entry describes one account as a
 # dictionary; `name` is mandatory, all other keys are optional and fall back to
 # `user_linux_account_defaults` (where noted) or to the underlying platform
-# defaults.
-#
-# This role manages local accounts only (entries in `/etc/passwd`); it never
-# creates or modifies identities in a central directory such as LDAP, Active
-# Directory or FreeIPA.
+# defaults (when completely undefined).
 #
 # To remove an account, set its `state` to `absent`: this deletes the user
 # together with its data (home directory and mail spool). There is intentionally
@@ -89,9 +85,9 @@ user_linux_accounts: []
 # name (see `user_linux_groups`); any value provided here is overridden by an
 # explicit value on the individual group.
 #
-# Only the keys you want to change need to be supplied; they are deep-merged over
-# the role's built-in defaults (see `__user_linux_group_defaults_builtin` in
-# `vars/main.yml`). The effective built-in defaults are:
+# Only the keys you want to change need to be supplied; they are deep-merged
+# over the role's built-in defaults (see `__user_linux_group_defaults_builtin`
+# in `vars/main.yml`). The effective built-in defaults are:
 #
 # ```yaml
 # user_linux_group_defaults:
