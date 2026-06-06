@@ -1,0 +1,95 @@
+# Check collection role "sudo" outcomes.
+
+- name: "Molecule | Verify | sudo | Initialize the foundata.linux.sudo role (expose internal vars without running it)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.sudo"
+    tasks_from: "init"
+    public: true
+
+
+- name: "Molecule | Verify | sudo | Set sudo_linux_* and __testing_* parameters as facts from __testing_state"
+  ansible.builtin.set_fact:
+    "{{ item['key'] }}": "{{ item['value'] }}"
+  loop: >-
+    {{
+      (__testing_state | ansible.builtin.default({}, true))
+      | ansible.builtin.dict2items
+      | ansible.builtin.selectattr('key', 'match', '^(sudo_linux_|__testing_)')
+      | ansible.builtin.list
+    }}
+
+
+- name: "Molecule | Verify | sudo | Stat the managed drop-in files (one per grantee plus the global Defaults file)"
+  ansible.builtin.stat:
+    path: "{{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_basename }}"
+  register: __testing_sudo_dropins
+  loop:
+    - "{{ __sudo_linux_dropin_prefix }}molecule_admins-group-molecule_sudoadmins"
+    - "{{ __sudo_linux_dropin_prefix }}molecule_deploy-user-molecule_deployer"
+    - "{{ __sudo_linux_dropin_prefix }}molecule_multi-user-molecule_deployer"
+    - "{{ __sudo_linux_dropin_prefix }}molecule_multi-group-molecule_sudoadmins"
+    - "{{ __sudo_linux_dropin_prefix }}defaults"
+  loop_control:
+    loop_var: "__sudo_linux_dropin_basename"
+
+
+- name: "Molecule | Verify | sudo | Assert every managed drop-in exists with root:root ownership and mode 0440"
+  ansible.builtin.assert:
+    that:
+      - __sudo_linux_dropin_stat['stat']['exists']
+      - __sudo_linux_dropin_stat['stat']['pw_name'] == __sudo_linux_dropin_file_owner
+      - __sudo_linux_dropin_stat['stat']['gr_name'] == __sudo_linux_dropin_file_group
+      - __sudo_linux_dropin_stat['stat']['mode'] == '0440'
+    fail_msg: "Drop-in '{{ __sudo_linux_dropin_stat['__sudo_linux_dropin_basename'] }}' is missing or has unexpected ownership/permissions."
+    success_msg: "Drop-in '{{ __sudo_linux_dropin_stat['__sudo_linux_dropin_basename'] }}' exists with root:root and mode 0440."
+  loop: "{{ __testing_sudo_dropins['results'] }}"
+  loop_control:
+    loop_var: "__sudo_linux_dropin_stat"
+    label: "{{ __sudo_linux_dropin_stat['__sudo_linux_dropin_basename'] }}"
+
+
+- name: "Molecule | Verify | sudo | Stat the drop-in of the 'absent' rule"
+  ansible.builtin.stat:
+    path: "{{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_prefix }}molecule_legacy_absent-group-molecule_sudoadmins"
+  register: __testing_sudo_absent
+
+
+- name: "Molecule | Verify | sudo | Assert the 'absent' rule has no drop-in"
+  ansible.builtin.assert:
+    that:
+      - not __testing_sudo_absent['stat']['exists']
+    fail_msg: "The drop-in for the 'absent' rule still exists."
+    success_msg: "The 'absent' rule has no drop-in, as expected."
+
+
+- name: "Molecule | Verify | sudo | Read the global Defaults / extra_content drop-in"
+  ansible.builtin.slurp:
+    src: "{{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_prefix }}defaults"
+  register: __testing_sudo_defaults
+
+
+- name: "Molecule | Verify | sudo | Assert the global Defaults and extra_content were rendered"
+  vars:
+    __testing_sudo_defaults_content: "{{ __testing_sudo_defaults['content'] | ansible.builtin.b64decode }}"
+  ansible.builtin.assert:
+    that:
+      - "'Defaults env_reset' in __testing_sudo_defaults_content"
+      - "'Defaults timestamp_timeout=15' in __testing_sudo_defaults_content"
+      # verbatim sudo_linux_extra_content (a qualified Defaults the list cannot express)
+      - "'Defaults:molecule_deployer !requiretty' in __testing_sudo_defaults_content"
+    fail_msg: "The global Defaults drop-in does not contain the expected directives."
+    success_msg: "The global Defaults drop-in contains the expected directives and extra_content."
+
+
+- name: "Molecule | Verify | sudo | Validate every managed drop-in with visudo -cf (non-zero rc fails the task)"
+  ansible.builtin.command:
+    cmd: "{{ __sudo_linux_visudo_exec_path }} -cf {{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_basename }}"
+  changed_when: false
+  loop:
+    - "{{ __sudo_linux_dropin_prefix }}molecule_admins-group-molecule_sudoadmins"
+    - "{{ __sudo_linux_dropin_prefix }}molecule_deploy-user-molecule_deployer"
+    - "{{ __sudo_linux_dropin_prefix }}molecule_multi-user-molecule_deployer"
+    - "{{ __sudo_linux_dropin_prefix }}molecule_multi-group-molecule_sudoadmins"
+    - "{{ __sudo_linux_dropin_prefix }}defaults"
+  loop_control:
+    loop_var: "__sudo_linux_dropin_basename"
