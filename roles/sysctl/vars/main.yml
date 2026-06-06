@@ -15,6 +15,11 @@
 #     gather_subset:
 #       - '!min'
 #       - '<subset_name, see parameter doc for details>'
+#
+# These are "gather_subset" tokens for ansible.builtin.setup (not raw fact key
+# names). The "hardware" token is required because profile auto-calculation
+# (vars/profiles/*.yml) derives values from ansible_facts['memtotal_mb'], which
+# is only provided by "hardware" (there is no fine-grained memory token).
 __sysctl_linux_used_facts:
   # from subset "distribution"
   - "distribution"
@@ -24,6 +29,22 @@ __sysctl_linux_used_facts:
   # from subset "virtual"
   - "virtualization_role"
   - "virtualization_type"
+  # from subset "hardware" (provides memtotal_mb and processor_* for profiles)
+  - "hardware"
+
+
+# Concrete ansible_facts key names the role actually consumes. Used to decide
+# whether facts must be (re)gathered: unlike __sysctl_linux_used_facts (which
+# contains gather_subset tokens like "hardware" that are never fact keys), every
+# entry here is a real key in ansible_facts, so it can be checked for presence.
+__sysctl_linux_required_fact_keys:
+  - "distribution"
+  - "distribution_major_version"
+  - "distribution_version"
+  - "os_family"
+  - "virtualization_role"
+  - "virtualization_type"
+  - "memtotal_mb"
 
 
 # List of platforms this role supports and was designed for.
@@ -128,6 +149,22 @@ __sysctl_linux_config_dropin_file_mode: "{{ __sysctl_linux_config_file_mode }}"
 
 # Executable paths
 __sysctl_linux_sysctl_executable: "/usr/sbin/sysctl"
+
+
+# Kernel modules required by the selected profile (e.g. "nf_conntrack" for the
+# router profiles, "br_netfilter" for virtualization). The default is empty; a
+# profile overrides it via vars/profiles/<profile>.yml (include_vars outranks
+# this file). tasks/init.yml loads them on a best-effort basis so module-
+# dependent kernel parameters (net.netfilter.*, net.bridge.*) can be set.
+__sysctl_linux_profile_modules: []
+
+
+# Memory page size in bytes, used by profile auto-calculation for parameters
+# expressed in pages (e.g. kernel.shmall). There is no Ansible fact for it, so
+# tasks/init.yml overrides this default with the value reported by
+# "getconf PAGE_SIZE" when a profile that needs it is selected. The 4096 default
+# is the common x86_64 / aarch64 (4K) page size and a safe fallback.
+__sysctl_linux_page_size: 4096
 
 
 # Effective sysctl parameters: the profile parameters (loaded on demand by
