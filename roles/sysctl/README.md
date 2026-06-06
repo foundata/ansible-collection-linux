@@ -187,25 +187,25 @@ Possible values:
 
 - '' (empty string): No tuning applied. Only explicit `sysctl_linux_parameters` are set.
 - `web`: High connection count and throughput. Recommended for web servers, API
-  gateways, load balancers, reverse proxies.  See [`web.md`](../vars/profiles/web.md)
+  gateways, load balancers, reverse proxies.  See [`web.md`](./vars/profiles/web.md)
   for details.
 - `database`: Memory management, shared memory, low swappiness, I/O tuning. Recommended
   for PostgreSQL, MySQL, Redis, Elasticsearch and so on. See
-  [`database.md`](../vars/profiles/database.md) for details.
+  [`database.md`](./vars/profiles/database.md) for details.
 - `file`: Network throughput and storage I/O. Recommended for fileservers (NFS,
   Samba/CIFS, SFTP) backup targets ad their like. See
-  [`file.md`](../vars/profiles/file.md) for details.
+  [`file.md`](./vars/profiles/file.md) for details.
 - `virtualization`: Memory overcommit, scheduler tuning, storage I/O. Recommended for
-  KVM/QEMU hosts, Proxmox. See [`virtualization.md`](../vars/profiles/virtualization.md)
+  KVM/QEMU hosts, Proxmox. See [`virtualization.md`](./vars/profiles/virtualization.md)
   for details.
 - `router`: Connection tracking, neighbor tables, IP forwarding (IPv4 + IPv6).
   Recommended for firewalls, NAT gateways, VPN concentrators.
-  See [`router.md`](../vars/profiles/router.md) for details.
+  See [`router.md`](./vars/profiles/router.md) for details.
 - `router_v4only`: Like `router` but enables IPv4 forwarding only and explicitly disables
-  IPv6 forwarding. See [`router_v4only.md`](../vars/profiles/router_v4only.md) for
+  IPv6 forwarding. See [`router_v4only.md`](./vars/profiles/router_v4only.md) for
   details.
 - `router_v6only`: Like `router` but enables IPv6 forwarding only and explicitly disables
-  IPv4 forwarding. See [`router_v6only.md`](../vars/profiles/router_v6only.md) for details.
+  IPv4 forwarding. See [`router_v6only.md`](./vars/profiles/router_v6only.md) for details.
 
 - **Type**: `str`
 - **Required**: No
@@ -244,7 +244,9 @@ Example overriding a profile value:
 ```yaml
 sysctl_linux_profile: "database"
 sysctl_linux_parameters:
-  "vm.swappiness": 1  # override database profile default
+  "vm.swappiness": 1  # override profile default with another value
+  "vm.min_free_kbytes": null  # override profile default, do not manage and use kernel default
+  "net.ipv4.ip_forward": 1 # additional parameter not handled by the profile at all
 ```
 
 - **Type**: `dict`
