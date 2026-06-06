@@ -119,6 +119,10 @@
       - '__testing_file_content is regex("(?m)^#\s*net\.ipv4\.tcp_syncookies\s*=")'
       - '__testing_file_content is not regex("(?m)^net\.ipv4\.tcp_timestamps\s*=")'
       - '__testing_file_content is regex("(?m)^#\s*net\.ipv4\.tcp_timestamps\s*=")'
+      # Profile-derived parameter (managed by the "web" profile, not present in
+      # sysctl_linux_parameters): must also be commented out so the drop-in wins.
+      - '__testing_file_content is not regex("(?m)^net\.ipv4\.tcp_fin_timeout\s*=")'
+      - '__testing_file_content is regex("(?m)^#\s*net\.ipv4\.tcp_fin_timeout\s*=")'
     fail_msg: "Managed parameters not properly commented out or unmanaged parameter was modified in '{{ __sysctl_linux_config_file_path }}'."
     success_msg: "All managed parameters are commented out and unmanaged parameters remain untouched in '{{ __sysctl_linux_config_file_path }}'."
   when:
@@ -193,3 +197,211 @@
           - __sysctl_linux_effective_parameters['vm.swappiness'] == "10"
         fail_msg: "__sysctl_linux_effective_parameters did not merge profile and user parameters as expected."
         success_msg: "__sysctl_linux_effective_parameters merged profile and user parameters correctly."
+
+
+## Regression tests: profile loading and resource auto-calculation
+#
+# Re-run the role's init with a profile selected (no user parameters) and assert
+# the resulting __sysctl_linux_effective_parameters directly: static keys, the
+# required kernel module list, and the RAM-derived auto-calculated values. This
+# is init-only (nothing is applied to the kernel), so it is safe in containers.
+
+- name: "Molecule | Verify | Validate web profile (init-only, incl. auto-calculation)"
+  block:
+
+    - name: "Molecule | Verify | Select the web profile for the profile check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile: "web"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with the web profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert web profile parameters and auto-calculation"
+      ansible.builtin.assert:
+        that:
+          - (__sysctl_linux_effective_parameters['net.core.somaxconn'] | ansible.builtin.int) == 65535
+          - (__sysctl_linux_effective_parameters['net.ipv4.tcp_syncookies'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['fs.protected_symlinks'] | ansible.builtin.int) == 1
+          - "'nf_conntrack' in __sysctl_linux_profile_modules"
+          - (__sysctl_linux_effective_parameters['net.netfilter.nf_conntrack_max'] | ansible.builtin.int) ==
+            ((ansible_facts['memtotal_mb'] | ansible.builtin.int) * 16)
+          - (__sysctl_linux_effective_parameters['fs.file-max'] | ansible.builtin.int) ==
+            ([(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 100, 100000] | ansible.builtin.max)
+          - (__sysctl_linux_effective_parameters['net.core.rmem_max'] | ansible.builtin.int) ==
+            ([(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 128, 16777216] | ansible.builtin.min)
+        fail_msg: "web profile did not load or auto-calculate as expected."
+        success_msg: "web profile loaded and auto-calculated correctly."
+
+
+- name: "Molecule | Verify | Validate database profile (init-only, incl. auto-calculation)"
+  block:
+
+    - name: "Molecule | Verify | Select the database profile for the profile check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile: "database"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with the database profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert database profile parameters and auto-calculation"
+      ansible.builtin.assert:
+        that:
+          - (__sysctl_linux_effective_parameters['vm.swappiness'] | ansible.builtin.int) == 10
+          - (__sysctl_linux_effective_parameters['vm.dirty_ratio'] | ansible.builtin.int) == 40
+          - (__sysctl_linux_effective_parameters['kernel.shmmax'] | ansible.builtin.int) ==
+            ((ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 2)
+          - (__sysctl_linux_effective_parameters['kernel.shmall'] | ansible.builtin.int) ==
+            ((ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 2 // (__sysctl_linux_page_size | ansible.builtin.int))
+          - (__sysctl_linux_effective_parameters['vm.min_free_kbytes'] | ansible.builtin.int) ==
+            ([(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 // 100, 2097152] | ansible.builtin.min)
+        fail_msg: "database profile did not load or auto-calculate as expected."
+        success_msg: "database profile loaded and auto-calculated correctly."
+
+
+- name: "Molecule | Verify | Validate file profile (init-only, incl. auto-calculation)"
+  block:
+
+    - name: "Molecule | Verify | Select the file profile for the profile check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile: "file"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with the file profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert file profile parameters and auto-calculation"
+      vars:
+        __testing_bufmax: "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 128, 16777216] | ansible.builtin.min }}"
+      ansible.builtin.assert:
+        that:
+          - (__sysctl_linux_effective_parameters['net.core.rmem_default'] | ansible.builtin.int) == 1048576
+          - (__sysctl_linux_effective_parameters['fs.inotify.max_user_watches'] | ansible.builtin.int) == 524288
+          - (__sysctl_linux_effective_parameters['net.core.rmem_max'] | ansible.builtin.int) ==
+            (__testing_bufmax | ansible.builtin.int)
+          - __sysctl_linux_effective_parameters['net.ipv4.tcp_rmem'] ==
+            ('4096 1048576 ' ~ __testing_bufmax)
+        fail_msg: "file profile did not load or auto-calculate as expected."
+        success_msg: "file profile loaded and auto-calculated correctly."
+
+
+- name: "Molecule | Verify | Validate virtualization profile (init-only)"
+  block:
+
+    - name: "Molecule | Verify | Select the virtualization profile for the profile check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile: "virtualization"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with the virtualization profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert virtualization profile parameters and required module"
+      ansible.builtin.assert:
+        that:
+          - (__sysctl_linux_effective_parameters['vm.overcommit_memory'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['kernel.sched_migration_cost_ns'] | ansible.builtin.int) == 5000000
+          - (__sysctl_linux_effective_parameters['net.bridge.bridge-nf-call-iptables'] | ansible.builtin.int) == 0
+          - "'br_netfilter' in __sysctl_linux_profile_modules"
+        fail_msg: "virtualization profile did not load as expected."
+        success_msg: "virtualization profile loaded correctly."
+
+
+- name: "Molecule | Verify | Validate router profiles (init-only, incl. forwarding direction)"
+  block:
+
+    - name: "Molecule | Verify | Select the router profile for the profile check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile: "router"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with the router profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert router profile forwarding, conntrack and rp_filter"
+      ansible.builtin.assert:
+        that:
+          - (__sysctl_linux_effective_parameters['net.ipv4.ip_forward'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['net.ipv6.conf.all.forwarding'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['net.ipv4.conf.all.rp_filter'] | ansible.builtin.int) == 2
+          - "'nf_conntrack' in __sysctl_linux_profile_modules"
+          - (__sysctl_linux_effective_parameters['net.netfilter.nf_conntrack_max'] | ansible.builtin.int) ==
+            ((ansible_facts['memtotal_mb'] | ansible.builtin.int) * 32)
+          - (__sysctl_linux_effective_parameters['net.netfilter.nf_conntrack_buckets'] | ansible.builtin.int) ==
+            ((ansible_facts['memtotal_mb'] | ansible.builtin.int) * 8)
+        fail_msg: "router profile did not load or auto-calculate as expected."
+        success_msg: "router profile loaded and auto-calculated correctly."
+
+
+    - name: "Molecule | Verify | Select the router_v4only profile for the profile check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile: "router_v4only"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with the router_v4only profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert router_v4only enables IPv4 and disables IPv6 forwarding"
+      ansible.builtin.assert:
+        that:
+          - (__sysctl_linux_effective_parameters['net.ipv4.ip_forward'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['net.ipv4.conf.all.forwarding'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['net.ipv6.conf.all.forwarding'] | ansible.builtin.int) == 0
+          - (__sysctl_linux_effective_parameters['net.ipv6.conf.default.forwarding'] | ansible.builtin.int) == 0
+        fail_msg: "router_v4only forwarding direction is wrong."
+        success_msg: "router_v4only forwarding direction is correct."
+
+
+    - name: "Molecule | Verify | Select the router_v6only profile for the profile check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile: "router_v6only"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with the router_v6only profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert router_v6only enables IPv6 and disables IPv4 forwarding"
+      ansible.builtin.assert:
+        that:
+          - (__sysctl_linux_effective_parameters['net.ipv6.conf.all.forwarding'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['net.ipv4.ip_forward'] | ansible.builtin.int) == 0
+          - (__sysctl_linux_effective_parameters['net.ipv4.conf.all.forwarding'] | ansible.builtin.int) == 0
+          - (__sysctl_linux_effective_parameters['net.ipv4.conf.default.forwarding'] | ansible.builtin.int) == 0
+        fail_msg: "router_v6only forwarding direction is wrong."
+        success_msg: "router_v6only forwarding direction is correct."

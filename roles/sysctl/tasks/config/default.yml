@@ -139,9 +139,16 @@
 
 - name: "Config | Default | Build list of sysctl drop-in parameters that should take precedence"
   ansible.builtin.set_fact:
+    # Use the effective parameters (profile + user merge), not just
+    # sysctl_linux_parameters: every key the role writes to the drop-in must be
+    # commented out in the main config file. /etc/sysctl.conf is applied last by
+    # `sysctl --system` (after /etc/sysctl.d/*.conf, regardless of the drop-in's
+    # numeric prefix), so an uncommented duplicate there would otherwise override
+    # the managed value, including profile-derived ones. The null/'' filter below
+    # keeps keys we intentionally unmanage untouched.
     __sysctl_linux_parameters_comment: >-
       {{
-        sysctl_linux_parameters
+        __sysctl_linux_effective_parameters
         | ansible.builtin.dict2items
         | ansible.builtin.selectattr('value', 'ne', none)
         | ansible.builtin.rejectattr('value', 'equalto', '')
