@@ -64,6 +64,10 @@ argument_specs:
             is effectively full root access.
           - `nopassword` defaults to `false` (a password is required). Enable it
             only for specific, non-interactive commands.
+          - Avoid granting sudo access to broadly powerful commands such as `chmod`,
+            `chown`, `cp`, `mv`, or shell-capable tools unless the arguments are tightly
+            restricted. Misconfigured sudo rules can enable privilege escalation; see
+            GTFOBins for examples: https://gtfobins.org/
 
           Example:
           ```yaml
@@ -72,7 +76,7 @@ argument_specs:
             # ("sudo" on Debian/Ubuntu, "wheel" on RHEL/Fedora/SUSE).
             - name: "admins"
               groups:
-                - "wheel"
+                - "{\{ (ansible_facts['os_family'] == 'Debian') | ternary('sudo', 'wheel') }\}"
               commands:
                 - "ALL"
               runas: "ALL"
@@ -123,8 +127,8 @@ argument_specs:
           groups:
             description: |
               Group names this rule applies to (rendered with a leading `%` in the
-              sudoers file). At least one entry across `users` and `groups` is
-              required for a `present` rule.
+              sudoers file but do not put `%` here in the definition). At least one entry
+              across `users` and `groups` is required for a `present` rule.
             type: "list"
             elements: "str"
 
@@ -137,24 +141,23 @@ argument_specs:
 
           runas:
             description: |
-              Target identity the commands may be run as, i.e. the `(runas)` part of
-              the sudoers specification (for example `ALL`, `root`, or `ALL:ALL` to
-              also allow selecting a group). Falls back to
+              Target identity the commands may be run as, i.e. the `(runas)` part of the
+              sudoers specification (for example `ALL`, `root`, or `ALL:ALL` to also
+              allow selecting a group). Falls back to
               `sudo_linux_rule_defaults['runas']`.
             type: "str"
 
           nopassword:
             description: |
               If `true`, the grantees are not prompted for a password (`NOPASSWD`).
-              Falls back to `sudo_linux_rule_defaults['nopassword']` (which defaults
-              to `false`, i.e. a password is required).
+              Falls back to `sudo_linux_rule_defaults['nopassword']` (which defaults to
+              `false`, i.e. a password is required).
             type: "bool"
 
           setenv:
             description: |
-              If `true`, allow the grantees to set environment variables on the
-              command line (`SETENV`). Falls back to
-              `sudo_linux_rule_defaults['setenv']`.
+              If `true`, allow the grantees to set environment variables on the command
+              line (`SETENV`). Falls back to `sudo_linux_rule_defaults['setenv']`.
             type: "bool"
 
           noexec:
@@ -165,20 +168,20 @@ argument_specs:
 
           host:
             description: |
-              Host part of the sudoers specification, restricting the rule to
-              matching hosts. Falls back to `sudo_linux_rule_defaults['host']`
-              (which defaults to `ALL`).
+              Host part of the sudoers specification, restricting the rule to matching
+              hosts. Falls back to `sudo_linux_rule_defaults['host']` (which defaults
+              to `ALL`).
             type: "str"
 
       sudo_linux_rule_defaults:
         description: |
-          Default values applied to every entry in `sudo_linux_rules` that does not
-          set the corresponding key itself. The keys mirror the per-rule keys of the
-          same name (see `sudo_linux_rules`). Any value provided here is overridden
-          by an explicit value on the individual rule.
+          Default values applied to every entry in `sudo_linux_rules` that does not set
+          the corresponding key itself. The keys mirror the per-rule keys of the same
+          name (see `sudo_linux_rules`). Any value provided here is overridden by an
+          explicit value on the individual rule.
 
-          Only the keys you want to change need to be supplied; they are merged over
-          the role's built-in defaults (see `__sudo_linux_rule_defaults_builtin` in
+          Only the keys you want to change need to be supplied; they are merged over the
+          role's built-in defaults (see `__sudo_linux_rule_defaults_builtin` in
           `vars/main.yml`). The effective built-in defaults are:
 
           ```yaml
@@ -198,25 +201,57 @@ argument_specs:
 
       sudo_linux_defaults:
         description: |
-          Global `Defaults` directives to apply, rendered verbatim (one per line)
-          into a single managed, `visudo`-validated drop-in file. This is the escape
-          hatch for sudo-wide settings that are not tied to a specific rule, since
-          the per-rule mechanism cannot express `Defaults` lines.
+          Global `Defaults` directives to apply, for sudo-wide settings that are
+          not tied to a specific rule (the per-rule mechanism cannot express
+          `Defaults` lines). Each entry is one directive: the role prepends the
+          `Defaults` keyword and renders one `Defaults <entry>` line into a single
+          managed, `visudo`-validated drop-in file.
 
           Provide each directive as it would appear after the `Defaults` keyword in
           a sudoers file (without the leading `Defaults`).
+
+          This covers plain, global `Defaults` only. The qualified forms that attach
+          a specifier directly to the keyword (`Defaults:user`, `Defaults@host`,
+          `Defaults>runas`, `Defaults!command`) and any other raw sudoers content
+          (e.g. `Cmnd_Alias`, `User_Alias`) cannot be expressed here; use
+          `sudo_linux_extra_content` for those.
 
           Example:
           ```yaml
           sudo_linux_defaults:
             - "env_reset"
-            - "secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\""
+            - 'secure_path="/usr/sbin:/usr/bin:/sbin:/bin"'
             - "timestamp_timeout=15"
             - "!visiblepw"
           ```
         type: "list"
         elements: "str"
         default: []
+
+      sudo_linux_extra_content:
+        description: |
+          Last-resort escape hatch: raw sudoers content appended verbatim to the
+          role's managed, `visudo`-validated drop-in file, after the lines rendered
+          from `sudo_linux_defaults`. Use it for anything the structured variables
+          cannot express, for example qualified `Defaults` (`Defaults:user`,
+          `Defaults@host`, `Defaults>runas`, `Defaults!command`) or alias
+          definitions (`Cmnd_Alias`, `User_Alias`, `Runas_Alias`).
+
+          Unlike `sudo_linux_defaults`, nothing is prepended: write complete,
+          syntactically valid sudoers lines (including the `Defaults` keyword where
+          needed). The whole drop-in is still `visudo`-validated, so malformed
+          content fails the run rather than corrupting sudo. Prefer
+          `sudo_linux_rules` and `sudo_linux_defaults` whenever possible; reach for
+          this only when there is no other way.
+
+          Example:
+          ```yaml
+          sudo_linux_extra_content: |
+            Defaults:ansible !requiretty
+            Cmnd_Alias SERVICES = /usr/bin/systemctl
+          ```
+        type: "str"
+        default: ""
 
       sudo_linux_delete_unmanaged:
         description: |

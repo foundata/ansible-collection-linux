@@ -25,6 +25,7 @@ The `foundata.linux.sudo` Ansible role (part of the `foundata.linux` Ansible col
     - [`sudo_linux_rules['host']`](#variable-sudo_linux_rules-sub-host)
   - [`sudo_linux_rule_defaults`](#variable-sudo_linux_rule_defaults)
   - [`sudo_linux_defaults`](#variable-sudo_linux_defaults)
+  - [`sudo_linux_extra_content`](#variable-sudo_linux_extra_content)
   - [`sudo_linux_delete_unmanaged`](#variable-sudo_linux_delete_unmanaged)
   - [`sudo_linux_delete_unmanaged_exclude`](#variable-sudo_linux_delete_unmanaged_exclude)
 <!-- ANSIBLE DOCSMITH TOC END -->
@@ -215,7 +216,8 @@ The following variables can be configured for this role:
 | `sudo_linux_autoupgrade` | `bool` | No | `false` | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one).<br><br>This role manages the `sudo` package (it is missing from some minimal […](#variable-sudo_linux_autoupgrade) |
 | `sudo_linux_rules` | `list` | No | `[]` | List of sudo rules to manage. Each entry grants one or more users and/or groups the right to run a set of commands, and is rendered into validated drop-in files below `/etc/sudoers.d/` (one file per grantee, as the underlying […](#variable-sudo_linux_rules) |
 | `sudo_linux_rule_defaults` | `dict` | No | `{}` | Default values applied to every entry in `sudo_linux_rules` that does not set the corresponding key itself. The keys mirror the per-rule keys of the same name (see `sudo_linux_rules`). Any value provided here is overridden by an explicit value on the […](#variable-sudo_linux_rule_defaults) |
-| `sudo_linux_defaults` | `list` | No | `[]` | Global `Defaults` directives to apply, rendered verbatim (one per line) into a single managed, `visudo`-validated drop-in file. This is the escape hatch for sudo-wide settings that are not tied to a specific rule, since the per-rule mechanism cannot […](#variable-sudo_linux_defaults) |
+| `sudo_linux_defaults` | `list` | No | `[]` | Global `Defaults` directives to apply, for sudo-wide settings that are not tied to a specific rule (the per-rule mechanism cannot express `Defaults` lines). Each entry is one directive: the role prepends the `Defaults` keyword and renders one […](#variable-sudo_linux_defaults) |
+| `sudo_linux_extra_content` | `str` | No | `""` | Last-resort escape hatch: raw sudoers content appended verbatim to the role's managed, `visudo`-validated drop-in file, after the lines rendered from `sudo_linux_defaults`. Use it for anything the structured variables cannot express, for example […](#variable-sudo_linux_extra_content) |
 | `sudo_linux_delete_unmanaged` | `bool` | No | `false` | If `true`, the role manages `/etc/sudoers.d/` authoritatively: every drop-in file that is **not** created by this role is removed, except for<br><br>- an internal, per-platform protected list (for example the `README` shipped by the `sudo` package on […](#variable-sudo_linux_delete_unmanaged) |
 | `sudo_linux_delete_unmanaged_exclude` | `list` | No | `[]` | List of drop-in file names (basenames, relative to `/etc/sudoers.d/`) that must never be removed by `sudo_linux_delete_unmanaged`, even though they are not managed by this role. Use this for files shipped by the distribution or other software that […](#variable-sudo_linux_delete_unmanaged_exclude) |
 
@@ -283,6 +285,10 @@ Security notes:
   is effectively full root access.
 - `nopassword` defaults to `false` (a password is required). Enable it
   only for specific, non-interactive commands.
+- Avoid granting sudo access to broadly powerful commands such as `chmod`,
+  `chown`, `cp`, `mv`, or shell-capable tools unless the arguments are tightly
+  restricted. Misconfigured sudo rules can enable privilege escalation; see
+  GTFOBins for examples: https://gtfobins.org/
 
 Example:
 ```yaml
@@ -291,7 +297,7 @@ sudo_linux_rules:
   # ("sudo" on Debian/Ubuntu, "wheel" on RHEL/Fedora/SUSE).
   - name: "admins"
     groups:
-      - "wheel"
+      - "{\{ (ansible_facts['os_family'] == 'Debian') | ternary('sudo', 'wheel') }\}"
     commands:
       - "ALL"
     runas: "ALL"
@@ -354,8 +360,8 @@ User names this rule applies to. At least one entry across `users` and
 [*⇑ Back to ToC ⇑*](#toc)
 
 Group names this rule applies to (rendered with a leading `%` in the
-sudoers file). At least one entry across `users` and `groups` is
-required for a `present` rule.
+sudoers file but do not put `%` here in the definition). At least one entry
+across `users` and `groups` is required for a `present` rule.
 
 - **Type**: `list`
 - **Required**: No
@@ -376,9 +382,9 @@ Commands the grantees may run, as absolute paths or the special value
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Target identity the commands may be run as, i.e. the `(runas)` part of
-the sudoers specification (for example `ALL`, `root`, or `ALL:ALL` to
-also allow selecting a group). Falls back to
+Target identity the commands may be run as, i.e. the `(runas)` part of the
+sudoers specification (for example `ALL`, `root`, or `ALL:ALL` to also
+allow selecting a group). Falls back to
 `sudo_linux_rule_defaults['runas']`.
 
 - **Type**: `str`
@@ -389,8 +395,8 @@ also allow selecting a group). Falls back to
 [*⇑ Back to ToC ⇑*](#toc)
 
 If `true`, the grantees are not prompted for a password (`NOPASSWD`).
-Falls back to `sudo_linux_rule_defaults['nopassword']` (which defaults
-to `false`, i.e. a password is required).
+Falls back to `sudo_linux_rule_defaults['nopassword']` (which defaults to
+`false`, i.e. a password is required).
 
 - **Type**: `bool`
 - **Required**: No
@@ -399,9 +405,8 @@ to `false`, i.e. a password is required).
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-If `true`, allow the grantees to set environment variables on the
-command line (`SETENV`). Falls back to
-`sudo_linux_rule_defaults['setenv']`.
+If `true`, allow the grantees to set environment variables on the command
+line (`SETENV`). Falls back to `sudo_linux_rule_defaults['setenv']`.
 
 - **Type**: `bool`
 - **Required**: No
@@ -420,9 +425,9 @@ If `true`, prevent the run commands from executing further commands
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Host part of the sudoers specification, restricting the rule to
-matching hosts. Falls back to `sudo_linux_rule_defaults['host']`
-(which defaults to `ALL`).
+Host part of the sudoers specification, restricting the rule to matching
+hosts. Falls back to `sudo_linux_rule_defaults['host']` (which defaults
+to `ALL`).
 
 - **Type**: `str`
 - **Required**: No
@@ -433,13 +438,13 @@ matching hosts. Falls back to `sudo_linux_rule_defaults['host']`
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Default values applied to every entry in `sudo_linux_rules` that does not
-set the corresponding key itself. The keys mirror the per-rule keys of the
-same name (see `sudo_linux_rules`). Any value provided here is overridden
-by an explicit value on the individual rule.
+Default values applied to every entry in `sudo_linux_rules` that does not set
+the corresponding key itself. The keys mirror the per-rule keys of the same
+name (see `sudo_linux_rules`). Any value provided here is overridden by an
+explicit value on the individual rule.
 
-Only the keys you want to change need to be supplied; they are merged over
-the role's built-in defaults (see `__sudo_linux_rule_defaults_builtin` in
+Only the keys you want to change need to be supplied; they are merged over the
+role's built-in defaults (see `__sudo_linux_rule_defaults_builtin` in
 `vars/main.yml`). The effective built-in defaults are:
 
 ```yaml
@@ -465,19 +470,26 @@ sudo is always an explicit, per-rule opt-in.
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Global `Defaults` directives to apply, rendered verbatim (one per line)
-into a single managed, `visudo`-validated drop-in file. This is the escape
-hatch for sudo-wide settings that are not tied to a specific rule, since
-the per-rule mechanism cannot express `Defaults` lines.
+Global `Defaults` directives to apply, for sudo-wide settings that are
+not tied to a specific rule (the per-rule mechanism cannot express
+`Defaults` lines). Each entry is one directive: the role prepends the
+`Defaults` keyword and renders one `Defaults <entry>` line into a single
+managed, `visudo`-validated drop-in file.
 
 Provide each directive as it would appear after the `Defaults` keyword in
 a sudoers file (without the leading `Defaults`).
+
+This covers plain, global `Defaults` only. The qualified forms that attach
+a specifier directly to the keyword (`Defaults:user`, `Defaults@host`,
+`Defaults>runas`, `Defaults!command`) and any other raw sudoers content
+(e.g. `Cmnd_Alias`, `User_Alias`) cannot be expressed here; use
+`sudo_linux_extra_content` for those.
 
 Example:
 ```yaml
 sudo_linux_defaults:
   - "env_reset"
-  - "secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\""
+  - 'secure_path="/usr/sbin:/usr/bin:/sbin:/bin"'
   - "timestamp_timeout=15"
   - "!visiblepw"
 ```
@@ -486,6 +498,37 @@ sudo_linux_defaults:
 - **Required**: No
 - **Default**: `[]`
 - **List Elements**: `str`
+
+
+
+### `sudo_linux_extra_content`<a id="variable-sudo_linux_extra_content"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+Last-resort escape hatch: raw sudoers content appended verbatim to the
+role's managed, `visudo`-validated drop-in file, after the lines rendered
+from `sudo_linux_defaults`. Use it for anything the structured variables
+cannot express, for example qualified `Defaults` (`Defaults:user`,
+`Defaults@host`, `Defaults>runas`, `Defaults!command`) or alias
+definitions (`Cmnd_Alias`, `User_Alias`, `Runas_Alias`).
+
+Unlike `sudo_linux_defaults`, nothing is prepended: write complete,
+syntactically valid sudoers lines (including the `Defaults` keyword where
+needed). The whole drop-in is still `visudo`-validated, so malformed
+content fails the run rather than corrupting sudo. Prefer
+`sudo_linux_rules` and `sudo_linux_defaults` whenever possible; reach for
+this only when there is no other way.
+
+Example:
+```yaml
+sudo_linux_extra_content: |
+  Defaults:ansible !requiretty
+  Cmnd_Alias SERVICES = /usr/bin/systemctl
+```
+
+- **Type**: `str`
+- **Required**: No
+- **Default**: `""`
 
 
 

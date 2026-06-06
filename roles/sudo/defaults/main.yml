@@ -56,6 +56,10 @@ sudo_linux_autoupgrade: false
 #   effectively full root access.
 # - `nopassword` defaults to `false` (a password is required). Enable it only
 #   for specific, non-interactive commands.
+# - Avoid granting sudo access to broadly powerful commands such as `chmod`,
+#   `chown`, `cp`, `mv`, or shell-capable tools unless the arguments are tightly
+#   restricted. Misconfigured sudo rules can enable privilege escalation; see
+#   GTFOBins for examples: https://gtfobins.org/
 #
 # Example:
 #
@@ -65,7 +69,7 @@ sudo_linux_autoupgrade: false
 #   # ("sudo" on Debian/Ubuntu, "wheel" on RHEL/Fedora/SUSE).
 #   - name: "admins"
 #     groups:
-#       - "wheel"
+#       - "{\{ (ansible_facts['os_family'] == 'Debian') | ternary('sudo', 'wheel') }\}"
 #     commands:
 #       - "ALL"
 #     runas: "ALL"
@@ -117,20 +121,27 @@ sudo_linux_rules: []
 # - Default: {}
 sudo_linux_rule_defaults: {}
 
-# Global `Defaults` directives to apply, rendered verbatim (one per line) into a
-# single managed, `visudo` -validated drop-in file. This is the escape hatch for
-# sudo-wide settings that are not tied to a specific rule, since the per-rule
-# mechanism cannot express `Defaults` lines.
+# Global `Defaults` directives to apply, for sudo-wide settings that are not
+# tied to a specific rule (the per-rule mechanism cannot express `Defaults`
+# lines). Each entry is one directive: the role prepends the `Defaults` keyword
+# and renders one `Defaults <entry>` line into a single managed, `visudo`
+# -validated drop-in file.
 #
 # Provide each directive as it would appear after the `Defaults` keyword in a
 # sudoers file (without the leading `Defaults`).
+#
+# This covers plain, global `Defaults` only. The qualified forms that attach a
+# specifier directly to the keyword (`Defaults:user`, `Defaults@host`,
+# `Defaults>runas`, `Defaults!command`) and any other raw sudoers content (e.g.
+# `Cmnd_Alias`, `User_Alias`) cannot be expressed here; use
+# `sudo_linux_extra_content` for those.
 #
 # Example:
 #
 # ```yaml
 # sudo_linux_defaults:
 #   - "env_reset"
-#   - "secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\""
+#   - 'secure_path="/usr/sbin:/usr/bin:/sbin:/bin"'
 #   - "timestamp_timeout=15"
 #   - "!visiblepw"
 # ```
@@ -161,6 +172,33 @@ sudo_linux_defaults: []
 # - Required: No
 # - Default: false
 sudo_linux_delete_unmanaged: false
+
+# Last-resort escape hatch: raw sudoers content appended verbatim to the role's
+# managed, `visudo` -validated drop-in file, after the lines rendered from
+# `sudo_linux_defaults`. Use it for anything the structured variables cannot
+# express, for example qualified `Defaults` (`Defaults:user`, `Defaults@host`,
+# `Defaults>runas`, `Defaults!command`) or alias definitions (`Cmnd_Alias`,
+# `User_Alias`, `Runas_Alias`).
+#
+# Unlike `sudo_linux_defaults`, nothing is prepended: write complete,
+# syntactically valid sudoers lines (including the `Defaults` keyword where
+# needed). The whole drop-in is still `visudo` -validated, so malformed content
+# fails the run rather than corrupting sudo. Prefer `sudo_linux_rules` and
+# `sudo_linux_defaults` whenever possible; reach for this only when there is no
+# other way.
+#
+# Example:
+#
+# ```yaml
+# sudo_linux_extra_content: |
+#   Defaults:ansible !requiretty
+#   Cmnd_Alias SERVICES = /usr/bin/systemctl
+# ```
+#
+# - Type: str
+# - Required: No
+# - Default: ""
+sudo_linux_extra_content: ""
 
 # List of drop-in file names (basenames, relative to `/etc/sudoers.d/`) that
 # must never be removed by `sudo_linux_delete_unmanaged`, even though they are
