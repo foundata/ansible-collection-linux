@@ -41,12 +41,33 @@ __sudo_linux_used_facts:
 # - name: "Debian"
 #   versions:
 #     - "all"
-__sudo_linux_supported_platforms: []
+__sudo_linux_supported_platforms:
+  - name: "Debian"
+    versions:
+      - "12"
+      - "13"
+  - name: "Fedora"
+    versions:
+      - "43"
+      - "44"
+  - name: "openSUSE Leap"
+    versions:
+      - "16.0"
+  - name: "RedHat" # includes AlmaLinux, Rocky and CentOS Stream
+    versions:
+      - "9"
+      - "10"
+  - name: "Ubuntu"
+    versions:
+      - "22.04"
+      - "24.04"
+      - "26.04"
 
 
 # List of package names to be installed when sudo_linux_state is
 # set to "present".
-__sudo_linux_packages_install: []
+__sudo_linux_packages_install:
+  - "sudo"
 
 
 # List of package names to be uninstalled when sudo_linux_state is
@@ -56,7 +77,12 @@ __sudo_linux_packages_install: []
 # software. This is usually the case if there are common dependencies like
 # "curl" or "openssl" which typically should remain installed even after
 # uninstalling the software managed by this role.
-__sudo_linux_packages_uninstall: "{{ __sudo_linux_packages_install }}"
+#
+# Deliberately empty: sudo is a core component that other tooling and the
+# system itself rely on, so this role never uninstalls it (see the
+# sudo_linux_state documentation). Uninstalling only removes the drop-in files
+# this role manages.
+__sudo_linux_packages_uninstall: []
 
 
 # List of package names to be removed unconditionally before installation
@@ -78,6 +104,70 @@ __sudo_linux_paths_removal: []
 # configuration, while modified files are preserved. For example, RPM with
 # %config(noreplace) restores missing files but preserves modified ones.
 __sudo_linux_paths_neutralize: {}
+
+
+# Built-in default values applied to every entry in "sudo_linux_rules" that does
+# not set the corresponding key itself. The public "sudo_linux_rule_defaults" is
+# merged over this dict (see __sudo_linux_rule_defaults_effective below), and an
+# individual rule overrides both.
+#
+# Note: "nopassword: false" deliberately differs from the community.general.sudoers
+# module default (true), so that passwordless sudo is always an explicit, per-rule
+# opt-in.
+__sudo_linux_rule_defaults_builtin:
+  runas: "ALL"
+  host: "ALL"
+  nopassword: false
+  setenv: false
+  noexec: false
+
+
+# Effective per-rule defaults: the built-in defaults merged with the public
+# "sudo_linux_rule_defaults". Each rule in "sudo_linux_rules" is in turn merged
+# over this in tasks/config/default.yml.
+__sudo_linux_rule_defaults_effective: >-
+  {{
+    __sudo_linux_rule_defaults_builtin
+    | ansible.builtin.combine(sudo_linux_rule_defaults, recursive=true)
+  }}
+
+
+# Directory holding the sudoers drop-in files this role manages.
+__sudo_linux_dropin_dir: "/etc/sudoers.d"
+
+
+# Ownership and permissions for the drop-in files this role creates directly
+# (the global Defaults / extra_content file). sudoers files must be mode 0440
+# owned by root; this matches what community.general.sudoers applies to the
+# per-rule files it manages (the module hard-codes 0440 and has no mode option).
+__sudo_linux_dropin_file_owner: "root"
+__sudo_linux_dropin_file_group: "root"
+__sudo_linux_dropin_file_mode: "u=r,g=r,o=" # 0440
+
+
+# Filename prefix for every drop-in file this role creates. It serves two roles:
+#
+# - Marker: it makes files identifiable as role-managed so they can be reliably
+#   found again for cleanup (uninstall) and distinguished from foreign files
+#   (sudo_linux_delete_unmanaged).
+# - Ordering: sudo reads /etc/sudoers.d in lexical order and the last matching
+#   definition wins (both for "Defaults" and overlapping user specs). The leading
+#   "99_" makes the role's drop-ins load late, so its policy predictably takes
+#   precedence over lower-numbered foreign drop-ins (e.g. "90-cloud-init-users").
+#   It must not contain a dot, as sudo ignores any drop-in whose name has one.
+__sudo_linux_dropin_prefix: "99_managed_"
+
+
+# Path to the visudo executable used to validate the drop-in files this role
+# renders itself (community.general.sudoers locates visudo on its own).
+__sudo_linux_visudo_exec_path: "/usr/sbin/visudo"
+
+
+# Basenames in __sudo_linux_dropin_dir that sudo_linux_delete_unmanaged must
+# never remove, even though they are not managed by this role (supplemented by
+# the public sudo_linux_delete_unmanaged_exclude). Platform overrides add the
+# files shipped by the distribution's "sudo" package (e.g. "README" on Debian).
+__sudo_linux_dropin_protected: []
 
 
 ### Override defaults of dependencies used by this role (if any).

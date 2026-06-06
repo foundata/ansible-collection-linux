@@ -2,6 +2,27 @@
 
 ---
 
+- name: "Setup | Uninstall | List role-managed sudo drop-in files"
+  ansible.builtin.find:
+    paths:
+      - "{{ __sudo_linux_dropin_dir }}"
+    patterns:
+      - "{{ __sudo_linux_dropin_prefix }}*"
+    file_type: "file"
+    hidden: true
+  register: __sudo_linux_managed_dropins
+
+
+- name: "Setup | Uninstall | Remove role-managed sudo drop-in files"
+  ansible.builtin.file:
+    path: "{{ __sudo_linux_uninstall_item['path'] }}"
+    state: "absent"
+  loop: "{{ __sudo_linux_managed_dropins['files'] }}"
+  loop_control:
+    loop_var: "__sudo_linux_uninstall_item"
+    label: "{{ __sudo_linux_uninstall_item['path'] }}"
+
+
 - name: "Setup | Uninstall | Remove packages"
   ansible.builtin.package:
     name: "{{ __sudo_linux_packages_uninstall }}"

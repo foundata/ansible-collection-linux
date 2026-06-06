@@ -5,4 +5,7 @@
 
 ---
 
-# none right now
+# The "sudo" package ships /etc/sudoers.d/README on Debian/Ubuntu. Protect it so
+# sudo_linux_delete_unmanaged does not reap it.
+__sudo_linux_dropin_protected:
+  - "README"

@@ -28,6 +28,8 @@ tags:
 # Note: "*" selects the latest version available (not: "any")
 dependencies:
   "ansible.posix": ">=2.0.0"
+  # community.general.sudoers is used by the sudo role; setenv/noexec need >=8.4.0.
+  "community.general": ">=8.4.0"
 
 # List of file glob-like patterns to filter files or directories that should
 # not be included in the build artifact. Some are always filtered by

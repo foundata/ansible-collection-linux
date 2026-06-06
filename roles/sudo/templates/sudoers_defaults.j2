@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+#
+# Global "Defaults" directives (from "sudo_linux_defaults", each rendered as a
+# "Defaults <entry>" line) and verbatim content (from "sudo_linux_extra_content").
+{% for __sudo_linux_default in sudo_linux_defaults | ansible.builtin.default([]) %}
+Defaults {{ __sudo_linux_default }}
+{% endfor %}
+{% if (sudo_linux_extra_content | ansible.builtin.default('') | trim | length) > 0 %}
+
+{{ sudo_linux_extra_content | trim }}
+{% endif %}

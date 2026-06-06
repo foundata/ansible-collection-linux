@@ -1,0 +1,68 @@
+# Execute the collection role "sudo" against all driver-created instances.
+
+
+- name: "Molecule | Converge | sudo | Store sudo_linux_* role parameters in __testing_state"
+  ansible.builtin.include_tasks:
+    file: "../tasks/state_update.yml"
+  vars:
+    __testing_state_update:
+      sudo_linux_rule_defaults:
+        nopassword: false
+      sudo_linux_rules:
+        # Full admin access for a group (single grantee).
+        - name: "molecule_admins"
+          groups:
+            - "molecule_sudoadmins"
+          commands:
+            - "ALL"
+          runas: "ALL"
+        # Passwordless, scoped commands for a user, allowed to keep the environment.
+        - name: "molecule_deploy"
+          users:
+            - "molecule_deployer"
+          commands:
+            - "/usr/bin/systemctl restart nginx"
+            - "/usr/bin/systemctl reload nginx"
+          nopassword: true
+          setenv: true
+        # Multiple grantees in one rule -> one drop-in per user and per group.
+        - name: "molecule_multi"
+          users:
+            - "molecule_deployer"
+          groups:
+            - "molecule_sudoadmins"
+          commands:
+            - "/usr/bin/id"
+        # Removal of a rule created with the same grantees.
+        - name: "molecule_legacy_absent"
+          groups:
+            - "molecule_sudoadmins"
+          state: "absent"
+      sudo_linux_defaults:
+        - "env_reset"
+        - "timestamp_timeout=15"
+      sudo_linux_extra_content: |
+        Defaults:molecule_deployer !requiretty
+      # Authoritatively own /etc/sudoers.d (safe here: throwaway container,
+      # connected as root). Exercises the reaping + protected-list path.
+      sudo_linux_delete_unmanaged: true
+
+
+- name: "Molecule | Converge | sudo | Set sudo_linux_* parameters as facts from __testing_state"
+  ansible.builtin.set_fact:
+    "{{ item['key'] }}": "{{ item['value'] }}"
+  loop: >-
+    {{
+      (__testing_state | ansible.builtin.default({}, true))
+      | ansible.builtin.dict2items
+      | ansible.builtin.selectattr('key', 'match', '^sudo_linux_')
+      | ansible.builtin.list
+    }}
+
+
+- name: "Molecule | Converge | sudo | Include the foundata.linux.sudo role"
+  ansible.builtin.include_role:
+    name: "foundata.linux.sudo"
+  # vars: All sudo_linux_* variables are set as facts and passed this way to the
+  #       role, so they can be persisted in __testing_state and restored in later
+  #       stages (e.g. verify) without duplicating data across playbooks.

@@ -327,7 +327,11 @@ sudo_linux_rules:
 
 Identifier for the rule. Must be unique within `sudo_linux_rules`. It
 is used to build the drop-in filenames, so use only `a-z`, `A-Z`,
-`0-9`, underscore (`_`), dot (`.`) and hyphen (`-`).
+`0-9`, underscore (`_`) and hyphen (`-`).
+
+Dots (`.`) are intentionally not allowed: sudo ignores any file in
+`/etc/sudoers.d` whose name contains a `.`, so a dotted rule name would
+silently produce a drop-in that is never applied.
 
 - **Type**: `str`
 - **Required**: Yes
