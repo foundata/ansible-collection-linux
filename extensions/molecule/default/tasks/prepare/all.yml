@@ -26,6 +26,16 @@
   loop: "{{ __testing_sysctl_values_to_comment | ansible.builtin.dict2items }}"
 
 
+# Simulate a leftover from an earlier run: a line the role previously disabled
+# (carries the marker) for a key it does NOT manage in the converge stage. The
+# present run must restore it (strip the marker) since the key is now unmanaged.
+- name: "Molecule | Prepare | Add a pre-existing role-disabled line for a now-unmanaged key"
+  ansible.builtin.lineinfile:
+    path: "{{ __sysctl_linux_config_file_path }}"
+    line: "{{ __sysctl_linux_main_disabled_marker }}net.ipv4.tcp_keepalive_time = 7200"
+    state: "present"
+
+
 ## Fixtures for the foundata.linux.user role tests.
 #
 # Created here (the prepare stage only auto-includes all.yml and

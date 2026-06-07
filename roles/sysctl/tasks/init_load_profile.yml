@@ -1,0 +1,46 @@
+# Load a single sysctl profile and merge it into the accumulator variables
+# __sysctl_linux_profile_parameters and __sysctl_linux_profile_modules.
+#
+# This file gets included once per entry of sysctl_linux_profile by
+# tasks/init.yml. Profiles are stacked in list order: later profiles win on
+# conflicting parameter keys, and required kernel modules are unioned.
+#
+# We use a separate include_tasks file (and include_vars) instead of an inline
+# "lookup('file') | from_yaml" in init.yml as include_vars templaates the values
+# it loads, so the auto-calculated Jinja expressions in the profile files (e.g.
+# "{{ ansible_facts['memtotal_mb'] ... }}") actually render.
+#
+# "lookup('file') | from_yaml" would return those values as literal, un-rendered
+# strings, which breaks the auto-calculation. include_vars cannot merge on its
+# own (each call would overwrite), and a loop runs only one task, hence this
+# two-task helper file.
+
+---
+
+- name: "Init | Load profile variables into a namespace"
+  ansible.builtin.include_vars:
+    # The profile file is loaded into a namespaced variable (not directly into
+    # the accumulator variables) so that the later used combine/union can merge
+    # it instead of overwriting the previous profile.
+    file: "{{ role_path }}/vars/profiles/{{ __sysctl_linux_profile_item }}.yml"
+    name: "__sysctl_linux_profile_current"
+
+
+# Note (eager evaluation): combining the loaded dict here renders any auto-
+# calculated Jinja values it contains (e.g. those using ansible_facts['memtotal_mb'])
+# at this point, include_vars makes those values templatable; that input is
+# gathered earlier in tasks/init.yml, so this is safe.
+- name: "Init | Merge profile into the accumulators"
+  ansible.builtin.set_fact:
+    __sysctl_linux_profile_parameters: >-
+      {{
+        (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
+        | ansible.builtin.combine(__sysctl_linux_profile_current['__sysctl_linux_profile_parameters']
+                                  | ansible.builtin.default({}))
+      }}
+    __sysctl_linux_profile_modules: >-
+      {{
+        ((__sysctl_linux_profile_modules | ansible.builtin.default([]))
+         + (__sysctl_linux_profile_current['__sysctl_linux_profile_modules'] | ansible.builtin.default([])))
+        | ansible.builtin.unique
+      }}

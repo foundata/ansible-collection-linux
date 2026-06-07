@@ -1,6 +1,66 @@
 # Variables for the sysctl profile "file"
+#
+# Performance tuning for file servers and backup targets (NFS, Samba/CIFS, SFTP,
+# rsync, borg/restic, ...): high network throughput, many client connections and
+# sustained storage I/O. See file.md for the reasoning behind every value.
+#
+# This profile targets performance/reliability only. For the shared security
+# hardening, stack the "hardening-default" profile (usually first), e.g.
+# sysctl_linux_profile: ["hardening-default", "file"].
+#
+# Auto-calculated values are Jinja expressions based on
+# ansible_facts['memtotal_mb'] (RAM in MiB), evaluated when the profile is
+# loaded. Override any value via sysctl_linux_parameters; set it to null to
+# unmanage it.
 
 ---
 
-# FIXME to be implemented
-__sysctl_linux_profile_parameters: {}
+__sysctl_linux_profile_parameters:
+
+  ## Socket buffers (auto-calculated maxima)
+
+  # Max socket buffer sizes: RAM_bytes / 128, capped at 16 MiB. Only the maxima
+  # are raised; the per-socket defaults are left at the kernel values so many
+  # concurrent connections do not each reserve a large buffer.
+  "net.core.rmem_max": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 128, 16777216] | ansible.builtin.min }}"
+  "net.core.wmem_max": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 128, 16777216] | ansible.builtin.min }}"
+  # TCP autotuning ranges "min default max": modest default, RAM-derived max so
+  # TCP can grow buffers on fast/long links without bloating idle connections.
+  "net.ipv4.tcp_rmem": "4096 131072 {{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 128, 16777216] | ansible.builtin.min }}"
+  "net.ipv4.tcp_wmem": "4096 16384 {{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 128, 16777216] | ansible.builtin.min }}"
+
+  ## TCP throughput
+
+  # Probe path MTU after an ICMP black hole is detected (PLPMTUD); this does NOT
+  # proactively enable jumbo frames, it avoids PMTU black-hole stalls.
+  "net.ipv4.tcp_mtu_probing": 1
+  # Keep the congestion window warm between transfers.
+  "net.ipv4.tcp_slow_start_after_idle": 0
+
+  ## Connection handling (many clients)
+
+  # Larger accept and ingress queues for many concurrent SMB/NFS/SFTP clients.
+  "net.core.somaxconn": 65535
+  "net.core.netdev_max_backlog": 65535
+  # System-wide open file limit: 100 per MiB of RAM, at least 100000.
+  "fs.file-max": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 100, 100000] | ansible.builtin.max }}"
+
+  ## Dirty pages (write-back; byte-based to bound writeback regardless of RAM)
+
+  # background = min(RAM/20, 1 GiB), hard = min(RAM/10, 4 GiB). Byte-based limits
+  # replace the RAM-percentage ratios so large sequential writes do not build a
+  # huge dirty backlog and stall. Setting *_bytes disables the *_ratio knobs.
+  "vm.dirty_background_bytes": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 20, 1073741824] | ansible.builtin.min }}"
+  "vm.dirty_bytes": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 10, 4294967296] | ansible.builtin.min }}"
+
+  ## I/O
+
+  # Headroom for async I/O and for inotify-based sync/scan/backup tools.
+  "fs.aio-max-nr": 1048576
+  "fs.inotify.max_user_watches": 524288
+  "fs.inotify.max_user_instances": 1024
+
+  ## Memory
+
+  # Retain inode/dentry caches longer (fileservers walk huge directory trees).
+  "vm.vfs_cache_pressure": 50

@@ -145,38 +145,27 @@
     label: "{{ __sysctl_linux_effective_var }}"
 
 
-- name: "Init | Include sysctl profile-specific variables (if any)"
-  ansible.builtin.include_vars:
-    file: "{{ role_path }}/vars/profiles/{{ sysctl_linux_profile }}.yml"
-  when:
-    - sysctl_linux_profile | ansible.builtin.length > 0
-
-
-# kernel.shmall is expressed in memory pages, so the "database" profile's
-# auto-calculation needs the actual page size. There is no Ansible fact for it,
-# hence the command. The default from vars/main.yml (4096) remains in effect
-# when this task is skipped or yields no usable value.
-- name: "Init | Determine memory page size (needed by the 'database' profile)"
-  ansible.builtin.command:
-    argv:
-      - "getconf"
-      - "PAGE_SIZE"
-  when:
-    - sysctl_linux_profile == 'database'
-  changed_when:
-    - false
-  register: __sysctl_linux_page_size_result
-
-
-- name: "Init | Set memory page size fact (if determined)"
+# Profiles are stacked: each entry of the sysctl_linux_profile list is loaded in
+# order and merged into the accumulators __sysctl_linux_profile_parameters and
+# __sysctl_linux_profile_modules, so a later profile wins on a key set by an
+# earlier one and the required kernel modules are unioned.
+- name: "Init | Reset accumulated sysctl profile parameters and modules"
   ansible.builtin.set_fact:
-    __sysctl_linux_page_size: "{{ __sysctl_linux_page_size_result['stdout'] | ansible.builtin.trim }}"
-  when:
-    - __sysctl_linux_page_size_result['stdout'] is ansible.builtin.defined
-    - (__sysctl_linux_page_size_result['stdout'] | ansible.builtin.trim) is ansible.builtin.regex('^[0-9]+$')
+    __sysctl_linux_profile_parameters: {}
+    __sysctl_linux_profile_modules: []
 
 
-# Required for checkability due to read-only kernel parameters in containerized systems
+- name: "Init | Accumulate sysctl profile variables (listed order; last wins, kernel modules unioned)"
+  ansible.builtin.include_tasks:
+    file: "{{ role_path }}/tasks/init_load_profile.yml"
+  loop: "{{ sysctl_linux_profile }}"
+  loop_control:
+    loop_var: "__sysctl_linux_profile_item"
+    label: "{{ __sysctl_linux_profile_item }}"
+
+
+# Detect if we run in a container (required for checkability due to read-only kernel
+# parameters in containerized systems)
 - name: "Init | Set container detection fact"
   ansible.builtin.set_fact:
     __sysctl_linux_is_container: >-
@@ -186,6 +175,40 @@
          or
          (ansible_facts.get('env', {}).get('container') is not none))
       }}
+
+
+# Detect IPv6 availability. When IPv6 is disabled at boot (ipv6.disable=1) or
+# compiled out, /proc/sys/net/ipv6 does not exist and writing any net.ipv6.*
+# parameter would fail (sysctl_linux_verify defaults to true). vars/main.yml
+# uses this fact to drop net.ipv6.* keys from the effective parameters in that
+# case.
+- name: "Init | Check IPv6 availability"
+  ansible.builtin.stat:
+    path: "/proc/sys/net/ipv6"
+  register: __sysctl_linux_ipv6_stat
+
+
+- name: "Init | Set IPv6 availability fact"
+  ansible.builtin.set_fact:
+    __sysctl_linux_ipv6_available: "{{ __sysctl_linux_ipv6_stat['stat']['exists'] | ansible.builtin.default(true) }}"
+
+
+- name: "Init | Notify when net.ipv6.* parameters are skipped (IPv6 unavailable)"
+  ansible.builtin.debug:
+    msg: >-
+      IPv6 is unavailable (/proc/sys/net/ipv6 missing); skipping
+      net.ipv6.* parameter(s) (if any):
+      {{
+        (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
+        | ansible.builtin.combine(sysctl_linux_parameters | ansible.builtin.default({}))
+        | ansible.builtin.dict2items
+        | ansible.builtin.rejectattr('key', 'ansible.builtin.match', '^net\.ipv6\.')
+        | ansible.builtin.list
+        | ansible.builtin.items2dict
+      }}
+    verbosity: 1
+  when:
+    - not __sysctl_linux_ipv6_available
 
 
 # Load kernel modules a profile depends on (e.g. nf_conntrack for routers,

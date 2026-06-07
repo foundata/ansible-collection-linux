@@ -1,6 +1,43 @@
 # Variables for the sysctl profile "virtualization"
+#
+# Performance tuning for KVM/QEMU hypervisor hosts (libvirt, Proxmox VE, ...):
+# memory overcommit for dense guest packing, an emergency memory reserve,
+# bounded write-back and storage I/O headroom. See virtualization.md for the
+# reasoning behind every value.
+#
+# This profile targets performance/reliability only. For the shared security
+# hardening, stack the "hardening-default" profile (usually first), e.g.
+# sysctl_linux_profile: ["hardening-default", "virtualization"].
+#
+# Auto-calculated values are Jinja expressions based on
+# ansible_facts['memtotal_mb'] (RAM in MiB), evaluated when the profile is
+# loaded. Override any value via sysctl_linux_parameters; set it to null to
+# unmanage it.
 
 ---
 
-# FIXME to be implemented
-__sysctl_linux_profile_parameters: {}
+__sysctl_linux_profile_parameters:
+
+  ## Memory
+
+  # Always overcommit: lets you allocate more guest RAM than physically present
+  # (relying on ballooning/KSM/not-all-guests-busy), the common hypervisor case.
+  "vm.overcommit_memory": 1
+  # Strongly avoid swapping the host/guest working sets.
+  "vm.swappiness": 10
+  # Keep an emergency reserve: 1% of RAM, capped at 2 GiB (in KiB).
+  "vm.min_free_kbytes": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 // 100, 2097152] | ansible.builtin.min }}"
+
+  ## Dirty pages (write-back; byte-based to bound writeback regardless of RAM)
+
+  # background = min(RAM/20, 1 GiB), hard = min(RAM/10, 4 GiB). Byte-based limits
+  # replace the RAM-percentage ratios: on a big-RAM hypervisor a 40% dirty ratio
+  # is tens of GiB and stalls all guests on flush. Setting *_bytes disables the
+  # *_ratio knobs (mutually exclusive).
+  "vm.dirty_background_bytes": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 20, 1073741824] | ansible.builtin.min }}"
+  "vm.dirty_bytes": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 10, 4294967296] | ansible.builtin.min }}"
+
+  ## I/O
+
+  # Plenty of async I/O requests for many guest disk backends.
+  "fs.aio-max-nr": 1048576

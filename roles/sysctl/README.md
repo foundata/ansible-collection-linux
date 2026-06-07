@@ -2,7 +2,8 @@
 
 Manages Linux kernel parameters via `sysctl`, with optional workload-specific profiles that auto-tune values based on system resources.
 
-Choose a profile for your workload (web server, database, file server, virtualization host, or router) and the role applies optimized parameters including security hardening. Override any value with `sysctl_linux_parameters`.
+Choose one or more profiles for your workload (web server, the database engines, file server, virtualization host, or router) and the role applies performance-tuned parameters. Security hardening lives in separate, stackable profiles (`
+`, `hardening-extra`) — stack them with a workload profile, e.g. `["hardening-default", "web"]`. Override any value with `sysctl_linux_parameters`.
 
 
 ## Table of contents<a id="toc"></a>
@@ -31,12 +32,12 @@ Choose a profile for your workload (web server, database, file server, virtualiz
 Main features:
 
 * **Simple usage**: Use the [`sysctl_linux_parameters`](#variable-sysctl_linux_parameters) dictionary to maintain custom kernel parameters
-* **Optional workload profiles**:
-  * Pre-configured parameter sets for common workloads (e.g. `web`, `database`, ,`virtualization`, `router`; see [`sysctl_linux_profile`](#variable-sysctl_linux_profile) for details).
-  * Auto-tuning: Profiles automatically calculate optimal values based on system resources (RAM, CPU cores) using Ansible facts.
-  * Security hardening: All profiles include security best practices (source validation, ICMP hardening, filesystem protections).
+* **Optional, stackable profiles** (`sysctl_linux_profile` is a list, applied in order, last wins):
+  * Workload (performance) profiles: `web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`, `virtualization`, `router`/`router_v4only`/`router_v6only` (see [`sysctl_linux_profile`](#variable-sysctl_linux_profile) for details).
+  * Security profiles to stack on a workload: `hardening-default` (shared network/kernel/filesystem hardening) and `hardening-extra` (stricter kernel hardening), e.g. `["hardening-default", "web", "hardening-extra"]`.
+  * Auto-tuning: Profiles automatically calculate optimal values based on system RAM using Ansible facts.
   * Use [`sysctl_linux_parameters`](#variable-sysctl_linux_parameters) to overwrite a profile parameter to customize for edge cases.
-* Container-aware: Handles read-only kernel parameters in containerized environments gracefully.
+* Container-aware: on detected containers the role automatically skips live application (`sysctl -w`) and only writes the drop-in file, and tolerates `sysctl --system` reload failures — no need to set `sysctl_linux_verify: false` yourself.
 * Designed for cross-platform compatibility, working seamlessly across major Linux distributions.
 
 
@@ -71,11 +72,13 @@ Use a profile for workload-specific tuning:
   hosts: "webservers"
   tasks:
 
-    - name: "Apply web server profile"
+    - name: "Apply web server profile with the shared security baseline"
       ansible.builtin.include_role:
         name: "foundata.linux.sysctl"
       vars:
-        sysctl_linux_profile: "web"
+        sysctl_linux_profile:
+          - "hardening-default"
+          - "web"
 ```
 
 
@@ -84,18 +87,20 @@ Override profile values with custom parameters:
 ```yaml
 ---
 
-- name: "Configure database server"
+- name: "Configure PostgreSQL server"
   hosts: "databases"
   tasks:
 
-    - name: "Apply database profile with custom swappiness and min_free; Allow routing"
+    - name: "Apply postgresql + hardening-default, override swappiness, unmanage dirty_bytes, allow routing"
       ansible.builtin.include_role:
         name: "foundata.linux.sysctl"
       vars:
-        sysctl_linux_profile: "database"
+        sysctl_linux_profile:
+          - "hardening-default"
+          - "postgresql"
         sysctl_linux_parameters:
           "vm.swappiness": 1  # override profile default with another value
-          "vm.min_free_kbytes": null  # override profile default, do not manage and use kernel default
+          "vm.dirty_bytes": null  # override profile default, do not manage and use kernel default
           "net.ipv4.ip_forward": 1 # additional parameter not handled by the profile at all
 ```
 
@@ -124,8 +129,8 @@ The following variables can be configured for this role:
 |----------|------|----------|---------|------------------------|
 | `sysctl_linux_state` | `str` | No | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-sysctl_linux_state) |
 | `sysctl_linux_autoupgrade` | `bool` | No | `false` | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
-| `sysctl_linux_profile` | `str` | No | `""` | Selects a predefined set of kernel parameters optimized for a specific workload. Each profile provides tuned values for network, memory, I/O, and security settings. Some values are auto-calculated based on system resources (RAM, CPU cores) to fit the […](#variable-sysctl_linux_profile) |
-| `sysctl_linux_parameters` | `dict` | Yes | N/A | Dictionary of kernel parameters to manage via sysctl. Keys are parameter names (e.g., `net.ipv4.ip_forward`), values are the desired settings.<br><br>The drop-in configuration file is fully declarative: any parameter in the file that is not present […](#variable-sysctl_linux_parameters) |
+| `sysctl_linux_profile` | `list` | No | `[]` | Selects one or more predefined sets of kernel parameters ("profiles") optimized for specific workloads.<br><br>Profiles are applied in the given order and, for a parameter set by more than one profile, the later profile wins. The required kernel […](#variable-sysctl_linux_profile) |
+| `sysctl_linux_parameters` | `dict` | No | `{}` | Dictionary of kernel parameters to manage via sysctl. Keys are parameter names (e.g., `net.ipv4.ip_forward`), values are the desired settings.<br><br>The drop-in configuration file is fully declarative: any parameter in the file that is not present […](#variable-sysctl_linux_parameters) |
 | `sysctl_linux_reload` | `bool` | No | `true` | If set to `true`, triggers `sysctl --system` after configuration changes to reload all sysctl configuration files following the proper precedence order. This ensures all drop-in files and possibly existing other sysctl configuration files not managed […](#variable-sysctl_linux_reload) |
 | `sysctl_linux_verify` | `bool` | No | `true` | If set to `true`, verifies the parameter value using the sysctl command and actively sets it in the running kernel using `sysctl -w` if the current value differs from the desired one.<br><br>When `false`, only writes the parameter to the […](#variable-sysctl_linux_verify) |
 | `sysctl_linux_ignore_unknown_key_errors` | `bool` | No | `false` | If set to `true`, ignores errors caused by unknown or unsupported kernel parameter keys. This is useful in container environments where certain parameters may not exist or be accessible.<br><br>Generally not recommended for bare-metal or VM […](#variable-sysctl_linux_ignore_unknown_key_errors) |
@@ -141,13 +146,20 @@ Determines whether the managed resources should be `present` or `absent`.
 installed and configured.
 
 `absent` reverts changes as much as possible, such as removing packages,
-deleting created users, stopping services, restoring modified settings, …
+deleting created users, stopping services, restoring modified settings, ...
 
 Note: For this role, the required component and package set is minimal. There
 are no users or services to manage and the components needed to set kernel
 parameter are preinstalled even on hardened systems. They also cannot be
 safely removed due to dependencies, so the role rarely modifies the system
 in this regard.
+
+On `absent`, the managed drop-in file(s) are removed and any lines the role
+previously commented out in the main config file (`/etc/sysctl.conf`, to make
+the drop-in win) are restored — only those lines, identified by an internal
+marker, so settings you commented out yourself are left untouched. As with any
+sysctl change, already-applied running values are not actively reset; a reload
+(or reboot) re-applies the restored main-file values.
 
 - **Type**: `str`
 - **Required**: No
@@ -174,43 +186,85 @@ currently installed one).
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Selects a predefined set of kernel parameters optimized for a specific workload.
-Each profile provides tuned values for network, memory, I/O, and security settings.
-Some values are auto-calculated based on system resources (RAM, CPU cores) to fit
-the target system. All profiles include security best practices such as source
-validation, ICMP hardening, and filesystem protections.
+Selects one or more predefined sets of kernel parameters ("profiles") optimized
+for specific workloads.
 
-Use `sysctl_linux_parameters` to override any profile value if needed for your
-specific use-case.
+Profiles are applied in the given order and, for a parameter set by more than
+one profile, the later profile wins. The required kernel modules (if any) of
+all selected profiles are loaded automatically. An empty list (the default)
+applies no profile; and only explicit `sysctl_linux_parameters` are set then.
 
-Possible values:
+A single profile is a one-element list, e.g. `["web"]`. Profiles can be
+stacked, e.g. `["hardening-default", "web", "hardening-extra"]` to add a workload
+profile on to the hardening baseline and kernel hardening on top of the
+workload profile.
 
-- '' (empty string): No tuning applied. Only explicit `sysctl_linux_parameters` are set.
-- `web`: High connection count and throughput. Recommended for web servers, API
-  gateways, load balancers, reverse proxies.  See [`web.md`](./vars/profiles/web.md)
-  for details.
-- `database`: Memory management, shared memory, low swappiness, I/O tuning. Recommended
-  for PostgreSQL, MySQL, Redis, Elasticsearch and so on. See
-  [`database.md`](./vars/profiles/database.md) for details.
-- `file`: Network throughput and storage I/O. Recommended for fileservers (NFS,
-  Samba/CIFS, SFTP) backup targets ad their like. See
+The workload profiles (`web`, `postgresql`, `mysql`, `redis`, `elasticsearch`,
+`file`, `virtualization`, `router`/`router_v4only`/`router_v6only`) tune for
+performance and reliability. Security hardening lives in separate, stackable
+profiles: `hardening-default` (shared safe network/kernel/filesystem defaults) and
+`hardening-extra` (stricter kernel hardening).
+
+Stack them with a workload profile, e.g. `["hardening-default", "web"]` or
+`["hardening-default", "web", "hardening-extra"]`. Some values are auto-calculated
+from system resources (RAM). Use `sysctl_linux_parameters` to override any
+profile value; it takes precedence over every profile.
+
+Available base profiles (alphabetical order):
+
+- `hardening-default`: Shared network/kernel/filesystem security hardening,
+  meant to be *stacked first before a workload profile (e.g.
+  `["hardening-default", "web"]`). The workload profiles target performance
+  and do not include these keys. See
+  [`hardening-default.md`](./vars/profiles/hardening-default.md) for details.
+- `hardening-extra`: Conservative kernel-level security hardening, meant to be **stacked** on a
+  workload profile (e.g. `["hardening-default", "web", "hardening-extra"]`). See
+  [`hardening-extra.md`](./vars/profiles/hardening-extra.md) for details.
+
+Available workload profiles (alphabetical order):
+
+- `elasticsearch`: Mandatory `vm.max_map_count`, file limits and memory policy
+  for Elasticsearch/OpenSearch. See
+  [`elasticsearch.md`](./vars/profiles/elasticsearch.md) for details.
+- `file`: Network throughput and storage I/O. Recommended for fileservers
+  (NFS, Samba/CIFS, SFTP), backup targets and the like. See
   [`file.md`](./vars/profiles/file.md) for details.
-- `virtualization`: Memory overcommit, scheduler tuning, storage I/O. Recommended for
-  KVM/QEMU hosts, Proxmox. See [`virtualization.md`](./vars/profiles/virtualization.md)
-  for details.
-- `router`: Connection tracking, neighbor tables, IP forwarding (IPv4 + IPv6).
-  Recommended for firewalls, NAT gateways, VPN concentrators.
-  See [`router.md`](./vars/profiles/router.md) for details.
-- `router_v4only`: Like `router` but enables IPv4 forwarding only and explicitly disables
-  IPv6 forwarding. See [`router_v4only.md`](./vars/profiles/router_v4only.md) for
+- `mysql`: Like `postgresql`, tuned for MySQL/MariaDB (InnoDB native AIO, file
+  limits). See [`mysql.md`](./vars/profiles/mysql.md) for details.
+- `postgresql`: Memory policy, byte-based write-back, file limits for
+  PostgreSQL. See [`postgresql.md`](./vars/profiles/postgresql.md) for
   details.
-- `router_v6only`: Like `router` but enables IPv6 forwarding only and explicitly disables
-  IPv4 forwarding. See [`router_v6only.md`](./vars/profiles/router_v6only.md) for details.
+- `redis`: Memory overcommit (for fork-based persistence) and a high accept
+  backlog for Redis and compatible in-memory stores. See
+  [`redis.md`](./vars/profiles/redis.md) for details.
+- `router`: Connection tracking, neighbor tables, IP forwarding (IPv4 + IPv6).
+  Recommended for firewalls, NAT gateways, VPN concentrators. See
+  [`router.md`](./vars/profiles/router.md) for details.
+- `router_v4only`: Like `router` but enables IPv4 forwarding only and
+  explicitly disables IPv6 forwarding. See
+  [`router_v4only.md`](./vars/profiles/router_v4only.md)  for details.
+- `router_v6only`: Like `router` but enables IPv6 forwarding only and
+  explicitly disables IPv4 forwarding. See
+  [`router_v6only.md`](./vars/profiles/router_v6only.md) for details.
+- `virtualization`: Memory overcommit, scheduler tuning, storage I/O.
+  Recommended for KVM/QEMU hosts, Proxmox VE and the like. See
+  [`virtualization.md`](./vars/profiles/virtualization.md) for details.
+- `web`: High connection count and throughput. Recommended for web servers,
+  API gateways, load balancers, reverse proxies. See
+  [`web.md`](./vars/profiles/web.md) for details.
 
-- **Type**: `str`
+Note: removing a profile (or a key from one) stops the role from managing that
+key and the role notifies a `sysctl --system` reload, which re-applies the
+remaining configuration files However, `sysctl` cannot reset a key that is no
+longer present in any file back to its kernel default, and a persistently
+loaded kernel module stays loaded; reverting those to the pre-role state needs
+a reboot (or a manual `sysctl -w` / `modprobe -r`).
+
+- **Type**: `list`
 - **Required**: No
-- **Default**: `""`
-- **Choices**: ``, `web`, `database`, `file`, `virtualization`, `router`, `router_v4only`, `router_v6only`
+- **Default**: `[]`
+- **Choices**: `web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`, `virtualization`, `router`, `router_v4only`, `router_v6only`, `hardening-default`, `hardening-extra`
+- **List Elements**: `str`
 
 
 
@@ -242,15 +296,24 @@ sysctl_linux_parameters:
 Example overriding a profile value:
 
 ```yaml
-sysctl_linux_profile: "database"
+sysctl_linux_profile:
+  - "redis"
 sysctl_linux_parameters:
   "vm.swappiness": 1  # override profile default with another value
-  "vm.min_free_kbytes": null  # override profile default, do not manage and use kernel default
+  "vm.overcommit_memory": null  # override profile default, do not manage and use kernel default
   "net.ipv4.ip_forward": 1 # additional parameter not handled by the profile at all
 ```
 
+Note: removing a key stops the role from managing that key and the role
+notifies a `sysctl --system` reload, which re-applies the remaining
+configuration files However, `sysctl` cannot reset a key that is no longer
+present in any file back to its kernel default, and a persistently loaded
+kernel module stays loaded; reverting those to the pre-role state needs a
+reboot (or a manual `sysctl -w` / `modprobe -r`).
+
 - **Type**: `dict`
-- **Required**: Yes
+- **Required**: No
+- **Default**: `{}`
 
 
 
@@ -263,8 +326,10 @@ reload all sysctl configuration files following the proper precedence order.
 This ensures all drop-in files and possibly existing other sysctl configuration
 files not managed by this role are applied consistently.
 
-Set to `false` in container environments where `sysctl --system` may fail due
-to read-only kernel parameters.
+You generally do not need to change this for containers: the role tolerates
+`sysctl --system` reload failures on detected containers (and skips live
+`sysctl -w`, see `sysctl_linux_verify`). Set to `false` only if you want to
+skip the reload entirely (e.g. to batch it yourself).
 
 - **Type**: `bool`
 - **Required**: No
@@ -282,6 +347,11 @@ differs from the desired one.
 
 When `false`, only writes the parameter to the configuration file without
 verifying or immediately applying it to the running kernel.
+
+Note: this is automatically treated as `false` on detected containers
+(kernel parameters are typically read-only there), so the role only writes
+the drop-in file and does not fail. You do not need to set it manually for
+containers.
 
 - **Type**: `bool`
 - **Required**: No

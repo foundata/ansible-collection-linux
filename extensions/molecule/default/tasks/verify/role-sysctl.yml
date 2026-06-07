@@ -113,16 +113,21 @@
       # (?m) enables multiline mode so ^ matches start of each line, not just start of string
       # Unmanaged parameter: must exist as uncommented line (role should not touch it)
       - '__testing_file_content is regex("(?m)^net\.ipv4\.tcp_mtu_probing\s*=")'
-      # Managed parameters: must be commented out (no uncommented line) AND commented line must
-      # exist (proving the role commented them out, not that they were never there)
+      # Managed parameters: must be commented out (no uncommented line) AND a line
+      # disabled with the role's restore marker must exist (proving the role
+      # commented them out, recoverably, not that they were never there).
       - '__testing_file_content is not regex("(?m)^net\.ipv4\.tcp_syncookies\s*=")'
-      - '__testing_file_content is regex("(?m)^#\s*net\.ipv4\.tcp_syncookies\s*=")'
+      - '__testing_file_content is regex("(?m)^#ANSIBLE_DISABLED\s+net\.ipv4\.tcp_syncookies\s*=")'
       - '__testing_file_content is not regex("(?m)^net\.ipv4\.tcp_timestamps\s*=")'
-      - '__testing_file_content is regex("(?m)^#\s*net\.ipv4\.tcp_timestamps\s*=")'
+      - '__testing_file_content is regex("(?m)^#ANSIBLE_DISABLED\s+net\.ipv4\.tcp_timestamps\s*=")'
       # Profile-derived parameter (managed by the "web" profile, not present in
       # sysctl_linux_parameters): must also be commented out so the drop-in wins.
       - '__testing_file_content is not regex("(?m)^net\.ipv4\.tcp_fin_timeout\s*=")'
-      - '__testing_file_content is regex("(?m)^#\s*net\.ipv4\.tcp_fin_timeout\s*=")'
+      - '__testing_file_content is regex("(?m)^#ANSIBLE_DISABLED\s+net\.ipv4\.tcp_fin_timeout\s*=")'
+      # Previously role-disabled key that is NOT managed in this run: must be
+      # restored (marker stripped, line uncommented again).
+      - '__testing_file_content is regex("(?m)^net\.ipv4\.tcp_keepalive_time\s*=")'
+      - '__testing_file_content is not regex("(?m)^#ANSIBLE_DISABLED\s+net\.ipv4\.tcp_keepalive_time")'
     fail_msg: "Managed parameters not properly commented out or unmanaged parameter was modified in '{{ __sysctl_linux_config_file_path }}'."
     success_msg: "All managed parameters are commented out and unmanaged parameters remain untouched in '{{ __sysctl_linux_config_file_path }}'."
   when:
@@ -176,7 +181,7 @@
 
     - name: "Molecule | Verify | Set custom parameters and clear the profile for the merge check"
       ansible.builtin.set_fact:
-        sysctl_linux_profile: ""
+        sysctl_linux_profile: []
         sysctl_linux_parameters:
           net.ipv4.ip_forward: "1"
           vm.swappiness: "10"
@@ -211,7 +216,8 @@
 
     - name: "Molecule | Verify | Select the web profile for the profile check"
       ansible.builtin.set_fact:
-        sysctl_linux_profile: "web"
+        sysctl_linux_profile:
+          - "web"
         sysctl_linux_parameters: {}
 
 
@@ -226,11 +232,15 @@
       ansible.builtin.assert:
         that:
           - (__sysctl_linux_effective_parameters['net.core.somaxconn'] | ansible.builtin.int) == 65535
-          - (__sysctl_linux_effective_parameters['net.ipv4.tcp_syncookies'] | ansible.builtin.int) == 1
-          - (__sysctl_linux_effective_parameters['fs.protected_symlinks'] | ansible.builtin.int) == 1
-          - "'nf_conntrack' in __sysctl_linux_profile_modules"
-          - (__sysctl_linux_effective_parameters['net.netfilter.nf_conntrack_max'] | ansible.builtin.int) ==
-            ((ansible_facts['memtotal_mb'] | ansible.builtin.int) * 16)
+          - (__sysctl_linux_effective_parameters['fs.nr_open'] | ansible.builtin.int) == 2097152
+          - (__sysctl_linux_effective_parameters['net.ipv4.tcp_tw_reuse'] | ansible.builtin.int) == 2
+          - (__sysctl_linux_effective_parameters['net.ipv4.ip_local_port_range']) == "16384 65535"
+          # security baseline moved to hardening-default; conntrack/rp_filter not managed; no modules.
+          - "'net.ipv4.tcp_syncookies' not in __sysctl_linux_effective_parameters"
+          - "'fs.protected_symlinks' not in __sysctl_linux_effective_parameters"
+          - "'net.netfilter.nf_conntrack_max' not in __sysctl_linux_effective_parameters"
+          - "'net.ipv4.conf.all.rp_filter' not in __sysctl_linux_effective_parameters"
+          - (__sysctl_linux_profile_modules | ansible.builtin.length) == 0
           - (__sysctl_linux_effective_parameters['fs.file-max'] | ansible.builtin.int) ==
             ([(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 100, 100000] | ansible.builtin.max)
           - (__sysctl_linux_effective_parameters['net.core.rmem_max'] | ansible.builtin.int) ==
@@ -239,35 +249,64 @@
         success_msg: "web profile loaded and auto-calculated correctly."
 
 
-- name: "Molecule | Verify | Validate database profile (init-only, incl. auto-calculation)"
+- name: "Molecule | Verify | Validate database engine profiles (init-only, incl. byte-based write-back)"
   block:
 
-    - name: "Molecule | Verify | Select the database profile for the profile check"
+    - name: "Molecule | Verify | Select the redis profile for the profile check"
       ansible.builtin.set_fact:
-        sysctl_linux_profile: "database"
+        sysctl_linux_profile:
+          - "redis"
         sysctl_linux_parameters: {}
 
 
-    - name: "Molecule | Verify | Re-initialize sysctl with the database profile"
+    - name: "Molecule | Verify | Re-initialize sysctl with the redis profile"
       ansible.builtin.include_role:
         name: "foundata.linux.sysctl"
         tasks_from: "init"
         public: true
 
 
-    - name: "Molecule | Verify | Assert database profile parameters and auto-calculation"
+    - name: "Molecule | Verify | Assert redis profile (shared DB tuning + redis specifics, no legacy shm/oom)"
       ansible.builtin.assert:
         that:
           - (__sysctl_linux_effective_parameters['vm.swappiness'] | ansible.builtin.int) == 10
-          - (__sysctl_linux_effective_parameters['vm.dirty_ratio'] | ansible.builtin.int) == 40
-          - (__sysctl_linux_effective_parameters['kernel.shmmax'] | ansible.builtin.int) ==
-            ((ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 2)
-          - (__sysctl_linux_effective_parameters['kernel.shmall'] | ansible.builtin.int) ==
-            ((ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 2 // (__sysctl_linux_page_size | ansible.builtin.int))
-          - (__sysctl_linux_effective_parameters['vm.min_free_kbytes'] | ansible.builtin.int) ==
-            ([(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 // 100, 2097152] | ansible.builtin.min)
-        fail_msg: "database profile did not load or auto-calculate as expected."
-        success_msg: "database profile loaded and auto-calculated correctly."
+          - (__sysctl_linux_effective_parameters['vm.overcommit_memory'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['net.core.somaxconn'] | ansible.builtin.int) == 65535
+          # byte-based write-back replaces the dirty ratios
+          - (__sysctl_linux_effective_parameters['vm.dirty_background_bytes'] | ansible.builtin.int) ==
+            ([(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 20, 1073741824] | ansible.builtin.min)
+          - (__sysctl_linux_effective_parameters['vm.dirty_bytes'] | ansible.builtin.int) ==
+            ([(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 10, 4294967296] | ansible.builtin.min)
+          # removed legacy/questionable keys and rp_filter are not managed
+          - "'vm.dirty_ratio' not in __sysctl_linux_effective_parameters"
+          - "'kernel.shmmax' not in __sysctl_linux_effective_parameters"
+          - "'vm.oom_kill_allocating_task' not in __sysctl_linux_effective_parameters"
+          - "'net.ipv4.conf.all.rp_filter' not in __sysctl_linux_effective_parameters"
+        fail_msg: "redis profile did not load as expected."
+        success_msg: "redis profile loaded correctly (shared tuning + byte-based write-back)."
+
+
+    - name: "Molecule | Verify | Select the elasticsearch profile for the profile check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile:
+          - "elasticsearch"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with the elasticsearch profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert elasticsearch profile sets the mandatory max_map_count"
+      ansible.builtin.assert:
+        that:
+          - (__sysctl_linux_effective_parameters['vm.max_map_count'] | ansible.builtin.int) == 262144
+          - (__sysctl_linux_effective_parameters['fs.nr_open'] | ansible.builtin.int) == 2097152
+        fail_msg: "elasticsearch profile did not load as expected."
+        success_msg: "elasticsearch profile loaded correctly (vm.max_map_count set)."
 
 
 - name: "Molecule | Verify | Validate file profile (init-only, incl. auto-calculation)"
@@ -275,7 +314,8 @@
 
     - name: "Molecule | Verify | Select the file profile for the profile check"
       ansible.builtin.set_fact:
-        sysctl_linux_profile: "file"
+        sysctl_linux_profile:
+          - "file"
         sysctl_linux_parameters: {}
 
 
@@ -291,12 +331,16 @@
         __testing_bufmax: "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 128, 16777216] | ansible.builtin.min }}"
       ansible.builtin.assert:
         that:
-          - (__sysctl_linux_effective_parameters['net.core.rmem_default'] | ansible.builtin.int) == 1048576
           - (__sysctl_linux_effective_parameters['fs.inotify.max_user_watches'] | ansible.builtin.int) == 524288
+          - (__sysctl_linux_effective_parameters['vm.vfs_cache_pressure'] | ansible.builtin.int) == 50
           - (__sysctl_linux_effective_parameters['net.core.rmem_max'] | ansible.builtin.int) ==
             (__testing_bufmax | ansible.builtin.int)
+          # only the autotuning max is raised; the per-socket default is left alone
           - __sysctl_linux_effective_parameters['net.ipv4.tcp_rmem'] ==
-            ('4096 1048576 ' ~ __testing_bufmax)
+            ('4096 131072 ' ~ __testing_bufmax)
+          - "'net.core.rmem_default' not in __sysctl_linux_effective_parameters"
+          # default-on TCP flags are no longer asserted (unmanaged)
+          - "'net.ipv4.tcp_window_scaling' not in __sysctl_linux_effective_parameters"
         fail_msg: "file profile did not load or auto-calculate as expected."
         success_msg: "file profile loaded and auto-calculated correctly."
 
@@ -306,7 +350,8 @@
 
     - name: "Molecule | Verify | Select the virtualization profile for the profile check"
       ansible.builtin.set_fact:
-        sysctl_linux_profile: "virtualization"
+        sysctl_linux_profile:
+          - "virtualization"
         sysctl_linux_parameters: {}
 
 
@@ -317,15 +362,19 @@
         public: true
 
 
-    - name: "Molecule | Verify | Assert virtualization profile parameters and required module"
+    - name: "Molecule | Verify | Assert virtualization profile parameters (no bridge/scheduler/module coupling)"
       ansible.builtin.assert:
         that:
           - (__sysctl_linux_effective_parameters['vm.overcommit_memory'] | ansible.builtin.int) == 1
-          - (__sysctl_linux_effective_parameters['kernel.sched_migration_cost_ns'] | ansible.builtin.int) == 5000000
-          - (__sysctl_linux_effective_parameters['net.bridge.bridge-nf-call-iptables'] | ansible.builtin.int) == 0
-          - "'br_netfilter' in __sysctl_linux_profile_modules"
+          - (__sysctl_linux_effective_parameters['vm.dirty_bytes'] | ansible.builtin.int) ==
+            ([(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 10, 4294967296] | ansible.builtin.min)
+          # bridge filtering, the scheduler knob, rp_filter and modules are intentionally not managed
+          - "'net.bridge.bridge-nf-call-iptables' not in __sysctl_linux_effective_parameters"
+          - "'kernel.sched_migration_cost_ns' not in __sysctl_linux_effective_parameters"
+          - "'net.ipv4.conf.all.rp_filter' not in __sysctl_linux_effective_parameters"
+          - (__sysctl_linux_profile_modules | ansible.builtin.length) == 0
         fail_msg: "virtualization profile did not load as expected."
-        success_msg: "virtualization profile loaded correctly."
+        success_msg: "virtualization profile loaded correctly (no bridge/scheduler/module coupling)."
 
 
 - name: "Molecule | Verify | Validate router profiles (init-only, incl. forwarding direction)"
@@ -333,7 +382,8 @@
 
     - name: "Molecule | Verify | Select the router profile for the profile check"
       ansible.builtin.set_fact:
-        sysctl_linux_profile: "router"
+        sysctl_linux_profile:
+          - "router"
         sysctl_linux_parameters: {}
 
 
@@ -361,7 +411,8 @@
 
     - name: "Molecule | Verify | Select the router_v4only profile for the profile check"
       ansible.builtin.set_fact:
-        sysctl_linux_profile: "router_v4only"
+        sysctl_linux_profile:
+          - "router_v4only"
         sysctl_linux_parameters: {}
 
 
@@ -385,7 +436,8 @@
 
     - name: "Molecule | Verify | Select the router_v6only profile for the profile check"
       ansible.builtin.set_fact:
-        sysctl_linux_profile: "router_v6only"
+        sysctl_linux_profile:
+          - "router_v6only"
         sysctl_linux_parameters: {}
 
 
@@ -405,3 +457,210 @@
           - (__sysctl_linux_effective_parameters['net.ipv4.conf.default.forwarding'] | ansible.builtin.int) == 0
         fail_msg: "router_v6only forwarding direction is wrong."
         success_msg: "router_v6only forwarding direction is correct."
+
+
+- name: "Molecule | Verify | Validate stacked profiles (init-only: order, last-wins, module union)"
+  block:
+
+    - name: "Molecule | Verify | Select a stacked profile list for the stacking check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile:
+          - "router_v4only"
+          - "router_v6only"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with the stacked profile list"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert later profile wins on conflicts and modules are unioned"
+      ansible.builtin.assert:
+        that:
+          # router_v4only sets ip_forward=1 / ipv6 forwarding=0; router_v6only (later) flips both.
+          - (__sysctl_linux_effective_parameters['net.ipv4.ip_forward'] | ansible.builtin.int) == 0
+          - (__sysctl_linux_effective_parameters['net.ipv6.conf.all.forwarding'] | ansible.builtin.int) == 1
+          # Both variants require nf_conntrack; the union deduplicates to a single entry.
+          - "'nf_conntrack' in __sysctl_linux_profile_modules"
+          - (__sysctl_linux_profile_modules | ansible.builtin.length) == 1
+        fail_msg: "Stacked profiles did not apply in order / union modules as expected."
+        success_msg: "Stacked profiles apply in order (last wins) and union their modules."
+
+
+- name: "Molecule | Verify | Validate hardening-extra profile, stacked on a workload (init-only)"
+  block:
+
+    - name: "Molecule | Verify | Select a workload + hardening-extra stack for the check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile:
+          - "web"
+          - "hardening-extra"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with the web + hardening-extra stack"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert hardening-extra keys compose with the workload profile"
+      ansible.builtin.assert:
+        that:
+          # hardening-extra keys present
+          - (__sysctl_linux_effective_parameters['kernel.kptr_restrict'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['kernel.dmesg_restrict'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['vm.mmap_min_addr'] | ansible.builtin.int) == 65536
+          - (__sysctl_linux_effective_parameters['net.ipv4.tcp_rfc1337'] | ansible.builtin.int) == 1
+          # web keys still present (stack composed, not replaced)
+          - (__sysctl_linux_effective_parameters['net.core.somaxconn'] | ansible.builtin.int) == 65535
+          # aggressive opt-in keys are NOT shipped by the profile
+          - "'kernel.yama.ptrace_scope' not in __sysctl_linux_effective_parameters"
+          - "'kernel.unprivileged_bpf_disabled' not in __sysctl_linux_effective_parameters"
+        fail_msg: "hardening-extra profile did not compose with the workload profile as expected."
+        success_msg: "hardening-extra profile composes with the workload profile (safe subset only)."
+
+
+- name: "Molecule | Verify | Validate hardening-default profile and its composition with a workload (init-only)"
+  block:
+
+    - name: "Molecule | Verify | Select hardening-default alone for the check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile:
+          - "hardening-default"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with hardening-default only"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert hardening-default sets the shared hardening keys (and not rp_filter)"
+      ansible.builtin.assert:
+        that:
+          - (__sysctl_linux_effective_parameters['net.ipv4.tcp_syncookies'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['kernel.randomize_va_space'] | ansible.builtin.int) == 2
+          - (__sysctl_linux_effective_parameters['fs.protected_symlinks'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['net.ipv6.conf.all.accept_redirects'] | ansible.builtin.int) == 0
+          - "'net.ipv4.conf.all.rp_filter' not in __sysctl_linux_effective_parameters"
+        fail_msg: "hardening-default did not load the expected hardening keys."
+        success_msg: "hardening-default loaded the shared hardening keys (rp_filter excluded)."
+
+
+    - name: "Molecule | Verify | Select hardening-default stacked before a workload"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile:
+          - "hardening-default"
+          - "web"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with hardening-default + web"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert security baseline and workload tuning compose"
+      ansible.builtin.assert:
+        that:
+          # hardening-default hardening key
+          - (__sysctl_linux_effective_parameters['net.ipv4.tcp_syncookies'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['fs.suid_dumpable'] | ansible.builtin.int) == 0
+          # web performance key
+          - (__sysctl_linux_effective_parameters['net.core.somaxconn'] | ansible.builtin.int) == 65535
+          - (__sysctl_linux_effective_parameters['net.ipv4.tcp_tw_reuse'] | ansible.builtin.int) == 2
+        fail_msg: "hardening-default + web did not compose security and performance keys."
+        success_msg: "hardening-default + web compose security and performance keys."
+
+
+# IPv6-disabled robustness: when /proc/sys/net/ipv6 is absent the role must drop
+# net.ipv6.* keys so it does not fail on IPv6-disabled hosts. The molecule
+# container has IPv6, so the fact is overridden AFTER init (the effective
+# variable is evaluated lazily and re-reads __sysctl_linux_ipv6_available).
+- name: "Molecule | Verify | Validate net.ipv6.* are dropped when IPv6 is unavailable (init-only)"
+  block:
+
+    - name: "Molecule | Verify | Select hardening-default for the IPv6-unavailable check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile:
+          - "hardening-default"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl (hardening-default) for the IPv6 check"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Force IPv6 unavailable (overrides the init detection)"
+      ansible.builtin.set_fact:
+        __sysctl_linux_ipv6_available: false
+
+
+    - name: "Molecule | Verify | Assert net.ipv6.* dropped while net.ipv4.* and others remain"
+      ansible.builtin.assert:
+        that:
+          - "'net.ipv6.conf.all.accept_redirects' not in __sysctl_linux_effective_parameters"
+          - "'net.ipv6.conf.default.accept_source_route' not in __sysctl_linux_effective_parameters"
+          # non-IPv6 keys must be untouched
+          - (__sysctl_linux_effective_parameters['net.ipv4.tcp_syncookies'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['kernel.randomize_va_space'] | ansible.builtin.int) == 2
+          - (__sysctl_linux_effective_parameters['net.ipv4.conf.all.accept_redirects'] | ansible.builtin.int) == 0
+        fail_msg: "net.ipv6.* keys were not dropped (or non-IPv6 keys were lost) when IPv6 is unavailable."
+        success_msg: "net.ipv6.* keys are dropped when IPv6 is unavailable; non-IPv6 keys retained."
+
+
+# Runs LAST: state=absent mutates the host (removes the drop-in, restores the
+# main config). It verifies that uninstall restores exactly the lines the role
+# disabled (marker stripped) and leaves user-commented and unmanaged lines alone.
+- name: "Molecule | Verify | Validate state=absent restores the main config lines the role disabled"
+  block:
+
+    - name: "Molecule | Verify | Run the role with state=absent (uninstall)"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+      vars:
+        sysctl_linux_state: "absent"
+        sysctl_linux_reload: false
+
+
+    - name: "Molecule | Verify | Re-read the main config file after uninstall"
+      ansible.builtin.slurp:
+        src: "{{ __sysctl_linux_config_file_path }}"
+      register: __testing_main_after_uninstall
+
+
+    - name: "Molecule | Verify | Check the managed drop-in file was removed"
+      ansible.builtin.stat:
+        path: "{{ __sysctl_linux_config_dropin_file_path }}"
+      register: __testing_dropin_after_uninstall
+
+
+    - name: "Molecule | Verify | Assert role-disabled lines restored, others untouched, drop-in gone"
+      vars:
+        __testing_after: "{{ __testing_main_after_uninstall['content'] | ansible.builtin.b64decode }}"
+      ansible.builtin.assert:
+        that:
+          # the restore marker is fully gone
+          - '__testing_after is not regex("ANSIBLE_DISABLED")'
+          # previously role-disabled lines are restored (now uncommented again)
+          - '__testing_after is regex("(?m)^net\.ipv4\.tcp_syncookies\s*=")'
+          - '__testing_after is regex("(?m)^net\.ipv4\.tcp_timestamps\s*=")'
+          - '__testing_after is regex("(?m)^net\.ipv4\.tcp_fin_timeout\s*=")'
+          # the unmanaged line was never touched
+          - '__testing_after is regex("(?m)^net\.ipv4\.tcp_mtu_probing\s*=")'
+          # the managed drop-in file is removed
+          - not (__testing_dropin_after_uninstall['stat']['exists'] | ansible.builtin.default(false))
+        fail_msg: "state=absent did not restore the disabled main-config lines or remove the drop-in."
+        success_msg: "state=absent restored the role-disabled main-config lines and removed the drop-in."

@@ -1,6 +1,0 @@
-# Variables for the sysctl profile "database"
-
----
-
-# FIXME to be implemented
-__sysctl_linux_profile_parameters: {}

@@ -1,0 +1,49 @@
+# Variables for the sysctl profile "redis"
+#
+# Performance/reliability tuning for Redis (and API-compatible in-memory stores):
+# memory overcommit so fork-based persistence (RDB/AOF) cannot fail, a high
+# accept backlog, a swap-averse memory policy and bounded write-back. See
+# redis.md for the reasoning behind every value.
+#
+# This profile targets performance/reliability only. For the shared security
+# hardening, stack the "hardening-default" profile (usually first), e.g.
+# sysctl_linux_profile: ["hardening-default", "redis"].
+#
+# Auto-calculated values are Jinja expressions based on
+# ansible_facts['memtotal_mb'] (RAM in MiB), evaluated when the profile is
+# loaded. Override any value via sysctl_linux_parameters; set it to null to
+# unmanage it.
+
+---
+
+__sysctl_linux_profile_parameters:
+
+  ## Redis specifics
+
+  # Required by Redis: background saves fork() and rely on overcommit to copy-on-
+  # write; heuristic/strict mode can make the fork fail under memory pressure.
+  "vm.overcommit_memory": 1
+  # Raise the accept backlog so Redis's `tcp-backlog` is not silently capped.
+  "net.core.somaxconn": 65535
+
+  ## Memory (shared DB tuning)
+
+  # Strongly prefer reclaiming page cache over swapping the dataset.
+  "vm.swappiness": 10
+  # Retain inode/dentry caches longer.
+  "vm.vfs_cache_pressure": 50
+  # Disable NUMA zone reclaim (latency spikes on multi-socket hosts).
+  "vm.zone_reclaim_mode": 0
+
+  ## Dirty pages (write-back; byte-based to bound writeback regardless of RAM)
+
+  # background = min(RAM/20, 1 GiB), hard = min(RAM/10, 4 GiB). Setting *_bytes
+  # disables the *_ratio knobs (mutually exclusive), giving a fixed ceiling
+  # instead of a percentage of (possibly huge) RAM.
+  "vm.dirty_background_bytes": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 20, 1073741824] | ansible.builtin.min }}"
+  "vm.dirty_bytes": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 10, 4294967296] | ansible.builtin.min }}"
+
+  ## I/O
+
+  # Headroom for async I/O (AOF rewrite / RDB save background I/O).
+  "fs.aio-max-nr": 1048576

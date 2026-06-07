@@ -32,14 +32,19 @@
     file: "../tasks/state_update.yml"
   vars:
     __testing_state_update:
-      sysctl_linux_verify: "{{ (not __testing_is_container) }}"
-      # A profile is selected so the role also manages profile-derived keys.
-      # This exercises that duplicates of profile keys in the main config file
-      # (e.g. net.ipv4.tcp_fin_timeout, seeded by the prepare stage) are
-      # commented out too, not just keys from sysctl_linux_parameters. The
-      # explicit sysctl_linux_parameters below still take precedence over the
-      # profile and verify the merge.
-      sysctl_linux_profile: "web"
+      # sysctl_linux_verify is intentionally NOT set here: the role auto-disables
+      # live `sysctl -w` on detected containers, so converge must pass on the
+      # podman instances without the caller opting out (proves "container-aware").
+      # A stacked profile list is selected so converge exercises the real stack:
+      # hardening-default (shared hardening) + web (performance). This also checks
+      # that profile-derived keys duplicated in the main config file (e.g.
+      # net.ipv4.tcp_fin_timeout from web, seeded by the prepare stage) are
+      # commented out, and that the explicit sysctl_linux_parameters below still
+      # take precedence over the profiles (e.g. tcp_syncookies overrides the
+      # hardening-default value).
+      sysctl_linux_profile:
+        - "hardening-default"
+        - "web"
       sysctl_linux_parameters:
         "net.ipv4.tcp_syncookies": 0
         "net.ipv4.tcp_timestamps": 1

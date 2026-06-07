@@ -147,6 +147,15 @@ __sysctl_linux_config_dropin_file_group: "{{ __sysctl_linux_config_file_group }}
 __sysctl_linux_config_dropin_file_mode: "{{ __sysctl_linux_config_file_mode }}"
 
 
+# Marker prefixed to lines the role comments out in the main config file
+# (/etc/sysctl.conf) so the managed drop-in takes precedence. The marker lets the
+# uninstall path (state: absent) restore exactly those lines (and nothing the user
+# commented out themselves). It is intentionally free of regex metacharacters so
+# it can be used verbatim in both a `replace` value and a `regexp`. Keep the
+# comment-out (tasks/config/default.yml) and restore (tasks/setup/uninstall) in sync.
+__sysctl_linux_main_disabled_marker: "#ANSIBLE_DISABLED "
+
+
 # Executable paths
 __sysctl_linux_sysctl_executable: "/usr/sbin/sysctl"
 
@@ -159,28 +168,34 @@ __sysctl_linux_sysctl_executable: "/usr/sbin/sysctl"
 __sysctl_linux_profile_modules: []
 
 
-# Memory page size in bytes, used by profile auto-calculation for parameters
-# expressed in pages (e.g. kernel.shmall). There is no Ansible fact for it, so
-# tasks/init.yml overrides this default with the value reported by
-# "getconf PAGE_SIZE" when a profile that needs it is selected. The 4096 default
-# is the common x86_64 / aarch64 (4K) page size and a safe fallback.
-__sysctl_linux_page_size: 4096
-
-
-# Effective sysctl parameters: the profile parameters (loaded on demand by
-# tasks/init.yml from vars/profile/<profile>.yml into
-# __sysctl_linux_profile_parameters) merged with the user-supplied
-# sysctl_linux_parameters, the latter taking precedence. Both operands are
-# guarded with default({}) so this resolves even when no profile is selected
-# (the profile include_vars is conditional) and when the user sets no
-# parameters.
+# Effective sysctl parameters actually applied.
 #
-# Lazy / late-bound evaluation: Jinja renders this variable on access,
-# after tasks/init.yml loads the platform vars file that sets the inputs.
+# __sysctl_linux_profile_parameters is built by tasks/init.yml, which stacks the
+# profiles listed in sysctl_linux_profile (in order, last wins) via
+# tasks/load_profile.yml.
+#
+# When IPv6 is unavailable, all "net.ipv6.*" keys are dropped: otherwise writing
+# them would fail with the default sysctl_linux_verify=true /
+# sysctl_linux_ignore_unknown_key_errors=false. __sysctl_linux_ipv6_available is
+# set in tasks/init.yml; it defaults to true so a missing fact never filters
+# anything.
+#
+# Lazy / late-bound evaluation: Jinja renders this variable on access. Note the
+# profile auto-calculated values are already rendered eagerly during the
+# accumulation in tasks/load_profile.yml; the user-supplied parameters merged on
+# top here are resolved on access.
 __sysctl_linux_effective_parameters: >-
   {{
-    (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
-    | ansible.builtin.combine(sysctl_linux_parameters | ansible.builtin.default({}))
+    (
+      (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
+      | ansible.builtin.combine(sysctl_linux_parameters | ansible.builtin.default({}))
+      | ansible.builtin.dict2items
+      | ansible.builtin.rejectattr('key', 'ansible.builtin.match', '^net\.ipv6\.')
+      | ansible.builtin.items2dict
+    )
+    if (not (__sysctl_linux_ipv6_available | ansible.builtin.default(true)))
+    else (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
+         | ansible.builtin.combine(sysctl_linux_parameters | ansible.builtin.default({}))
   }}
 
 

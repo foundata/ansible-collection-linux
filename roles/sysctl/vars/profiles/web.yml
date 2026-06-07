@@ -1,6 +1,57 @@
 # Variables for the sysctl profile "web"
+#
+# Performance tuning for web servers, API gateways, load balancers and reverse
+# proxies: high connection counts, many short-lived sockets and large request
+# bursts. See web.md for the reasoning behind every value.
+#
+# This profile targets performance/reliability only. For the shared security
+# hardening, stack the "hardening-default" profile (usually first), e.g.
+# sysctl_linux_profile: ["hardening-default", "web"].
+#
+# Auto-calculated values are Jinja expressions based on
+# ansible_facts['memtotal_mb'] (RAM in MiB), evaluated when the profile is
+# loaded. Override any value via sysctl_linux_parameters; set it to null to
+# unmanage it.
 
 ---
 
-# FIXME to be implemented
-__sysctl_linux_profile_parameters: {}
+# This profile loads no kernel modules. Connection-tracking sizing
+# (net.netfilter.nf_conntrack_*) intentionally lives in the "router" profile,
+# not here: a plain web server should not be coupled to netfilter state
+# tracking. Hosts that also run a stateful firewall can stack the "router"
+# profile or set nf_conntrack_* via sysctl_linux_parameters.
+
+__sysctl_linux_profile_parameters:
+
+  ## Connection handling
+
+  # Accept queue (completed handshakes) and SYN backlog for bursty traffic.
+  "net.core.somaxconn": 65535
+  "net.ipv4.tcp_max_syn_backlog": 65535
+  # Packets queued when the NIC receives faster than the kernel processes.
+  "net.core.netdev_max_backlog": 65535
+  # System-wide open file limit: 100 per MiB of RAM, at least 100000.
+  "fs.file-max": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 100, 100000] | ansible.builtin.max }}"
+  # Per-process file-descriptor ceiling. Above the 1048576 default so a service's
+  # systemd LimitNOFILE / PAM nofile can be raised higher when needed.
+  "fs.nr_open": 2097152
+
+  ## TCP
+
+  # Free closing sockets quickly and recycle TIME_WAIT for outbound proxying.
+  "net.ipv4.tcp_fin_timeout": 15
+  # Loopback-only TIME_WAIT reuse (the modern kernel default); see web.md.
+  "net.ipv4.tcp_tw_reuse": 2
+  "net.ipv4.tcp_max_tw_buckets": 262144
+  # Widen the ephemeral port range for many concurrent outbound connections.
+  # Floor kept clear of most registered service ports (manage exceptions via
+  # net.ipv4.ip_local_reserved_ports).
+  "net.ipv4.ip_local_port_range": "16384 65535"
+  # Keep the congestion window warm on keep-alive connections.
+  "net.ipv4.tcp_slow_start_after_idle": 0
+
+  ## Socket buffers (auto-calculated)
+
+  # Max socket buffer sizes: RAM_bytes / 128, capped at 16 MiB.
+  "net.core.rmem_max": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 128, 16777216] | ansible.builtin.min }}"
+  "net.core.wmem_max": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 128, 16777216] | ansible.builtin.min }}"

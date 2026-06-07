@@ -1,0 +1,57 @@
+# Variables for the sysctl profile "hardening-default"
+#
+# Shared network / kernel / filesystem security hardening, meant to be STACKED
+# (usually first) before a workload/application profile, e.g.
+# sysctl_linux_profile: ["hardening-default", "web"]. The application profiles
+# target performance and no longer carry these keys, so select this profile to
+# apply the common safe defaults; stack "hardening-extra" too for stricter kernel
+# hardening.
+#
+# rp_filter is intentionally NOT part of this baseline: strict reverse-path
+# filtering breaks multihomed/asymmetric/VRRP/cloud setups. Only the "router"
+# profile sets it (loose mode), where it is functionally needed.
+#
+# Override any value via sysctl_linux_parameters; set it to null to unmanage it.
+
+---
+
+__sysctl_linux_profile_parameters:
+
+  ## Network hardening
+
+  # SYN cookies to survive SYN floods (a fallback, not a load-scaling mechanism).
+  "net.ipv4.tcp_syncookies": 1
+  # Ignore ICMP redirects (prevent route table tampering).
+  "net.ipv4.conf.all.accept_redirects": 0
+  "net.ipv4.conf.default.accept_redirects": 0
+  "net.ipv6.conf.all.accept_redirects": 0
+  "net.ipv6.conf.default.accept_redirects": 0
+  # Do not send ICMP redirects (a non-router host should not nudge peers).
+  "net.ipv4.conf.all.send_redirects": 0
+  "net.ipv4.conf.default.send_redirects": 0
+  # Reject source-routed packets.
+  "net.ipv4.conf.all.accept_source_route": 0
+  "net.ipv4.conf.default.accept_source_route": 0
+  "net.ipv6.conf.all.accept_source_route": 0
+  "net.ipv6.conf.default.accept_source_route": 0
+  # Log packets with impossible (martian) source addresses.
+  "net.ipv4.conf.all.log_martians": 1
+  "net.ipv4.conf.default.log_martians": 1
+  # ICMP hardening: ignore broadcast pings and bogus error responses.
+  "net.ipv4.icmp_echo_ignore_broadcasts": 1
+  "net.ipv4.icmp_ignore_bogus_error_responses": 1
+
+  ## Kernel hardening
+
+  # Full address space layout randomization.
+  "kernel.randomize_va_space": 2
+
+  ## Filesystem hardening
+
+  # Restrict hardlink/symlink creation and FIFO/regular-file writes in sticky
+  # world-writable dirs; disable SUID core dumps.
+  "fs.protected_hardlinks": 1
+  "fs.protected_symlinks": 1
+  "fs.protected_fifos": 2
+  "fs.protected_regular": 2
+  "fs.suid_dumpable": 0

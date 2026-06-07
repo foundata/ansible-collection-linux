@@ -1,0 +1,35 @@
+# Variables for the sysctl profile "hardening-extra"
+#
+# Kernel-level security hardening, intended to be stacked on top of hardening-default profile, e.g.
+# sysctl_linux_profile: ["hardening-default", "web", "hardening-extra"]. It adds
+# kernel-information and memory hardening on top of hardening-default's shared
+# network/kernel/filesystem defaults; the two do not overlap.
+#
+# Only a conservative, broadly safe subset is applied here. More aggressive keys
+# that can break debugging, profiling or BPF tooling are documented in
+# hardening.md as opt-in (set them via sysctl_linux_parameters if you want them).
+#
+# Override any value via sysctl_linux_parameters; set it to null to unmanage it.
+
+---
+
+__sysctl_linux_profile_parameters:
+
+  ## Kernel information exposure
+
+  # Hide kernel pointers from unprivileged users (/proc, dmesg, etc.).
+  "kernel.kptr_restrict": 1
+  # Restrict access to the kernel ring buffer (dmesg) to privileged users.
+  "kernel.dmesg_restrict": 1
+
+  ## Memory
+
+  # Disallow mmap()ing the low address space, mitigating kernel NULL-pointer
+  # dereference exploits. 65536 is the common hardened value (some distros/arches
+  # already set this or higher).
+  "vm.mmap_min_addr": 65536
+
+  ## Network
+
+  # Protect against TCP TIME-WAIT assassination (RFC 1337).
+  "net.ipv4.tcp_rfc1337": 1

@@ -20,3 +20,25 @@
     - "{{ __sysctl_linux_config_dropin_file_path_default }}"
   notify:
     - "sysctl_linux: reload"
+
+
+- name: "Setup | Uninstall | Check if the main sysctl config file exists"
+  ansible.builtin.stat:
+    path: "{{ __sysctl_linux_config_file_path }}"
+  register: __sysctl_linux_uninstall_main_stat
+
+
+# When state is "present" the config phase comments out duplicate keys in the
+# main config file (prefixing them with __sysctl_linux_main_disabled_marker) so
+# the managed drop-in wins. On uninstall, restore exactly those lines by stripping
+# the marker; lines the user commented out themselves carry no marker and are left
+# untouched.
+- name: "Setup | Uninstall | Restore lines previously disabled by the role in the main config file"
+  ansible.builtin.replace:
+    path: "{{ __sysctl_linux_config_file_path }}"
+    regexp: "^{{ __sysctl_linux_main_disabled_marker }}(.*)$"
+    replace: '\1'
+  when:
+    - __sysctl_linux_uninstall_main_stat['stat']['exists'] | ansible.builtin.default(false)
+  notify:
+    - "sysctl_linux: reload"

@@ -1,0 +1,52 @@
+# Variables for the sysctl profile "elasticsearch"
+#
+# Performance/reliability tuning for Elasticsearch / OpenSearch (Lucene
+# mmap-heavy search engines): the mandatory mmap count, generous file limits, a
+# swap-averse memory policy and bounded write-back. See elasticsearch.md for the
+# reasoning behind every value.
+#
+# This profile targets performance/reliability only. For the shared security
+# hardening, stack the "hardening-default" profile (usually first), e.g.
+# sysctl_linux_profile: ["hardening-default", "elasticsearch"].
+#
+# Auto-calculated values are Jinja expressions based on
+# ansible_facts['memtotal_mb'] (RAM in MiB), evaluated when the profile is
+# loaded. Override any value via sysctl_linux_parameters; set it to null to
+# unmanage it.
+
+---
+
+__sysctl_linux_profile_parameters:
+
+  ## Elasticsearch specifics
+
+  # Mandatory: Lucene mmaps many segment files; the 65530 default is too low and
+  # Elasticsearch refuses to start (bootstrap check) below 262144.
+  "vm.max_map_count": 262144
+  # Many shards/segments and clients: raise the open-file limits.
+  "fs.file-max": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 100, 100000] | ansible.builtin.max }}"
+  "fs.nr_open": 2097152
+
+  ## Memory (shared DB tuning)
+
+  # Strongly prefer reclaiming page cache over swapping the heap/page cache.
+  # Elasticsearch recommends disabling swap entirely or memory-locking the heap;
+  # see elasticsearch.md.
+  "vm.swappiness": 10
+  # Retain inode/dentry caches longer.
+  "vm.vfs_cache_pressure": 50
+  # Disable NUMA zone reclaim (latency spikes on multi-socket hosts).
+  "vm.zone_reclaim_mode": 0
+
+  ## Dirty pages (write-back; byte-based to bound writeback regardless of RAM)
+
+  # background = min(RAM/20, 1 GiB), hard = min(RAM/10, 4 GiB). Setting *_bytes
+  # disables the *_ratio knobs (mutually exclusive), giving a fixed ceiling
+  # instead of a percentage of (possibly huge) RAM.
+  "vm.dirty_background_bytes": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 20, 1073741824] | ansible.builtin.min }}"
+  "vm.dirty_bytes": "{{ [(ansible_facts['memtotal_mb'] | ansible.builtin.int) * 1024 * 1024 // 10, 4294967296] | ansible.builtin.min }}"
+
+  ## I/O
+
+  # Headroom for async I/O across many shards.
+  "fs.aio-max-nr": 1048576
