@@ -38,5 +38,5 @@ MySQL/MariaDB and especially InnoDB are sensitive to **Transparent Huge Pages (T
 
 ## References
 
-- MySQL — `innodb_use_native_aio`: <https://dev.mysql.com/doc/refman/en/innodb-parameters.html#sysvar_innodb_use_native_aio>
-- MariaDB — Configuring Linux for MariaDB: <https://mariadb.com/kb/en/configuring-linux-for-mariadb/>
+- MySQL: `innodb_use_native_aio`: <https://dev.mysql.com/doc/refman/en/innodb-parameters.html#sysvar_innodb_use_native_aio>
+- MariaDB: Configuring Linux for MariaDB: <https://mariadb.com/kb/en/configuring-linux-for-mariadb/>

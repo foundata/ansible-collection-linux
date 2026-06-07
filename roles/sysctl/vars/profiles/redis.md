@@ -37,4 +37,4 @@ This profile is optimized for performance and does **not** include security hard
 
 ## References
 
-- Redis — Administration: <https://redis.io/docs/management/admin/>
+- Redis: Administration: <https://redis.io/docs/management/admin/>

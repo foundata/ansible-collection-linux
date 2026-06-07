@@ -39,4 +39,4 @@ This profile is optimized for performance and does **not** include security hard
 
 ## References
 
-- PostgreSQL — Managing Kernel Resources: <https://www.postgresql.org/docs/current/kernel-resources.html>
+- PostgreSQL: Managing Kernel Resources: <https://www.postgresql.org/docs/current/kernel-resources.html>
