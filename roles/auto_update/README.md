@@ -474,7 +474,7 @@ Top-level keys (backends):
 
 - `unattended-upgrades`: Debian/Ubuntu (using `apt`).
 - `dnf-automatic`: RHEL/Fedora (using `dnf`).
-- `os_update`: openSUSE Leap (using `zypper`).
+- `os-update`: openSUSE Leap (using `zypper`).
 
 See the option value descriptions for their syntax. Example:
 

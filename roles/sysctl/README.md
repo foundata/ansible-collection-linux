@@ -2,8 +2,7 @@
 
 Manages Linux kernel parameters via `sysctl`, with optional workload-specific profiles that auto-tune values based on system resources.
 
-Choose one or more profiles for your workload (web server, the database engines, file server, virtualization host, or router) and the role applies performance-tuned parameters. Security hardening lives in separate, stackable profiles (`
-`, `hardening-extra`) — stack them with a workload profile, e.g. `["hardening-default", "web"]`. Override any value with `sysctl_linux_parameters`.
+Choose one or more profiles for your workload (web server, the database engines, file server, virtualization host, or router) and the role applies performance-tuned parameters. Security hardening lives in separate, stackable profiles (`hardening-default`, `hardening-extra`) — stack them with a workload profile, e.g. `["hardening-default", "web"]`. Override any value with `sysctl_linux_parameters`.
 
 
 ## Table of contents<a id="toc"></a>

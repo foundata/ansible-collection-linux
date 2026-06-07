@@ -12,12 +12,13 @@
     test_command: "{{ reboot_linux_test_cmd }}"
   when:
     - __reboot_linux_required
+    # Containers cannot be rebooted; skip there (the detection fact is set in init).
+    - not __reboot_linux_is_container
   register: __reboot_linux_reboot_result
 
 
 - name: "Reboot | Default | Set fact with reboot result data (rebooted, elapsed)"
   ansible.builtin.set_fact:
-    # Remember to update the fact task in handlers/main.yaml if this changes
     reboot_linux_result:
       # seconds that elapsed waiting for the system to be rebooted
       elapsed: "{{ __reboot_linux_reboot_result['elapsed'] | ansible.builtin.default(false) }}"

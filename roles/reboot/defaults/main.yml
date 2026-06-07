@@ -58,7 +58,7 @@ reboot_linux_boot_time_cmd: "cat '/proc/sys/kernel/random/boot_id'"
 # - Type: int
 # - Required: No
 # - Default: 0
-reboot_linux_connect_timeout: -1
+reboot_linux_connect_timeout: 0
 
 
 # Message to display to users before reboot.

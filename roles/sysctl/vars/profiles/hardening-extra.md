@@ -5,8 +5,8 @@ Conservative kernel-level security hardening, meant to be **stacked** on top of 
 ```yaml
 sysctl_linux_profile:
   - "hardening-default"
-  - "hardening-extra"
   - "web"
+  - "hardening-extra"
 ```
 
 This profile adds kernel-information and memory hardening on top of the shared network/kernel/filesystem defaults in [`hardening-default`](./hardening-default.md); the two do not overlap. The workload profiles themselves target performance and carry no hardening, so stack `hardening-default` as well — omitting it means no ASLR, ICMP/source-route hardening or `fs.protected_*`. Stacking composes them (last wins on conflicts, of which there are none here).
