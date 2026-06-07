@@ -36,5 +36,5 @@ Elasticsearch recommends **disabling swap entirely**, or locking the heap into m
 
 ## References
 
-- Elasticsearch — Virtual memory (`vm.max_map_count`): <https://www.elastic.co/guide/en/elasticsearch/reference/current/vm-max-map-count.html>
-- Elasticsearch — Disable swapping: <https://www.elastic.co/guide/en/elasticsearch/reference/current/setup-configuration-memory.html>
+- Elasticsearch: Virtual memory (`vm.max_map_count`): <https://www.elastic.co/guide/en/elasticsearch/reference/current/vm-max-map-count.html>
+- Elasticsearch: Disable swapping: <https://www.elastic.co/guide/en/elasticsearch/reference/current/setup-configuration-memory.html>
