@@ -1,31 +1,8 @@
 # Execute the collection role "sysctl" against all driver-created instances.
-
-# The following task avoids fragile workarounds (like parsing container names)
-# if additional platform specific preparations are needed. But it prevents
-# testing whether the role itself verifies these facts' availability (this
-# disadvantage had to be accepted; however, it was verified that the role really
-# does reload the facts when needed)
-- name: "Molecule | Converge | Gather playbook-specific facts"
-  ansible.builtin.setup:
-    gather_subset:
-      - "virtualization_role"
-      - "virtualization_type"
-  when:
-    - ansible_facts['virtualization_role'] is not ansible.builtin.defined or
-      ansible_facts['virtualization_type'] is not ansible.builtin.defined
-
-
-# Required for checkability due to read-only kernel parameters in containerized systems
-- name: "Molecule | Converge | Set container detection fact"
-  ansible.builtin.set_fact:
-    __testing_is_container: >-
-      {{
-        ((ansible_facts['virtualization_role'] == 'guest' and
-          ansible_facts['virtualization_type'] in ['docker', 'podman', 'containerd', 'lxc'])
-          or
-          (ansible_facts.get('env', {}).get('container') is not none))
-      }}
-
+#
+# No container detection is needed here: the role auto-detects containers and
+# skips live `sysctl -w` itself, so the converge does not opt out of verification
+# (gathering virtualization facts up front is left to the role's own init).
 
 - name: "Molecule | Converge | Store sysctl_linux_* role parameters in __testing_state"
   ansible.builtin.include_tasks:
