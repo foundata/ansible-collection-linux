@@ -47,9 +47,9 @@ KSM (`/sys/kernel/mm/ksm/`) and HugePages (`/sys/kernel/mm/hugepages/`, or `vm.n
 
 ## References
 
-- Linux kernel — `/proc/sys/vm/` (`overcommit_memory`, `swappiness`, `dirty_bytes`/`dirty_background_bytes`, `min_free_kbytes`): <https://docs.kernel.org/admin-guide/sysctl/vm.html>
-- Linux kernel — `/proc/sys/fs/` (`aio-max-nr`): <https://docs.kernel.org/admin-guide/sysctl/fs.html>
-- Red Hat — Optimizing virtual machine performance in RHEL 9 (the `tuned` `virtual-host` profile enables aggressive dirty-page writeback and `virtual-guest` lowers swappiness — the basis for the write-back and `swappiness` choices here): <https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_managing_virtualization/optimizing-virtual-machine-performance-in-rhel_configuring-and-managing-virtualization>
-- Proxmox VE — Dynamic Memory Management (KSM and ballooning; context for memory overcommit and the KSM scope note above): <https://pve.proxmox.com/wiki/Dynamic_Memory_Management>
-- Linux kernel — Kernel Samepage Merging (KSM), out of scope for this profile: <https://docs.kernel.org/admin-guide/mm/ksm.html>
-- Linux kernel — HugeTLB Pages (`vm.nr_hugepages` / `/sys/kernel/mm/hugepages`), out of scope for this profile: <https://docs.kernel.org/admin-guide/mm/hugetlbpage.html>
+- Linux kernel: `/proc/sys/vm/` (`overcommit_memory`, `swappiness`, `dirty_bytes`/`dirty_background_bytes`, `min_free_kbytes`): <https://docs.kernel.org/admin-guide/sysctl/vm.html>
+- Linux kernel: `/proc/sys/fs/` (`aio-max-nr`): <https://docs.kernel.org/admin-guide/sysctl/fs.html>
+- Red Hat: Optimizing virtual machine performance in RHEL 9 (the `tuned` `virtual-host` profile enables aggressive dirty-page writeback and `virtual-guest` lowers swappiness — the basis for the write-back and `swappiness` choices here): <https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_managing_virtualization/optimizing-virtual-machine-performance-in-rhel_configuring-and-managing-virtualization>
+- Proxmox VE: Dynamic Memory Management (KSM and ballooning; context for memory overcommit and the KSM scope note above): <https://pve.proxmox.com/wiki/Dynamic_Memory_Management>
+- Linux kernel: Kernel Samepage Merging (KSM), out of scope for this profile: <https://docs.kernel.org/admin-guide/mm/ksm.html>
+- Linux kernel: HugeTLB Pages (`vm.nr_hugepages` / `/sys/kernel/mm/hugepages`), out of scope for this profile: <https://docs.kernel.org/admin-guide/mm/hugetlbpage.html>
