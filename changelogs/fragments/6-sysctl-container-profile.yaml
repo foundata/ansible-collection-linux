@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - >
+    sysctl role - added a new ``container`` profile for OCI container hosts
+    (Docker, Podman including rootless, containerd/CRI-O). See
+    ``roles/sysctl/vars/profiles/container.md`` for the reasoning behind every
+    value (https://github.com/foundata/ansible-collection-linux/issues/6).

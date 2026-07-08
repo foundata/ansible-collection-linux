@@ -161,10 +161,11 @@ __sysctl_linux_sysctl_executable: "/usr/sbin/sysctl"
 
 
 # Kernel modules required by the selected profile (e.g. "nf_conntrack" for the
-# router profiles, "br_netfilter" for virtualization). The default is empty; a
-# profile overrides it via vars/profiles/<profile>.yml (include_vars outranks
-# this file). tasks/init.yml loads them on a best-effort basis so module-
-# dependent kernel parameters (net.netfilter.*, net.bridge.*) can be set.
+# router profiles, "nf_conntrack" and "br_netfilter" for container). The
+# default is empty; a profile overrides it via vars/profiles/<profile>.yml
+# (include_vars outranks this file). tasks/init.yml loads them on a best-effort
+# basis so module-dependent kernel parameters (net.netfilter.*, net.bridge.*)
+# can be set.
 __sysctl_linux_profile_modules: []
 
 

@@ -58,10 +58,11 @@ sysctl_linux_autoupgrade: false
 # the workload profile.
 #
 # The workload profiles (`web`, `postgresql`, `mysql`, `redis`, `elasticsearch`,
-# `file`, `virtualization`, `router`/`router_v4only`/`router_v6only`) tune for
-# performance and reliability. Security hardening lives in separate, stackable
-# profiles: `hardening-default` (shared safe network/kernel/filesystem defaults)
-# and `hardening-extra` (stricter kernel hardening).
+# `file`, `virtualization`, `container`,
+# `router`/`router_v4only`/`router_v6only`) tune for performance and
+# reliability. Security hardening lives in separate, stackable profiles:
+# `hardening-default` (shared safe network/kernel/filesystem defaults) and
+# `hardening-extra` (stricter kernel hardening).
 #
 # Stack them with a workload profile, e.g. `["hardening-default", "web"]` or
 # `["hardening-default", "web", "hardening-extra"]`. Some values are
@@ -82,6 +83,10 @@ sysctl_linux_autoupgrade: false
 #
 # Available workload profiles (alphabetical order):
 #
+# - `container`: IP forwarding, bridge netfilter, connection tracking, neighbor
+#   tables, inotify and keyring quotas. Recommended for OCI container hosts
+#   (Docker, Podman incl. rootless, containerd/CRI-O). See
+#   [`container.md`](./vars/profiles/container.md) for details.
 # - `elasticsearch`: Mandatory `vm.max_map_count`, file limits and memory policy
 #   for Elasticsearch/OpenSearch. See
 #   [`elasticsearch.md`](./vars/profiles/elasticsearch.md) for details.
@@ -122,7 +127,7 @@ sysctl_linux_autoupgrade: false
 # - Type: list
 # - Required: No
 # - Default: []
-# - Choices: web, postgresql, mysql, redis, elasticsearch, file, virtualization, router, router_v4only, router_v6only, hardening-default, hardening-extra
+# - Choices: web, postgresql, mysql, redis, elasticsearch, file, virtualization, container, router, router_v4only, router_v6only, hardening-default, hardening-extra
 # - List elements: str
 sysctl_linux_profile: []
 

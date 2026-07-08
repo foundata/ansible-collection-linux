@@ -459,6 +459,53 @@
         success_msg: "router_v6only forwarding direction is correct."
 
 
+- name: "Molecule | Verify | Validate container profile (init-only, incl. auto-calculation and modules)"
+  block:
+
+    - name: "Molecule | Verify | Select the container profile for the profile check"
+      ansible.builtin.set_fact:
+        sysctl_linux_profile:
+          - "container"
+        sysctl_linux_parameters: {}
+
+
+    - name: "Molecule | Verify | Re-initialize sysctl with the container profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+        tasks_from: "init"
+        public: true
+
+
+    - name: "Molecule | Verify | Assert container profile forwarding, bridge netfilter, conntrack and quotas"
+      ansible.builtin.assert:
+        that:
+          # forwarding (IPv4 + IPv6) and bridge netfilter
+          - (__sysctl_linux_effective_parameters['net.ipv4.ip_forward'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['net.ipv6.conf.all.forwarding'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['net.bridge.bridge-nf-call-iptables'] | ansible.builtin.int) == 1
+          - (__sysctl_linux_effective_parameters['net.bridge.bridge-nf-call-ip6tables'] | ansible.builtin.int) == 1
+          # loose reverse-path filtering (functional key, not part of hardening-default)
+          - (__sysctl_linux_effective_parameters['net.ipv4.conf.all.rp_filter'] | ansible.builtin.int) == 2
+          # conntrack sizing (auto-calculated, same formulas as the router profile)
+          - (__sysctl_linux_effective_parameters['net.netfilter.nf_conntrack_max'] | ansible.builtin.int) ==
+            ((ansible_facts['memtotal_mb'] | ansible.builtin.int) * 32)
+          - (__sysctl_linux_effective_parameters['net.netfilter.nf_conntrack_buckets'] | ansible.builtin.int) ==
+            ((ansible_facts['memtotal_mb'] | ansible.builtin.int) * 8)
+          # per-UID inotify and kernel keyring quotas for many containers
+          - (__sysctl_linux_effective_parameters['fs.inotify.max_user_watches'] | ansible.builtin.int) == 524288
+          - (__sysctl_linux_effective_parameters['fs.inotify.max_user_instances'] | ansible.builtin.int) == 1024
+          - (__sysctl_linux_effective_parameters['kernel.keys.maxkeys'] | ansible.builtin.int) == 2000
+          - (__sysctl_linux_effective_parameters['kernel.keys.maxbytes'] | ansible.builtin.int) == 2000000
+          # required kernel modules
+          - "'nf_conntrack' in __sysctl_linux_profile_modules"
+          - "'br_netfilter' in __sysctl_linux_profile_modules"
+          - (__sysctl_linux_profile_modules | ansible.builtin.length) == 2
+          # workload tuning is intentionally not managed (stack a workload profile instead)
+          - "'net.core.somaxconn' not in __sysctl_linux_effective_parameters"
+        fail_msg: "container profile did not load or auto-calculate as expected."
+        success_msg: "container profile loaded and auto-calculated correctly."
+
+
 - name: "Molecule | Verify | Validate stacked profiles (init-only: order, last-wins, module union)"
   block:
 

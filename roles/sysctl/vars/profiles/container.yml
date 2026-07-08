@@ -1,0 +1,105 @@
+# Variables for the sysctl profile "container"
+#
+# Tuning for OCI container hosts (Docker, Podman including rootless, and single
+# nodes running containerd/CRI-O): IPv4 and IPv6 forwarding for the NAT-based
+# container networks, bridge netfilter so bridged container traffic traverses
+# the host firewall (published ports, inter-container isolation), a
+# connection-tracking table sized for many masqueraded flows, bigger neighbor
+# (ARP/ND) tables, loose reverse-path filtering, and raised inotify and kernel
+# keyring quotas for many containers. See container.md for the reasoning behind
+# every value.
+#
+# This profile targets container host function only. For the shared security
+# hardening, stack the "hardening-default" profile (usually first), e.g.
+# sysctl_linux_profile: ["hardening-default", "container"]. rp_filter is kept
+# here (not in hardening-default) because a container host needs loose mode,
+# see below.
+#
+# Auto-calculated values are Jinja expressions based on
+# ansible_facts['memtotal_mb'] (RAM in MiB), evaluated when the profile is
+# loaded. Override any value via sysctl_linux_parameters; set it to null to
+# unmanage it.
+
+---
+
+# Kernel modules this profile depends on. nf_conntrack provides the
+# net.netfilter.nf_conntrack_* keys and br_netfilter the net.bridge.* keys
+# below; both are loaded best-effort by tasks/init.yml (tolerated if
+# unavailable, e.g. in containers).
+__sysctl_linux_profile_modules:
+  - "nf_conntrack"
+  - "br_netfilter"
+
+
+__sysctl_linux_profile_parameters:
+
+  ## IP forwarding (IPv4 + IPv6)
+
+  # Rootful bridge networking (Docker, Podman/netavark, CNIs) routes/NATs
+  # container traffic through the host; forwarding for both families keeps
+  # dual-stack container networks working. Caveat: IPv6 forwarding makes the
+  # kernel ignore Router Advertisements; see container.md if the host's uplink
+  # uses SLAAC.
+  "net.ipv4.ip_forward": 1
+  "net.ipv4.conf.all.forwarding": 1
+  "net.ipv4.conf.default.forwarding": 1
+  "net.ipv6.conf.all.forwarding": 1
+  "net.ipv6.conf.default.forwarding": 1
+
+  ## Bridge netfilter (requires br_netfilter)
+
+  # Make bridged (same-bridge, L2) container traffic traverse ip(6)tables so
+  # the runtime's isolation and published-port rules apply to it. arptables is
+  # left unmanaged.
+  "net.bridge.bridge-nf-call-iptables": 1
+  "net.bridge.bridge-nf-call-ip6tables": 1
+
+  ## Connection tracking (auto-calculated, requires nf_conntrack)
+
+  # Every masqueraded container connection occupies a conntrack entry in the
+  # host namespace; ~32 tracked connections per MiB of RAM (same sizing as the
+  # "router" profile) prevents "nf_conntrack: table full, dropping packet".
+  "net.netfilter.nf_conntrack_max": "{{ (ansible_facts['memtotal_mb'] | ansible.builtin.int) * 32 }}"
+  # Hash buckets = conntrack_max / 4 (i.e. RAM_MiB * 8). Note: the canonical way
+  # to size the hash table is the nf_conntrack `hashsize` module parameter at
+  # load time; this sysctl resizes it after load on current kernels. All
+  # conntrack timeouts are left at their kernel defaults.
+  "net.netfilter.nf_conntrack_buckets": "{{ (ansible_facts['memtotal_mb'] | ansible.builtin.int) * 8 }}"
+
+  ## Neighbor tables (ARP / NDP)
+
+  # Larger GC thresholds: every container veth adds neighbor entries on the
+  # host bridges, and dense hosts overflow the small kernel defaults.
+  "net.ipv4.neigh.default.gc_thresh1": 1024
+  "net.ipv4.neigh.default.gc_thresh2": 4096
+  "net.ipv4.neigh.default.gc_thresh3": 8192
+  "net.ipv6.neigh.default.gc_thresh1": 1024
+  "net.ipv6.neigh.default.gc_thresh2": 4096
+  "net.ipv6.neigh.default.gc_thresh3": 8192
+
+  ## Reverse path filtering (container-host-specific, not part of hardening-default)
+
+  # Loose mode (2): multiple bridges, hairpin NAT and service proxying create
+  # asymmetric paths where strict mode (1) would wrongly drop valid packets.
+  # Still rejects packets with an unroutable source. The kernel uses
+  # max(conf.all, conf.<iface>).
+  "net.ipv4.conf.all.rp_filter": 2
+  "net.ipv4.conf.default.rp_filter": 2
+
+  ## inotify (per-UID quotas)
+
+  # Many containers multiply inotify consumers (config watchers, log tailers,
+  # supervisors) while the quotas are per UID — which containers of the same
+  # user share. Same values as the "file" profile.
+  "fs.inotify.max_user_watches": 524288
+  "fs.inotify.max_user_instances": 1024
+
+  ## Kernel keyring (per-UID quotas)
+
+  # Each container gets its own session keyring, counted against the per-UID
+  # quota of the owning user (all rootful containers share UID 0; a rootless
+  # user's containers share that UID). The kernel defaults (200 keys, 20000
+  # bytes) fail around 200 containers; values from the Incus/LXD production
+  # guide.
+  "kernel.keys.maxkeys": 2000
+  "kernel.keys.maxbytes": 2000000

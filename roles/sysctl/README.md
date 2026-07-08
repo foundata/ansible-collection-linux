@@ -2,7 +2,7 @@
 
 Manages Linux kernel parameters via `sysctl`, with optional workload-specific profiles that auto-tune values based on system resources.
 
-Choose one or more profiles for your workload (web server, the database engines, file server, virtualization host, or router) and the role applies performance-tuned parameters. Security hardening lives in separate, stackable profiles (`hardening-default`, `hardening-extra`) — stack them with a workload profile, e.g. `["hardening-default", "web"]`. Override any value with `sysctl_linux_parameters`.
+Choose one or more profiles for your workload (web server, the database engines, file server, virtualization host, container host, or router) and the role applies performance-tuned parameters. Security hardening lives in separate, stackable profiles (`hardening-default`, `hardening-extra`) — stack them with a workload profile, e.g. `["hardening-default", "web"]`. Override any value with `sysctl_linux_parameters`.
 
 
 ## Table of contents<a id="toc"></a>
@@ -32,7 +32,7 @@ Main features:
 
 * **Simple usage**: Use the [`sysctl_linux_parameters`](#variable-sysctl_linux_parameters) dictionary to maintain custom kernel parameters
 * **Optional, stackable profiles** (`sysctl_linux_profile` is a list, applied in order, last wins):
-  * Workload (performance) profiles: `web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`, `virtualization`, `router`/`router_v4only`/`router_v6only` (see [`sysctl_linux_profile`](#variable-sysctl_linux_profile) for details).
+  * Workload (performance) profiles: `web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`, `virtualization`, `container`, `router`/`router_v4only`/`router_v6only` (see [`sysctl_linux_profile`](#variable-sysctl_linux_profile) for details).
   * Security profiles to stack on a workload: `hardening-default` (shared network/kernel/filesystem hardening) and `hardening-extra` (stricter kernel hardening), e.g. `["hardening-default", "web", "hardening-extra"]`.
   * Auto-tuning: Profiles automatically calculate optimal values based on system RAM using Ansible facts.
   * Use [`sysctl_linux_parameters`](#variable-sysctl_linux_parameters) to overwrite a profile parameter to customize for edge cases.
@@ -199,8 +199,8 @@ profile on to the hardening baseline and kernel hardening on top of the
 workload profile.
 
 The workload profiles (`web`, `postgresql`, `mysql`, `redis`, `elasticsearch`,
-`file`, `virtualization`, `router`/`router_v4only`/`router_v6only`) tune for
-performance and reliability. Security hardening lives in separate, stackable
+`file`, `virtualization`, `container`, `router`/`router_v4only`/`router_v6only`)
+tune for performance and reliability. Security hardening lives in separate, stackable
 profiles: `hardening-default` (shared safe network/kernel/filesystem defaults) and
 `hardening-extra` (stricter kernel hardening).
 
@@ -222,6 +222,10 @@ Available base profiles (alphabetical order):
 
 Available workload profiles (alphabetical order):
 
+- `container`: IP forwarding, bridge netfilter, connection tracking, neighbor
+  tables, inotify and keyring quotas. Recommended for OCI container hosts
+  (Docker, Podman incl. rootless, containerd/CRI-O). See
+  [`container.md`](./vars/profiles/container.md) for details.
 - `elasticsearch`: Mandatory `vm.max_map_count`, file limits and memory policy
   for Elasticsearch/OpenSearch. See
   [`elasticsearch.md`](./vars/profiles/elasticsearch.md) for details.
@@ -262,7 +266,7 @@ a reboot (or a manual `sysctl -w` / `modprobe -r`).
 - **Type**: `list`
 - **Required**: No
 - **Default**: `[]`
-- **Choices**: `web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`, `virtualization`, `router`, `router_v4only`, `router_v6only`, `hardening-default`, `hardening-extra`
+- **Choices**: `web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`, `virtualization`, `container`, `router`, `router_v4only`, `router_v6only`, `hardening-default`, `hardening-extra`
 - **List Elements**: `str`
 
 
