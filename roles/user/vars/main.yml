@@ -21,8 +21,11 @@ __user_linux_used_facts:
   - "distribution_major_version"
   - "distribution_version"
   - "os_family"
-  # from subset "user_id" (the Ansible connection user, protected from reaping
-  # by user_linux_accounts_delete_unmanaged); needed under reduced fact sets.
+  # from subset "user_id" (the effective user, "root" when running with become).
+  # It is one of the accounts protected from reaping by
+  # user_linux_accounts_delete_unmanaged; the real connection user is determined
+  # separately at runtime (see tasks/config/default.yml). Needed under reduced
+  # fact sets.
   - "user_id"
 
 

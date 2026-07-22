@@ -195,6 +195,34 @@
         database: "passwd"
 
 
+    # The connection/login user must never be reaped, otherwise a run with
+    # user_linux_accounts_delete_unmanaged could delete the account currently in
+    # use and lock the host out. The available metadata is unreliable for this
+    # guard:
+    #
+    # - ansible_facts['user_id'] is the *effective* user ("root" under
+    #   become, not the account used to connect)
+    #
+    # - "ansible_user" only exists when the remote user is set
+    #   explicitly (remote_user, -u or inventory) and even then reflects the
+    #   requested user, not the account the session landed on; undefined when
+    #   the connection relies on an SSH-config or current-user default.
+    #
+    # Running "id -un" with "become: false" reports the real connection user in
+    # every case; "check_mode: false" keeps the protection effective during a
+    # "--check" run.
+    - name: "Config | Default | Determine the Ansible connection user (unprivileged)"
+      ansible.builtin.command:
+        argv:
+          - "id"
+          - "-un"
+      become: false
+      changed_when:
+        - false
+      check_mode: false
+      register: __user_linux_reap_connection_user_raw
+
+
     - name: "Config | Default | Remove unmanaged accounts within the UID range (never: root, system accounts or the Ansible connection's user)"
       ansible.builtin.user:
         name: "{{ __user_linux_reap_item }}"
@@ -205,7 +233,10 @@
         __user_linux_reap_managed: "{{ user_linux_accounts | ansible.builtin.map(attribute='name') | ansible.builtin.list }}"
         __user_linux_reap_protected: >-
           {{
-            (['root', ansible_facts['user_id'] | ansible.builtin.default('')] | ansible.builtin.select | ansible.builtin.list)
+            (['root',
+              ansible_facts['user_id'] | ansible.builtin.default(''),
+              __user_linux_reap_connection_user_raw['stdout'] | ansible.builtin.trim]
+             | ansible.builtin.select | ansible.builtin.list)
             + __user_linux_reap_managed
             + (user_linux_accounts_delete_unmanaged_exclude | ansible.builtin.default([]))
           }}

@@ -1,0 +1,10 @@
+---
+bugfixes:
+  - >
+    user role - ``user_linux_accounts_delete_unmanaged`` no longer risks
+    deleting and locking out the account used to connect. The connection user
+    was derived from ``ansible_facts['user_id']``, which is the effective user
+    and therefore ``root`` when the role runs with ``become``, so the real
+    login user fell inside the reap candidates and could be removed with
+    ``remove: true, force: true``. The connection user is now determined at
+    runtime and always excluded from reaping.
