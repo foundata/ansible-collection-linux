@@ -549,6 +549,12 @@ drop-in file that is **not** created by this role is removed, except for
 
 This is a destructive operation and therefore disabled by default.
 
+Note: regardless of this setting, the role always manages its own
+`99_managed_*` drop-ins authoritatively. Renaming a rule or removing a
+user/group from a rule deletes the now-orphaned drop-in on the next
+run, so a revoked grant never lingers. This option only extends that
+cleanup to **foreign** files in `/etc/sudoers.d/`.
+
 WARNING: On cloud images, the file `/etc/sudoers.d/90-cloud-init-users`
 typically grants the cloud/admin user passwordless sudo. With this option
 enabled it would be deleted unless you add it to

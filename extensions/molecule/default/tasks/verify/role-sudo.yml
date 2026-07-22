@@ -19,16 +19,37 @@
     }}
 
 
+- name: "Molecule | Verify | sudo | Rebuild the expected per-grantee drop-in basenames"
+  # Reconstruct the filenames the role builds: "<prefix><rule>-<type>-<sanitized
+  # grantee, capped>-<sha1(original grantee)[:8]>". Kept in sync with
+  # roles/sudo/tasks/config/default.yml on purpose so a scheme change is caught.
+  ansible.builtin.set_fact:
+    __testing_sudo_grantees: >-
+      {%- set __ns = namespace(items=[]) -%}
+      {%- for __e in [
+            {'rule': 'molecule_admins', 'type': 'group', 'grantee': 'molecule_sudoadmins'},
+            {'rule': 'molecule_deploy', 'type': 'user', 'grantee': 'molecule_deployer'},
+            {'rule': 'molecule_multi', 'type': 'user', 'grantee': 'molecule_deployer'},
+            {'rule': 'molecule_multi', 'type': 'group', 'grantee': 'molecule_sudoadmins'},
+            {'rule': 'molecule_dotted', 'type': 'user', 'grantee': 'molecule.dotuser'},
+          ] -%}
+      {%-   set _ = __ns.items.append(__e | ansible.builtin.combine({
+              'file': __sudo_linux_dropin_prefix ~ __e['rule'] ~ '-' ~ __e['type'] ~ '-'
+                      ~ (__e['grantee'] | ansible.builtin.regex_replace('[^A-Za-z0-9_-]', '_'))[:40]
+                      ~ '-' ~ (__e['grantee'] | ansible.builtin.hash('sha1'))[:8]})) -%}
+      {%- endfor -%}
+      {{ __ns.items }}
+
+
 - name: "Molecule | Verify | sudo | Stat the managed drop-in files (one per grantee plus the global Defaults file)"
   ansible.builtin.stat:
     path: "{{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_basename }}"
   register: __testing_sudo_dropins
-  loop:
-    - "{{ __sudo_linux_dropin_prefix }}molecule_admins-group-molecule_sudoadmins"
-    - "{{ __sudo_linux_dropin_prefix }}molecule_deploy-user-molecule_deployer"
-    - "{{ __sudo_linux_dropin_prefix }}molecule_multi-user-molecule_deployer"
-    - "{{ __sudo_linux_dropin_prefix }}molecule_multi-group-molecule_sudoadmins"
-    - "{{ __sudo_linux_dropin_prefix }}defaults"
+  loop: >-
+    {{
+      (__testing_sudo_grantees | ansible.builtin.map(attribute='file') | ansible.builtin.list)
+      + [__sudo_linux_dropin_prefix ~ 'defaults']
+    }}
   loop_control:
     loop_var: "__sudo_linux_dropin_basename"
 
@@ -48,9 +69,40 @@
     label: "{{ __sudo_linux_dropin_stat['__sudo_linux_dropin_basename'] }}"
 
 
+- name: "Molecule | Verify | sudo | Read the drop-in of the grantee with a dotted name"
+  ansible.builtin.slurp:
+    src: >-
+      {{ __sudo_linux_dropin_dir }}/{{
+        (__testing_sudo_grantees | ansible.builtin.selectattr('rule', 'ansible.builtin.match', '^molecule_dotted$')
+         | ansible.builtin.map(attribute='file') | ansible.builtin.first)
+      }}
+  register: __testing_sudo_dotted
+
+
+- name: "Molecule | Verify | sudo | Assert the dotted grantee is filename-safe yet grants the real name"
+  vars:
+    __testing_sudo_dotted_file: >-
+      {{
+        __testing_sudo_grantees | ansible.builtin.selectattr('rule', 'ansible.builtin.match', '^molecule_dotted$')
+        | ansible.builtin.map(attribute='file') | ansible.builtin.first
+      }}
+  ansible.builtin.assert:
+    that:
+      # The filename is sudo-safe: the dot is gone, replaced in the readable stem.
+      - "'.' not in __testing_sudo_dotted_file"
+      - "'molecule_dotuser' in __testing_sudo_dotted_file"
+      # The rule itself still targets the real, dotted account.
+      - "'molecule.dotuser ' in (__testing_sudo_dotted['content'] | ansible.builtin.b64decode)"
+    fail_msg: "The dotted grantee drop-in is not sanitized correctly or does not grant the real name."
+    success_msg: "The dotted grantee has a sudo-safe filename '{{ __testing_sudo_dotted_file }}' and grants 'molecule.dotuser'."
+
+
 - name: "Molecule | Verify | sudo | Stat the drop-in of the 'absent' rule"
   ansible.builtin.stat:
-    path: "{{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_prefix }}molecule_legacy_absent-group-molecule_sudoadmins"
+    path: >-
+      {{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_prefix }}molecule_legacy_absent-group-molecule_sudoadmins-{{
+        ('molecule_sudoadmins' | ansible.builtin.hash('sha1'))[:8]
+      }}
   register: __testing_sudo_absent
 
 
@@ -60,6 +112,20 @@
       - not __testing_sudo_absent['stat']['exists']
     fail_msg: "The drop-in for the 'absent' rule still exists."
     success_msg: "The 'absent' rule has no drop-in, as expected."
+
+
+- name: "Molecule | Verify | sudo | Stat the seeded orphan role-managed drop-in"
+  ansible.builtin.stat:
+    path: "{{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_prefix }}molecule_orphan-user-ghost-deadbeef"
+  register: __testing_sudo_orphan
+
+
+- name: "Molecule | Verify | sudo | Assert the orphaned role-managed drop-in was cleaned up"
+  ansible.builtin.assert:
+    that:
+      - not __testing_sudo_orphan['stat']['exists']
+    fail_msg: "The orphaned '99_managed_*' drop-in was not removed; namespace cleanup did not run."
+    success_msg: "The orphaned '99_managed_*' drop-in was removed by the namespace cleanup."
 
 
 - name: "Molecule | Verify | sudo | Read the global Defaults / extra_content drop-in"
@@ -85,11 +151,10 @@
   ansible.builtin.command:
     cmd: "{{ __sudo_linux_visudo_exec_path }} -cf {{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_basename }}"
   changed_when: false
-  loop:
-    - "{{ __sudo_linux_dropin_prefix }}molecule_admins-group-molecule_sudoadmins"
-    - "{{ __sudo_linux_dropin_prefix }}molecule_deploy-user-molecule_deployer"
-    - "{{ __sudo_linux_dropin_prefix }}molecule_multi-user-molecule_deployer"
-    - "{{ __sudo_linux_dropin_prefix }}molecule_multi-group-molecule_sudoadmins"
-    - "{{ __sudo_linux_dropin_prefix }}defaults"
+  loop: >-
+    {{
+      (__testing_sudo_grantees | ansible.builtin.map(attribute='file') | ansible.builtin.list)
+      + [__sudo_linux_dropin_prefix ~ 'defaults']
+    }}
   loop_control:
     loop_var: "__sudo_linux_dropin_basename"

@@ -1,0 +1,17 @@
+---
+bugfixes:
+  - >
+    sudo role - grantee names that are not filename-safe no longer break the
+    grant. A user or group containing a dot (common with SSSD/AD, e.g.
+    ``john.doe``) produced a drop-in whose name sudo silently ignores per
+    sudoers(5), so the rule never applied. The name is now sanitized in the
+    drop-in filename and disambiguated with a short hash of the original name;
+    the real grantee name is unchanged in the rule itself.
+
+security_fixes:
+  - >
+    sudo role - a renamed rule, or a user/group removed from a rule, no longer
+    leaves an orphaned drop-in behind that keeps granting sudo. The role now
+    cleans up its own ``99_managed_*`` namespace authoritatively on every run,
+    independent of ``sudo_linux_delete_unmanaged`` (which still governs foreign
+    files only).

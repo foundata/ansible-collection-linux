@@ -44,6 +44,19 @@
 # reaping unmanaged ones, purging non-exclusive keys) while the second converge
 # stays idempotent.
 
+- name: "Molecule | Prepare | sudo | Seed a stale role-managed drop-in the role must clean up"
+  # A leftover "99_managed_*" file that no current rule produces (simulates a
+  # renamed rule or a removed grantee). Seeded in prepare (once) so the first
+  # converge removes it via the always-on namespace cleanup and the second
+  # converge stays idempotent.
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/99_managed_molecule_orphan-user-ghost-deadbeef"
+    content: "molecule_ghost ALL=(ALL) NOPASSWD: /usr/bin/true\n"
+    owner: "root"
+    group: "root"
+    mode: "u=r,g=r,o=" # 0440
+
+
 - name: "Molecule | Prepare | user | Create a group the role will remove (state: absent)"
   ansible.builtin.group:
     name: "molecule_legacy_absent"

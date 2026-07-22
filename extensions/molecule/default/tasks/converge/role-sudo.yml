@@ -33,6 +33,14 @@
             - "molecule_sudoadmins"
           commands:
             - "/usr/bin/id"
+        # Grantee name that is not filename-safe (a dot, common with SSSD/AD):
+        # the drop-in filename must be sanitized and hashed, while the rule still
+        # grants the real dotted name.
+        - name: "molecule_dotted"
+          users:
+            - "molecule.dotuser"
+          commands:
+            - "/usr/bin/uptime"
         # Removal of a rule created with the same grantees.
         - name: "molecule_legacy_absent"
           groups:

@@ -49,22 +49,33 @@
 - name: "Config | Default | Build the per-grantee drop-in lists from sudo_linux_rules"
   ansible.builtin.set_fact:
     # "present" grantees, each a flat dict carrying the merged rule options plus
-    # the target drop-in filename (one file per user and per group).
+    # the target drop-in filename (one file per user and per group). The grantee
+    # name is embedded for readability but sanitized to sudo-safe characters
+    # ([A-Za-z0-9_-]) and capped: a dot or trailing "~" would make sudo silently
+    # ignore the file (sudoers(5)), and the cap keeps the name within NAME_MAX.
+    # An 8-char sha1 of the *original* name is appended so distinct names that
+    # sanitize alike (e.g. "john.doe" vs "john_doe") never collide.
     __sudo_linux_grantees_present: >-
       {%- set __ns = namespace(items=[]) -%}
       {%- for __rule in sudo_linux_rules -%}
       {%-   set __r = __sudo_linux_rule_defaults_effective | ansible.builtin.combine(__rule, recursive=true) -%}
       {%-   if __r['state'] | ansible.builtin.default('present') == 'present' -%}
       {%-     for __u in (__r['users'] | ansible.builtin.default([])) -%}
+      {%-       set __file = __sudo_linux_dropin_prefix ~ __rule['name'] ~ '-user-'
+                             ~ (__u | ansible.builtin.regex_replace('[^A-Za-z0-9_-]', '_'))[:40]
+                             ~ '-' ~ (__u | ansible.builtin.hash('sha1'))[:8] -%}
       {%-       set _ = __ns.items.append({
-                  'file': __sudo_linux_dropin_prefix ~ __rule['name'] ~ '-user-' ~ __u,
+                  'file': __file,
                   'user': __u, 'group': none,
                   'commands': __r['commands'], 'runas': __r['runas'], 'host': __r['host'],
                   'nopassword': __r['nopassword'], 'setenv': __r['setenv'], 'noexec': __r['noexec']}) -%}
       {%-     endfor -%}
       {%-     for __g in (__r['groups'] | ansible.builtin.default([])) -%}
+      {%-       set __file = __sudo_linux_dropin_prefix ~ __rule['name'] ~ '-group-'
+                             ~ (__g | ansible.builtin.regex_replace('[^A-Za-z0-9_-]', '_'))[:40]
+                             ~ '-' ~ (__g | ansible.builtin.hash('sha1'))[:8] -%}
       {%-       set _ = __ns.items.append({
-                  'file': __sudo_linux_dropin_prefix ~ __rule['name'] ~ '-group-' ~ __g,
+                  'file': __file,
                   'user': none, 'group': __g,
                   'commands': __r['commands'], 'runas': __r['runas'], 'host': __r['host'],
                   'nopassword': __r['nopassword'], 'setenv': __r['setenv'], 'noexec': __r['noexec']}) -%}
@@ -72,16 +83,24 @@
       {%-   endif -%}
       {%- endfor -%}
       {{ __ns.items }}
-    # "absent" grantees: only the target drop-in filenames need to be derived.
+    # "absent" grantees: only the target drop-in filenames need to be derived,
+    # using the exact same construction as the "present" list above so the names
+    # match on disk.
     __sudo_linux_grantees_absent: >-
       {%- set __ns = namespace(items=[]) -%}
       {%- for __rule in sudo_linux_rules -%}
       {%-   if (__rule['state'] | ansible.builtin.default('present')) == 'absent' -%}
       {%-     for __u in (__rule['users'] | ansible.builtin.default([])) -%}
-      {%-       set _ = __ns.items.append({'file': __sudo_linux_dropin_prefix ~ __rule['name'] ~ '-user-' ~ __u}) -%}
+      {%-       set __file = __sudo_linux_dropin_prefix ~ __rule['name'] ~ '-user-'
+                             ~ (__u | ansible.builtin.regex_replace('[^A-Za-z0-9_-]', '_'))[:40]
+                             ~ '-' ~ (__u | ansible.builtin.hash('sha1'))[:8] -%}
+      {%-       set _ = __ns.items.append({'file': __file}) -%}
       {%-     endfor -%}
       {%-     for __g in (__rule['groups'] | ansible.builtin.default([])) -%}
-      {%-       set _ = __ns.items.append({'file': __sudo_linux_dropin_prefix ~ __rule['name'] ~ '-group-' ~ __g}) -%}
+      {%-       set __file = __sudo_linux_dropin_prefix ~ __rule['name'] ~ '-group-'
+                             ~ (__g | ansible.builtin.regex_replace('[^A-Za-z0-9_-]', '_'))[:40]
+                             ~ '-' ~ (__g | ansible.builtin.hash('sha1'))[:8] -%}
+      {%-       set _ = __ns.items.append({'file': __file}) -%}
       {%-     endfor -%}
       {%-   endif -%}
       {%- endfor -%}
@@ -91,6 +110,21 @@
       {{
         (sudo_linux_defaults | ansible.builtin.default([]) | ansible.builtin.length) > 0
         or (sudo_linux_extra_content | ansible.builtin.default('') | trim | ansible.builtin.length) > 0
+      }}
+
+
+- name: "Config | Default | Compute the drop-in basenames to keep during cleanup"
+  ansible.builtin.set_fact:
+    # Files this role manages right now: the per-grantee drop-ins, the global
+    # Defaults drop-in (if any), the per-platform protected list and the
+    # caller-provided exclude list. Shared by the always-on cleanup of the
+    # role's own "99_managed_" namespace and the opt-in authoritative reap.
+    __sudo_linux_dropin_keep: >-
+      {{
+        (__sudo_linux_grantees_present | ansible.builtin.map(attribute='file') | ansible.builtin.list)
+        + ([__sudo_linux_dropin_prefix ~ 'defaults'] if (__sudo_linux_defaults_has_content | ansible.builtin.bool) else [])
+        + (__sudo_linux_dropin_protected | ansible.builtin.default([]))
+        + (sudo_linux_delete_unmanaged_exclude | ansible.builtin.default([]))
       }}
 
 
@@ -145,6 +179,34 @@
     - not (__sudo_linux_defaults_has_content | ansible.builtin.bool)
 
 
+# Always-on cleanup of the role's own "99_managed_*" namespace: the role
+# authoritatively owns these files, so a renamed rule or a removed grantee must
+# not leave a stale drop-in behind that keeps granting sudo. Only files carrying
+# the role's prefix are touched here; foreign files in /etc/sudoers.d require the
+# opt-in sudo_linux_delete_unmanaged reap below.
+- name: "Config | Default | List existing role-managed drop-in files"
+  ansible.builtin.find:
+    paths:
+      - "{{ __sudo_linux_dropin_dir }}"
+    patterns:
+      - "{{ __sudo_linux_dropin_prefix }}*"
+    file_type: "file"
+    hidden: true
+  register: __sudo_linux_managed_dropins
+
+
+- name: "Config | Default | Remove orphaned role-managed drop-in files"
+  ansible.builtin.file:
+    path: "{{ __sudo_linux_reap_item['path'] }}"
+    state: "absent"
+  when:
+    - (__sudo_linux_reap_item['path'] | ansible.builtin.basename) not in __sudo_linux_dropin_keep
+  loop: "{{ __sudo_linux_managed_dropins['files'] }}"
+  loop_control:
+    loop_var: "__sudo_linux_reap_item"
+    label: "{{ __sudo_linux_reap_item['path'] }}"
+
+
 - name: "Config | Default | Reap unmanaged drop-in files (authoritative /etc/sudoers.d)"
   when:
     - sudo_linux_delete_unmanaged | ansible.builtin.bool
@@ -163,17 +225,6 @@
       ansible.builtin.file:
         path: "{{ __sudo_linux_reap_item['path'] }}"
         state: "absent"
-      vars:
-        # Files to keep: the drop-ins this role manages right now, the global
-        # Defaults drop-in (if any), the per-platform protected list and the
-        # caller-provided exclude list.
-        __sudo_linux_dropin_keep: >-
-          {{
-            (__sudo_linux_grantees_present | ansible.builtin.map(attribute='file') | ansible.builtin.list)
-            + ([__sudo_linux_dropin_prefix ~ 'defaults'] if (__sudo_linux_defaults_has_content | ansible.builtin.bool) else [])
-            + (__sudo_linux_dropin_protected | ansible.builtin.default([]))
-            + (sudo_linux_delete_unmanaged_exclude | ansible.builtin.default([]))
-          }}
       when:
         - (__sudo_linux_reap_item['path'] | ansible.builtin.basename) not in __sudo_linux_dropin_keep
       loop: "{{ __sudo_linux_existing_dropins['files'] }}"
