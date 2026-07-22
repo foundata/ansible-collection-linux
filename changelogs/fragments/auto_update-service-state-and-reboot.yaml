@@ -17,3 +17,8 @@ bugfixes:
     flag was hard-coded to ``1``, so the apt-daily(-upgrade) timers kept running
     unattended-upgrades regardless of the role-managed timer; it now follows the
     service state.
+  - >
+    auto_update role - ``service_state: unmanaged`` now removes the role's
+    systemd timer drop-in and its Debian periodic flag file instead of leaving
+    them in place. The role fully backs off so the vendor timer schedule and the
+    distribution defaults take over.

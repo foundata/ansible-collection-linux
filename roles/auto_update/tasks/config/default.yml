@@ -33,6 +33,19 @@
         - "auto_update_linux: systemd daemon-reload"
 
 
+- name: "Config | Default | Remove role-managed systemd timer drop-in when unmanaged"
+  # override is removed to allow the vendor timer schedule takes over
+  ansible.builtin.file:
+    path: "{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}"
+    state: "absent"
+  when:
+    - auto_update_linux_service_state == 'unmanaged'
+    - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
+    - (__auto_update_linux_systemd_timer_unit_name | ansible.builtin.length) > 0
+  notify:
+    - "auto_update_linux: systemd daemon-reload"
+
+
 - name: "Config | Default | Warn about unsupported service manager for timer configuration"
   ansible.builtin.debug:
     msg: >-

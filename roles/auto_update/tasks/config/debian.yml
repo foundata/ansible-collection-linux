@@ -26,8 +26,16 @@
     # the role-managed timer, so it would otherwise keep running.
     tpl_unattended_upgrade: "{{ '1' if auto_update_linux_service_state in ['enabled', 'running'] else '0' }}"
   when:
-    # "unmanaged": leave the periodic flag as-is (do not manage the run trigger).
     - auto_update_linux_service_state != 'unmanaged'
+
+
+- name: "Config | Debian | Remove role-managed periodic apt maintenance file when unmanaged"
+  # periodic flag file is removed to allow the distribution default takes over
+  ansible.builtin.file:
+    path: "{{ __auto_update_linux_apt_periodic_file_path }}"
+    state: "absent"
+  when:
+    - auto_update_linux_service_state == 'unmanaged'
 
 
 - name: "Config | Debian | Create managed unattended-upgrades configuration"
