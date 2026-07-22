@@ -20,7 +20,7 @@
 - name: "Reboot | Default | Set fact with reboot result data (rebooted, elapsed)"
   ansible.builtin.set_fact:
     reboot_linux_result:
-      # seconds that elapsed waiting for the system to be rebooted
-      elapsed: "{{ __reboot_linux_reboot_result['elapsed'] | ansible.builtin.default(false) }}"
+      # seconds that elapsed waiting for the system to be rebooted (0 if skipped)
+      elapsed: "{{ __reboot_linux_reboot_result['elapsed'] | ansible.builtin.default(0) }}"
       # true if the machine was rebooted
-      rebooted: "{{ __reboot_linux_reboot_result['rebooted'] | ansible.builtin.default(0) }}"
+      rebooted: "{{ __reboot_linux_reboot_result['rebooted'] | ansible.builtin.default(false) }}"

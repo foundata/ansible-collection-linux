@@ -13,3 +13,17 @@
       The fact 'reboot_linux_result' is not ansible.builtin.defined. Role initialization may have failed.
     success_msg: >
       The fact 'reboot_linux_result' is ansible.builtin.defined (value: {{ reboot_linux_result }}).
+
+
+- name: "Molecule | Verify | Assert reboot result fact has correct types (rebooted boolean, elapsed numeric)"
+  # In a container the reboot is skipped, so the result defaults apply. These
+  # were previously swapped (elapsed defaulted to a bool, rebooted to an int),
+  # which breaks strict-boolean conditionals like "when: reboot_linux_result['rebooted']".
+  ansible.builtin.assert:
+    that:
+      - reboot_linux_result['rebooted'] is ansible.builtin.boolean
+      - reboot_linux_result['elapsed'] is not ansible.builtin.boolean
+    fail_msg: >
+      reboot_linux_result has wrong types (rebooted={{ reboot_linux_result['rebooted'] }},
+      elapsed={{ reboot_linux_result['elapsed'] }}): rebooted must be boolean and elapsed numeric.
+    success_msg: "reboot_linux_result types are correct (rebooted is boolean, elapsed is numeric)."

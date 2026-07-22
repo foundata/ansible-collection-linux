@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - >
+    reboot role - the ``reboot_linux_result`` fact now carries the correct types
+    when the reboot is skipped (no reboot required, or a container). The
+    ``elapsed`` and ``rebooted`` defaults were swapped, yielding
+    ``{elapsed: false, rebooted: 0}``; ``rebooted`` is now a boolean and
+    ``elapsed`` a number, so downstream ``when: reboot_linux_result['rebooted']``
+    conditionals behave correctly.
