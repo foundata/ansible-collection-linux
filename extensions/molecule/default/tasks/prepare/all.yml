@@ -36,6 +36,23 @@
     state: "present"
 
 
+- name: "Molecule | Prepare | sysctl | Seed drop-in lines exercising the existing-parameter parser"
+  # Two hand-written lines in the role-managed drop-in:
+  #   - an UNMANAGED key (net.ipv4.tcp_rfc1337): the parser must detect it and the
+  #     role must remove it. Requires splitlines(): split('\n') never splits the
+  #     real newlines here, so nothing is parsed and orphans are never removed.
+  #   - a hand-INDENTED MANAGED key: the parser must trim keys, otherwise the
+  #     indented key is misdetected as an orphan and the removal (which strips the
+  #     name) deletes the managed parameter, breaking idempotence.
+  # The file name matches sysctl_linux_config_dropin_file_name in the converge.
+  ansible.builtin.copy:
+    dest: "{{ __sysctl_linux_config_dropin_dir_path }}/90-custom-dropin.conf"
+    content: "net.ipv4.tcp_rfc1337 = 1\n  net.ipv4.tcp_syncookies = 0\n"
+    owner: "root"
+    group: "root"
+    mode: "u=rw,g=r,o=r" # 0644
+
+
 ## Fixtures for the foundata.linux.user role tests.
 #
 # Created here (the prepare stage only auto-includes all.yml and

@@ -55,16 +55,25 @@
 
 - name: "Config | Default | Parse existing parameters from drop-in file"
   ansible.builtin.set_fact:
+    # splitlines() (not split('\n')): inside this block scalar Jinja treats '\n'
+    # as the two literal characters, so split('\n') never splits the real
+    # newlines and the parse would always yield an empty list (dead orphan
+    # detection). map('trim') then normalizes keys: a hand-indented line
+    # ("  net.x = 1") would otherwise yield a key with leading whitespace that
+    # never matches the effective set, so it would be misdetected as an orphan
+    # and the removal (which strips the name) would delete the managed
+    # parameter, breaking idempotence.
     __sysctl_linux_existing_parameters: >-
       {{
         (__sysctl_linux_dropin_file_content['content'] | ansible.builtin.default('') | ansible.builtin.b64decode)
-        .split('\n')
+        .splitlines()
         | ansible.builtin.reject('match', '^\s*#')
         | ansible.builtin.reject('match', '^\s*$')
         | ansible.builtin.map('regex_replace', '\s*=\s*', '=')
         | ansible.builtin.map('regex_search', '^([^=]+)=')
         | ansible.builtin.select('string')
         | ansible.builtin.map('regex_replace', '=$', '')
+        | ansible.builtin.map('trim')
         | ansible.builtin.list
       }}
 

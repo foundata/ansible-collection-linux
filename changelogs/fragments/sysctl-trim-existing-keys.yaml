@@ -1,0 +1,16 @@
+---
+bugfixes:
+  - >
+    sysctl role - the role again removes parameters that linger in its managed
+    drop-in but are no longer managed (for example after a key is dropped from a
+    profile or from ``sysctl_linux_parameters``). The existing-parameter parser
+    split the file with ``split('\n')`` inside a Jinja block scalar, where
+    ``\n`` is two literal characters rather than a newline, so the parse always
+    returned an empty list and orphan detection never fired. It now uses
+    ``splitlines()``.
+  - >
+    sysctl role - a hand-indented line in the managed drop-in no longer breaks
+    idempotence. Parsed keys were not trimmed, so an indented key ("  net.x = 1")
+    was misdetected as an orphan and the removal (which strips the name) deleted
+    the managed parameter, making it flip-flop between runs. Keys are now
+    trimmed.

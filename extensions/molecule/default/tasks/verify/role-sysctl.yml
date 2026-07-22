@@ -81,6 +81,18 @@
     success_msg: "The sysctl drop-in configuration file contains all expected parameters."
 
 
+- name: "Molecule | Verify | Assert an orphaned (unmanaged) parameter was removed from the drop-in"
+  vars:
+    __testing_file_content: "{{ __testing_dropin_content['content'] | ansible.builtin.b64decode }}"
+  ansible.builtin.assert:
+    that:
+      # Seeded by 'prepare' but not in the managed set: existing-parameter parsing
+      # must detect it (requires splitlines()) and the removal must drop it.
+      - '__testing_file_content is not regex("net\.ipv4\.tcp_rfc1337")'
+    fail_msg: "The orphaned parameter net.ipv4.tcp_rfc1337 was not removed from the drop-in; orphan detection is not working."
+    success_msg: "The orphaned parameter net.ipv4.tcp_rfc1337 was removed from the drop-in."
+
+
 ## Main configuration
 
 - name: "Molecule | Verify | Check sysctl main configuration file exists (created by 'prepare' molecule stage)"
