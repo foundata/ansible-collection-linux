@@ -31,6 +31,7 @@
             {'rule': 'molecule_deploy', 'type': 'user', 'grantee': 'molecule_deployer'},
             {'rule': 'molecule_multi', 'type': 'user', 'grantee': 'molecule_deployer'},
             {'rule': 'molecule_multi', 'type': 'group', 'grantee': 'molecule_sudoadmins'},
+            {'rule': 'molecule_defaultcmd', 'type': 'user', 'grantee': 'molecule_deployer'},
             {'rule': 'molecule_dotted', 'type': 'user', 'grantee': 'molecule.dotuser'},
           ] -%}
       {%-   set _ = __ns.items.append(__e | ansible.builtin.combine({
@@ -95,6 +96,24 @@
       - "'molecule.dotuser ' in (__testing_sudo_dotted['content'] | ansible.builtin.b64decode)"
     fail_msg: "The dotted grantee drop-in is not sanitized correctly or does not grant the real name."
     success_msg: "The dotted grantee has a sudo-safe filename '{{ __testing_sudo_dotted_file }}' and grants 'molecule.dotuser'."
+
+
+- name: "Molecule | Verify | sudo | Read the drop-in of the rule that relies on rule_defaults for commands"
+  ansible.builtin.slurp:
+    src: >-
+      {{ __sudo_linux_dropin_dir }}/{{
+        (__testing_sudo_grantees | ansible.builtin.selectattr('rule', 'ansible.builtin.match', '^molecule_defaultcmd$')
+         | ansible.builtin.map(attribute='file') | ansible.builtin.first)
+      }}
+  register: __testing_sudo_defaultcmd
+
+
+- name: "Molecule | Verify | sudo | Assert a command supplied via rule_defaults was rendered"
+  ansible.builtin.assert:
+    that:
+      - "'/usr/bin/uptime' in (__testing_sudo_defaultcmd['content'] | ansible.builtin.b64decode)"
+    fail_msg: "The rule relying on rule_defaults for 'commands' did not render the default command."
+    success_msg: "A 'commands' value supplied via sudo_linux_rule_defaults was validated and rendered."
 
 
 - name: "Molecule | Verify | sudo | Stat the drop-in of the 'absent' rule"

@@ -1,0 +1,12 @@
+---
+bugfixes:
+  - >
+    sudo role - ``sudo_linux_rule_defaults`` can now supply ``commands``,
+    ``users`` or ``groups`` as documented. The rule validation checked the raw
+    rule entry while the drop-in builder used the rule merged with the defaults,
+    so a required key provided only via the defaults raised a false "Invalid
+    sudo_linux_rules entry" error. Validation and the absent-file list now both
+    use the merged rule.
+  - >
+    sudo role - removed the ``sudo_linux_service`` tag from the role
+    documentation. The role has no service phase, so the tag matched no tasks.

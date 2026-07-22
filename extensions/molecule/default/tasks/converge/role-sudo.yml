@@ -8,6 +8,10 @@
     __testing_state_update:
       sudo_linux_rule_defaults:
         nopassword: false
+        # Rule-level default: rules that omit "commands" inherit this. Exercises
+        # validation and rendering of a value supplied via rule_defaults.
+        commands:
+          - "/usr/bin/uptime"
       sudo_linux_rules:
         # Full admin access for a group (single grantee).
         - name: "molecule_admins"
@@ -33,6 +37,10 @@
             - "molecule_sudoadmins"
           commands:
             - "/usr/bin/id"
+        # Omits "commands" on purpose: they come from sudo_linux_rule_defaults.
+        - name: "molecule_defaultcmd"
+          users:
+            - "molecule_deployer"
         # Grantee name that is not filename-safe (a dot, common with SSSD/AD):
         # the drop-in filename must be sanitized and hashed, while the rule still
         # grants the real dotted name.

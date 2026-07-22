@@ -26,20 +26,27 @@
     that:
       # Dots are disallowed: sudo ignores drop-in files whose name contains a '.'.
       - "__sudo_linux_rule_item['name'] is ansible.builtin.match('^[a-zA-Z0-9_-]+$')"
-      # A "present" rule needs commands and at least one grantee; "absent" only needs its name.
+      # A "present" rule needs commands and at least one grantee; "absent" only
+      # needs its name. Checked on the rule merged with sudo_linux_rule_defaults
+      # (like the builder below), so commands/users/groups supplied via the
+      # defaults satisfy the requirement instead of raising a false error.
       - >-
-        (__sudo_linux_rule_item['state'] | ansible.builtin.default('present')) == 'absent'
-        or (__sudo_linux_rule_item['commands'] | ansible.builtin.default([]) | ansible.builtin.length) > 0
+        (__sudo_linux_rule_merged['state'] | ansible.builtin.default('present')) == 'absent'
+        or (__sudo_linux_rule_merged['commands'] | ansible.builtin.default([]) | ansible.builtin.length) > 0
       - >-
-        (__sudo_linux_rule_item['state'] | ansible.builtin.default('present')) == 'absent'
-        or ((__sudo_linux_rule_item['users'] | ansible.builtin.default([]) | ansible.builtin.length)
-            + (__sudo_linux_rule_item['groups'] | ansible.builtin.default([]) | ansible.builtin.length)) > 0
+        (__sudo_linux_rule_merged['state'] | ansible.builtin.default('present')) == 'absent'
+        or ((__sudo_linux_rule_merged['users'] | ansible.builtin.default([]) | ansible.builtin.length)
+            + (__sudo_linux_rule_merged['groups'] | ansible.builtin.default([]) | ansible.builtin.length)) > 0
     fail_msg: >-
       Invalid sudo_linux_rules entry "{{ __sudo_linux_rule_item['name'] | ansible.builtin.default('<unnamed>') }}":
       its 'name' may only contain a-z, A-Z, 0-9, '_' and '-' (no dots, as sudo
       ignores dotted drop-in filenames), and a 'present' rule requires 'commands'
-      and at least one entry across 'users'/'groups'.
+      and at least one entry across 'users'/'groups' (either on the rule or via
+      sudo_linux_rule_defaults).
     quiet: true
+  vars:
+    __sudo_linux_rule_merged: >-
+      {{ __sudo_linux_rule_defaults_effective | ansible.builtin.combine(__sudo_linux_rule_item, recursive=true) }}
   loop: "{{ sudo_linux_rules }}"
   loop_control:
     loop_var: "__sudo_linux_rule_item"
@@ -84,19 +91,20 @@
       {%- endfor -%}
       {{ __ns.items }}
     # "absent" grantees: only the target drop-in filenames need to be derived,
-    # using the exact same construction as the "present" list above so the names
-    # match on disk.
+    # using the exact same construction (and the same defaults merge) as the
+    # "present" list above so the names match what was created on disk.
     __sudo_linux_grantees_absent: >-
       {%- set __ns = namespace(items=[]) -%}
       {%- for __rule in sudo_linux_rules -%}
-      {%-   if (__rule['state'] | ansible.builtin.default('present')) == 'absent' -%}
-      {%-     for __u in (__rule['users'] | ansible.builtin.default([])) -%}
+      {%-   set __r = __sudo_linux_rule_defaults_effective | ansible.builtin.combine(__rule, recursive=true) -%}
+      {%-   if (__r['state'] | ansible.builtin.default('present')) == 'absent' -%}
+      {%-     for __u in (__r['users'] | ansible.builtin.default([])) -%}
       {%-       set __file = __sudo_linux_dropin_prefix ~ __rule['name'] ~ '-user-'
                              ~ (__u | ansible.builtin.regex_replace('[^A-Za-z0-9_-]', '_'))[:40]
                              ~ '-' ~ (__u | ansible.builtin.hash('sha1'))[:8] -%}
       {%-       set _ = __ns.items.append({'file': __file}) -%}
       {%-     endfor -%}
-      {%-     for __g in (__rule['groups'] | ansible.builtin.default([])) -%}
+      {%-     for __g in (__r['groups'] | ansible.builtin.default([])) -%}
       {%-       set __file = __sudo_linux_dropin_prefix ~ __rule['name'] ~ '-group-'
                              ~ (__g | ansible.builtin.regex_replace('[^A-Za-z0-9_-]', '_'))[:40]
                              ~ '-' ~ (__g | ansible.builtin.hash('sha1'))[:8] -%}
