@@ -38,7 +38,10 @@ __auto_update_linux_apt_config_file_mode: "u=rw,g=r,o=r" # 0644
 # "all". The ${distro_codename} placeholder is resolved by unattended-upgrades
 # itself at runtime.
 __auto_update_linux_apt_origins_security:
-  - "origin=Debian,codename=${distro_codename},label=Debian-Security"
+  # The security archive's Release carries "Codename: <codename>-security" (e.g.
+  # trixie-security), so the codename token must include the "-security" suffix;
+  # "codename=${distro_codename}" alone never matches.
+  - "origin=Debian,codename=${distro_codename}-security,label=Debian-Security"
 __auto_update_linux_apt_origins_all_extra:
   - "origin=Debian,codename=${distro_codename}-updates"
   - "origin=Debian,codename=${distro_codename}-proposed-updates"

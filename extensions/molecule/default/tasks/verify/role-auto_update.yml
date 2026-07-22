@@ -136,6 +136,23 @@
     - __auto_update_linux_backend == 'unattended-upgrades'
 
 
+- name: "Molecule | Verify | unattended-upgrades | Assert a security Origins-Pattern entry is well-formed"
+  vars:
+    __testing_uu_content: "{{ __testing_apt_config['content'] | ansible.builtin.b64decode }}"
+  ansible.builtin.assert:
+    that:
+      # A key=value security origin whose codename/archive ends in "-security"
+      # must be present. Guards two bugs: the Debian codename lacking the
+      # "-security" suffix (never matches the security archive), and Ubuntu using
+      # the "origin:archive" colon shorthand (Allowed-Origins syntax, which
+      # raises "not enough values to unpack" inside Origins-Pattern).
+      - '__testing_uu_content is regex("(codename|archive)=[^,\"]*-security")'
+    fail_msg: "No well-formed '-security' Origins-Pattern entry in '{{ __auto_update_linux_apt_config_file_path }}'."
+    success_msg: "The unattended-upgrades config has a well-formed security Origins-Pattern entry."
+  when:
+    - __auto_update_linux_backend == 'unattended-upgrades'
+
+
 ## Backend configuration: dnf / dnf5 automatic (RHEL/Fedora)
 
 - name: "Molecule | Verify | dnf-automatic | Read the managed configuration file"

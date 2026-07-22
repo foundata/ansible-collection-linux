@@ -1,0 +1,15 @@
+---
+bugfixes:
+  - >
+    auto_update role - the unattended-upgrades security origin on Debian now
+    matches. The pattern used ``codename=${distro_codename}``, but the security
+    archive's Release carries ``Codename: <codename>-security`` (e.g.
+    ``trixie-security``), so it never matched and security updates worked only
+    via the distribution's own default file. The pattern now uses
+    ``codename=${distro_codename}-security``.
+  - >
+    auto_update role - the unattended-upgrades origins on Ubuntu now apply. They
+    were written in the ``origin:archive`` shorthand (Allowed-Origins syntax),
+    but the role places them in ``Origins-Pattern``, where unattended-upgrades
+    parses ``key=value`` tokens and raised "not enough values to unpack" on the
+    colon form. They now use ``origin=${distro_id},archive=${distro_codename}-security``.

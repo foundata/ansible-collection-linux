@@ -9,9 +9,11 @@
 # Origins-Pattern entries for Unattended-Upgrade on Ubuntu. The ${distro_id} and
 # ${distro_codename} placeholders are resolved by unattended-upgrades itself at
 # runtime.
+# These use the "key=value" pattern form, not the "origin:archive" shorthand of
+# Allowed-Origins
 __auto_update_linux_apt_origins_security:
-  - "${distro_id}:${distro_codename}-security"
-  - "${distro_id}ESMApps:${distro_codename}-apps-security"
-  - "${distro_id}ESM:${distro_codename}-infra-security"
+  - "origin=${distro_id},archive=${distro_codename}-security"
+  - "origin=${distro_id}ESMApps,archive=${distro_codename}-apps-security"
+  - "origin=${distro_id}ESM,archive=${distro_codename}-infra-security"
 __auto_update_linux_apt_origins_all_extra:
-  - "${distro_id}:${distro_codename}-updates"
+  - "origin=${distro_id},archive=${distro_codename}-updates"
