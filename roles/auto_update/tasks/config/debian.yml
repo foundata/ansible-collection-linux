@@ -13,13 +13,21 @@
     - auto_update_linux_apply == 'notify'
 
 
-- name: "Config | Debian | Enable periodic apt maintenance (unattended upgrades)"
+- name: "Config | Debian | Manage periodic apt maintenance (unattended upgrades)"
   ansible.builtin.template:
     src: "apt_auto_upgrades.j2"
     dest: "{{ __auto_update_linux_apt_periodic_file_path }}"
     owner: "{{ __auto_update_linux_apt_config_file_owner }}"
     group: "{{ __auto_update_linux_apt_config_file_group }}"
     mode: "{{ __auto_update_linux_apt_config_file_mode }}"
+  vars:
+    # "disabled" must actually stop unattended upgrades: the apt-daily(-upgrade)
+    # timers trigger unattended-upgrades from this periodic flag independently of
+    # the role-managed timer, so it would otherwise keep running.
+    tpl_unattended_upgrade: "{{ '1' if auto_update_linux_service_state in ['enabled', 'running'] else '0' }}"
+  when:
+    # "unmanaged": leave the periodic flag as-is (do not manage the run trigger).
+    - auto_update_linux_service_state != 'unmanaged'
 
 
 - name: "Config | Debian | Create managed unattended-upgrades configuration"

@@ -1,7 +1,10 @@
 {#-
   Enable periodic apt maintenance so that unattended-upgrades runs on the
-  apt-daily(-upgrade) systemd timers.
+  apt-daily(-upgrade) systemd timers. The Unattended-Upgrade flag mirrors the
+  service state (tpl_unattended_upgrade): the apt-daily(-upgrade) timers honour
+  it independently of the role-managed timer, so "disabled" must set it to "0"
+  to actually stop automatic upgrades.
 -#}
 # {{ ansible_managed }}
 APT::Periodic::Update-Package-Lists "1";
-APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::Unattended-Upgrade "{{ tpl_unattended_upgrade | default('1') }}";

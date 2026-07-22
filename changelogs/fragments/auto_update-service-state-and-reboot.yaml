@@ -1,0 +1,19 @@
+---
+bugfixes:
+  - >
+    auto_update role - the scheduled-reboot timer now follows
+    ``auto_update_linux_service_state``. It was always enabled and started
+    whenever ``auto_update_linux_reboot`` was ``scheduled``, so a host with
+    ``service_state: disabled`` still had a running reboot timer; it is now
+    stopped/disabled accordingly and left untouched when ``unmanaged``.
+  - >
+    auto_update role - the scheduled-reboot helper no longer reboots on a
+    transient ``needs-restarting`` error. It treated any non-zero exit as
+    "reboot required", so an error (e.g. a dnf/rpm failure) could schedule a
+    production reboot. Only the documented exit code 1 now triggers one.
+  - >
+    auto_update role - ``service_state: disabled`` now actually stops automatic
+    upgrades on Debian and Ubuntu. The ``APT::Periodic::Unattended-Upgrade``
+    flag was hard-coded to ``1``, so the apt-daily(-upgrade) timers kept running
+    unattended-upgrades regardless of the role-managed timer; it now follows the
+    service state.

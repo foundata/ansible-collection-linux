@@ -15,11 +15,17 @@ if [ "${__reboot_required}" != '1' ] &&
     __reboot_required='1'
 fi
 
-# RedHat-like reboot indicator (needs-restarting -r: exit 1 = reboot required).
+# RedHat-like reboot indicator (needs-restarting -r).
+# Only exit code 1 means "reboot required"; any other non-zero code is an error
+# (e.g. a transient dnf/rpm failure) and must NOT schedule a production reboot.
 if [ "${__reboot_required}" != '1' ] &&
-    command -v 'needs-restarting' >/dev/null 2>&1 &&
-    ! needs-restarting -r >/dev/null 2>&1; then
-    __reboot_required='1'
+    command -v 'needs-restarting' >/dev/null 2>&1; then
+    needs-restarting -r >/dev/null 2>&1
+    __needs_restarting_rc="$?"
+    if [ "${__needs_restarting_rc}" = '1' ]; then
+        __reboot_required='1'
+    fi
+    unset __needs_restarting_rc
 fi
 
 # Running kernel differs from the newest installed kernel.

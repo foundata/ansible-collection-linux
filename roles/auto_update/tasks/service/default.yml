@@ -22,12 +22,15 @@
 
 # Scheduled reboot timer (auto_update_linux_reboot == "scheduled"). Its units
 # are installed/removed in tasks/config/default.yml; here we only manage its
-# enable/run state. Always enabled+started when scheduled.
+# enable/run state, following auto_update_linux_service_state like the update
+# timer above (so "disabled" does not leave a forced reboot timer running, and
+# "unmanaged" leaves its state untouched).
 - name: "Service | Default | Ensure scheduled reboot timer state: {{ __auto_update_linux_reboot_timer_unit_name }}"
   ansible.builtin.systemd_service:
     name: "{{ __auto_update_linux_reboot_timer_unit_name }}"
-    state: "started"
-    enabled: true
+    state: "{{ 'started' if auto_update_linux_service_state in ['enabled', 'running'] else 'stopped' if auto_update_linux_service_state == 'disabled' }}"
+    enabled: "{{ true if auto_update_linux_service_state == 'enabled' else false if auto_update_linux_service_state in ['disabled', 'running'] }}"
   when:
     - auto_update_linux_reboot == 'scheduled'
+    - auto_update_linux_service_state != 'unmanaged'
     - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
