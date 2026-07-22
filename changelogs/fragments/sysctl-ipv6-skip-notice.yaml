@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - >
+    sysctl role - the "IPv6 unavailable, skipping net.ipv6.*" notice now lists
+    the parameters that are actually skipped. It used ``rejectattr`` instead of
+    ``selectattr``, so it printed the parameters being kept and labelled them as
+    skipped. The notice is informational only; parameter filtering was already
+    correct (so the bug had no operational impact).

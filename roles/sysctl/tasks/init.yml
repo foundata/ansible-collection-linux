@@ -202,7 +202,7 @@
         (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
         | ansible.builtin.combine(sysctl_linux_parameters | ansible.builtin.default({}))
         | ansible.builtin.dict2items
-        | ansible.builtin.rejectattr('key', 'ansible.builtin.match', '^net\.ipv6\.')
+        | ansible.builtin.selectattr('key', 'ansible.builtin.match', '^net\.ipv6\.')
         | ansible.builtin.list
         | ansible.builtin.items2dict
       }}
