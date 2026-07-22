@@ -76,6 +76,38 @@
     success_msg: "The timer '{{ __auto_update_linux_systemd_timer_unit_name }}' is enabled."
 
 
+# The drop-in must REPLACE the vendor timer's schedule, not add to it. OnCalendar
+# is a list-typed systemd directive, so a drop-in that does not reset it first
+# leaves the vendor schedule active alongside the configured one. TimersCalendar
+# reflects the effective, merged schedule and lists one "OnCalendar=" entry per
+# active calendar spec, which makes accumulation visible without hard-coding
+# each platform's vendor time.
+- name: "Molecule | Verify | Get the effective calendar schedule of the automatic update timer"
+  ansible.builtin.command:
+    argv:
+      - "systemctl"
+      - "show"
+      - "--property=TimersCalendar"
+      - "{{ __auto_update_linux_systemd_timer_unit_name }}"
+  register: __testing_timer_calendar
+  changed_when:
+    - false
+
+
+- name: "Molecule | Verify | Assert the drop-in replaces the vendor schedule instead of accumulating"
+  ansible.builtin.assert:
+    that:
+      - "'03:30:00' in __testing_timer_calendar['stdout']"
+      - "(__testing_timer_calendar['stdout'] | ansible.builtin.regex_findall('OnCalendar=') | ansible.builtin.length) == 1"
+    fail_msg: >-
+      The timer '{{ __auto_update_linux_systemd_timer_unit_name }}' has an
+      unexpected effective schedule: the drop-in must replace the vendor
+      OnCalendar, not add to it. Got '{{ __testing_timer_calendar['stdout'] }}'.
+    success_msg: >-
+      The timer '{{ __auto_update_linux_systemd_timer_unit_name }}' runs only on
+      the configured schedule ('{{ __testing_timer_calendar['stdout'] }}').
+
+
 ## Backend configuration: unattended-upgrades (Debian/Ubuntu)
 
 - name: "Molecule | Verify | unattended-upgrades | Read the managed configuration file"

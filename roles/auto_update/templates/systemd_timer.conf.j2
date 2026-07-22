@@ -8,9 +8,28 @@
   - Keys are written as "Directive=Value".
   - If a value is boolean, it is rendered as "true" or "false".
   - All other value types are rendered as-is (stringified by Jinja).
+  - List-typed directives (e.g. OnCalendar) accumulate across a unit and its
+    drop-ins in systemd. This file is a drop-in over a vendor timer that already
+    ships its own schedule (e.g. apt-daily-upgrade.timer or dnf-automatic.timer
+    at "*-*-* 6:00"), so an empty reset line ("Directive=") is emitted before the
+    value to make the configured schedule replace the vendor one instead of
+    adding to it. See systemd.unit(5): "assigning the empty string [...] resets
+    the list".
 -#}
+{%- set tpl_timer_reset_directives = [
+      'OnCalendar',
+      'OnActiveSec',
+      'OnBootSec',
+      'OnStartupSec',
+      'OnUnitActiveSec',
+      'OnUnitInactiveSec',
+    ]
+-%}
 # {{ ansible_managed }}
 [Timer]
 {% for key, value in (tpl_timer_settings | default({})).items() %}
+{% if key in tpl_timer_reset_directives %}
+{{ key }}=
+{% endif %}
 {{ key }}={{ value | ternary('true', 'false') if value is ansible.builtin.boolean else value }}
 {% endfor %}

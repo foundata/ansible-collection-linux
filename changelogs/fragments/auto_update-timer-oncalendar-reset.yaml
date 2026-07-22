@@ -1,0 +1,10 @@
+---
+bugfixes:
+  - >
+    auto_update role - the systemd timer drop-in now replaces the vendor timer's
+    schedule instead of adding to it. ``OnCalendar`` is a list-typed systemd
+    directive, so the drop-in's schedule accumulated on top of the vendor unit
+    (for example ``apt-daily-upgrade.timer`` and ``dnf-automatic.timer`` at
+    ``*-*-* 6:00``), and updates kept running on the vendor schedule regardless
+    of ``auto_update_linux_timer_settings``. The drop-in now emits an empty
+    reset line before each list-typed directive.
