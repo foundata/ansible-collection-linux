@@ -1,0 +1,13 @@
+# Uninstall: Manage resource removal (Debian/Ubuntu, unattended-upgrades).
+
+---
+
+- name: "Setup | Uninstall | Debian | Remove managed apt configuration files"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: "absent"
+  loop:
+    - "{{ __auto_update_linux_apt_periodic_file_path }}"
+    - "{{ __auto_update_linux_apt_config_file_path }}"
+  loop_control:
+    label: "{{ item }}"

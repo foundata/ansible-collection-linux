@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - >
+    auto_update role - ``auto_update_linux_state: absent`` no longer fails with
+    an undefined-variable error on non-Debian platforms. The uninstall step
+    looped over the Debian-only ``__auto_update_linux_apt_*_file_path``
+    variables, so the task aborted on RHEL, Fedora and openSUSE. The apt
+    cleanup moved to a Debian-specific uninstall task file.

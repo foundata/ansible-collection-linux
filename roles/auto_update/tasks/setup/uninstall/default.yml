@@ -12,19 +12,6 @@
     - "auto_update_linux: systemd daemon-reload"
 
 
-- name: "Setup | Uninstall | Remove managed apt configuration files (Debian/Ubuntu)"
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: "absent"
-  when:
-    - __auto_update_linux_apt_config_file_path is ansible.builtin.defined
-  loop:
-    - "{{ __auto_update_linux_apt_periodic_file_path }}"
-    - "{{ __auto_update_linux_apt_config_file_path }}"
-  loop_control:
-    label: "{{ item }}"
-
-
 # Scheduled reboot timer resources (only present when auto_update_linux_reboot
 # was "scheduled"). Disable the timer before removing its unit files to avoid
 # leaving a dangling enablement symlink.
