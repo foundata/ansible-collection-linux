@@ -62,7 +62,12 @@
     local: "{{ __user_linux_account_item_effective['local'] }}"
     seuser: "{{ __user_linux_account_item_effective['seuser'] | ansible.builtin.default(omit) }}"
     expires: "{{ __user_linux_account_item_effective['expires'] }}"
-    password: "{{ __user_linux_account_item_effective['password']['hash'] | ansible.builtin.default(omit) }}"
+    # An empty (but defined) hash - e.g. from a vault lookup that returned
+    # nothing - must leave the password unmanaged, not write an empty crypt
+    # field (which would create a passwordless account). The "true" makes
+    # default() treat "" like undefined so the parameter is omitted; this
+    # matches the init assert, which accepts an empty hash as "unmanaged".
+    password: "{{ __user_linux_account_item_effective['password']['hash'] | ansible.builtin.default(omit, true) }}"
     password_lock: "{{ __user_linux_account_item_effective['password']['lock'] | ansible.builtin.default(omit) }}"
     update_password: "{{ __user_linux_account_item_effective['password']['update'] }}"
     password_expire_min: "{{ __user_linux_account_item_effective['password']['expire_min'] | ansible.builtin.default(omit) }}"
