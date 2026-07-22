@@ -203,6 +203,12 @@
     - name: "Config | Default | Gather local passwd database"
       ansible.builtin.getent:
         database: "passwd"
+        # The role only manages local accounts and service: "files" restricts the
+        # lookup to /etc/passwd ("getent -s files"). Without it, getent returns
+        # the full NSS view, so on SSSD/LDAP-backed hosts directory users whose
+        # UIDs fall in the reap range would become deletion candidates (and
+        # "userdel" would fail or half-run against them).
+        service: "files"
 
 
     # The connection/login user must never be reaped, otherwise a run with

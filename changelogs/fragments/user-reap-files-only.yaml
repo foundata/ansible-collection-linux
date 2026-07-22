@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - >
+    user role - reaping unmanaged accounts with
+    ``user_linux_accounts_delete_unmanaged`` now only considers local accounts.
+    The candidate list came from ``getent passwd`` (the full NSS view), so on
+    SSSD/LDAP-backed hosts directory users whose UIDs fell inside the reap range
+    became deletion candidates and ``userdel`` would fail or half-run against
+    them. The lookup is restricted to ``/etc/passwd`` via ``service: "files"``.
