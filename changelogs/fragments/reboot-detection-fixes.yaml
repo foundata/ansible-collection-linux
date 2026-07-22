@@ -1,0 +1,22 @@
+---
+bugfixes:
+  - >
+    reboot role - reboot detection now works on openSUSE. The detection script
+    had no zypper path, so on openSUSE Leap only a changed kernel was noticed;
+    it now honours ``zypper needs-rebooting`` (exit code 102).
+  - >
+    reboot role - reboot detection now runs under ``--check``. The detection
+    command lacked ``check_mode: false``, so in check mode it was skipped and the
+    role always concluded that no reboot was required.
+  - >
+    reboot role - the SELinux mode check no longer depends on the
+    ``en_US.UTF-8`` locale being present. It forces ``LC_ALL=C`` (like the
+    auto_update role) so ``sestatus`` output parses on minimal hosts.
+  - >
+    reboot role - stopped installing ``needrestart`` on Debian and Ubuntu. The
+    role never invoked it and it does not create ``/var/run/reboot-required``,
+    so it was an unused dependency.
+  - >
+    reboot role - the container-detection fallback that inspects the
+    ``container`` environment variable now gathers the ``env`` fact it relies on;
+    previously that fact was never collected, leaving the fallback inert.

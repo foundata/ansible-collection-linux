@@ -155,6 +155,18 @@
         __reboot_required='1'
       fi
 
+      # Check openSUSE reboot indicator (zypper needs-rebooting)
+      # Exit code 102 (ZYPPER_EXIT_INF_REBOOT_NEEDED) = reboot required
+      if [ "${__reboot_required}" != '1' ] \
+        && command -v 'zypper' >/dev/null 2>&1; then
+        zypper needs-rebooting >/dev/null 2>&1
+        __zypper_rc="$?"
+        if [ "${__zypper_rc}" = '102' ]; then
+          __reboot_required='1'
+        fi
+        unset __zypper_rc
+      fi
+
       # Check if running kernel differs from newest installed kernel
       if [ "${__reboot_required}" != '1' ]; then
         __kernel_installed=''
@@ -176,7 +188,7 @@
       # Check if SELinux mode changed (requires reboot to apply)
       if [ "${__reboot_required}" != '1' ] \
         && command -v 'sestatus' >/dev/null 2>&1; then
-        export LC_ALL='en_US.UTF-8'
+        export LC_ALL='C'
         __selinux_current="$(sestatus 2>/dev/null | grep -i -E 'current.+mode' \
           | cut -d':' -f2 | tr '[:upper:]' '[:lower:]' \
           | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
@@ -195,6 +207,9 @@
     executable: "/bin/bash"
   changed_when:
     - false
+  # The script is read-only; run it under "--check" too, otherwise the detection
+  # is skipped and the role always concludes that no reboot is required.
+  check_mode: false
   register: __reboot_linux_check_result
 
 

@@ -24,6 +24,10 @@ __reboot_linux_used_facts:
   # from subset "virtual"
   - "virtualization_role"
   - "virtualization_type"
+  # from subset "env" (used by the container detection fallback that checks the
+  # "container" environment variable when virtualization facts do not identify
+  # the container)
+  - "env"
 
 
 # List of platforms this role supports and was designed for.

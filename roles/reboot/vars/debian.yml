@@ -7,5 +7,11 @@
 
 # List of package names to be installed when reboot_linux_state is
 # set to "present".
-__reboot_linux_packages_install:
-  - "needrestart"
+#
+# Debian and Ubuntu need no extra package for reboot detection: the kernel check
+# uses coreutils/uname, and /var/run/reboot-required is read directly when
+# present. "needrestart" was installed here previously but is never invoked by
+# the role and does not create that file, so it has been removed. (Populating
+# /var/run/reboot-required for non-kernel updates on Ubuntu would require
+# "update-notifier-common", which does not provide that mechanism on Debian.)
+__reboot_linux_packages_install: []
