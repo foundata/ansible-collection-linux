@@ -1,0 +1,10 @@
+---
+bugfixes:
+  - >
+    user role - an account entry with an explicit empty ``groups: []`` no longer
+    removes the account from all of its supplementary groups. ``append`` was
+    omitted for an empty list, so the ``user`` module fell back to
+    ``append: false`` and treated the empty list as authoritative, stripping
+    memberships such as ``sudo`` or ``wheel`` despite the default
+    ``groups_append: true``. ``append`` is now sent whenever ``groups`` is
+    defined, making an empty list a no-op unless ``groups_append: false`` is set.

@@ -44,12 +44,17 @@
     comment: "{{ __user_linux_account_item_effective['comment'] }}"
     group: "{{ __user_linux_account_item_effective['group'] | ansible.builtin.default(omit) }}"
     groups: "{{ __user_linux_account_item_effective['groups'] | ansible.builtin.default(omit) }}"
-    # "append" is only meaningful together with "groups"; omit it otherwise to
-    # avoid the module's "append is set, but no groups are specified" warning.
+    # "append" is only meaningful together with "groups". Omit it only when
+    # "groups" is not set at all, to avoid the module's "append is set, but no
+    # groups are specified" warning (which fires only when groups is omitted).
+    # When "groups" is defined but empty, "append" must still be sent: with the
+    # default groups_append=true an empty list is a no-op (nothing appended),
+    # whereas omitting append lets the module default (append=false) strip every
+    # supplementary group the account already has.
     append: >-
       {{
         __user_linux_account_item_effective['groups_append']
-        if (__user_linux_account_item_effective['groups'] | ansible.builtin.default([]) | ansible.builtin.length) > 0
+        if ('groups' in __user_linux_account_item_effective)
         else omit
       }}
     shell: "{{ __user_linux_account_item_effective['shell'] }}"
