@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - >
+    reboot role - reboot detection no longer treats a transient
+    ``needs-restarting`` failure as "reboot required". The check counted any
+    non-zero exit as needing a reboot, so an error (for example a dnf/rpm
+    failure) could reboot the host. Only the documented exit code 1 now counts.
