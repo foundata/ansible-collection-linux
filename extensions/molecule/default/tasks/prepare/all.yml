@@ -36,6 +36,17 @@
     state: "present"
 
 
+- name: "Molecule | Prepare | sysctl | Ensure the drop-in directory exists before seeding"
+  # /etc/sysctl.d is created by the role, but the seed below runs first and some
+  # minimal images (e.g. AlmaLinux) do not ship the directory.
+  ansible.builtin.file:
+    path: "{{ __sysctl_linux_config_dropin_dir_path }}"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "u=rwx,g=rx,o=rx" # 0755
+
+
 - name: "Molecule | Prepare | sysctl | Seed drop-in lines exercising the existing-parameter parser"
   # Two hand-written lines in the role-managed drop-in:
   #   - an UNMANAGED key (net.ipv4.tcp_rfc1337): the parser must detect it and the
