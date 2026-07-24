@@ -6,7 +6,8 @@
 
 ---
 
-# List of facts used by the role (gathered on a best-effort basis if needed).
+# Facts used by the role (gathered on a best-effort basis if needed), as a
+# mapping of "gather_subset" name to the ansible_facts keys it provides.
 #
 # To identify which subset a fact belongs to during development, you can use
 # the following snippet:
@@ -16,18 +17,18 @@
 #       - '!min'
 #       - '<subset_name, see parameter doc for details>'
 __reboot_linux_used_facts:
-  # from subset "distribution"
-  - "distribution"
-  - "distribution_major_version"
-  - "distribution_version"
-  - "os_family"
-  # from subset "virtual"
-  - "virtualization_role"
-  - "virtualization_type"
-  # from subset "env" (used by the container detection fallback that checks the
-  # "container" environment variable when virtualization facts do not identify
-  # the container)
-  - "env"
+  distribution:
+    - "distribution"
+    - "distribution_major_version"
+    - "distribution_version"
+    - "os_family"
+  virtual:
+    - "virtualization_role"
+    - "virtualization_type"
+  # Used by the container detection fallback that checks the "container"
+  # environment variable when virtualization facts do not identify the container.
+  env:
+    - "env"
 
 
 # List of platforms this role supports and was designed for.

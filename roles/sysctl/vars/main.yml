@@ -6,7 +6,8 @@
 
 ---
 
-# List of facts used by the role (gathered on a best-effort basis if needed).
+# Facts used by the role (gathered on a best-effort basis if needed), as a
+# mapping of "gather_subset" name to the ansible_facts keys it provides.
 #
 # To identify which subset a fact belongs to during development, you can use
 # the following snippet:
@@ -15,36 +16,20 @@
 #     gather_subset:
 #       - '!min'
 #       - '<subset_name, see parameter doc for details>'
-#
-# These are "gather_subset" tokens for ansible.builtin.setup (not raw fact key
-# names). The "hardware" token is required because profile auto-calculation
-# (vars/profiles/*.yml) derives values from ansible_facts['memtotal_mb'], which
-# is only provided by "hardware" (there is no fine-grained memory token).
 __sysctl_linux_used_facts:
-  # from subset "distribution"
-  - "distribution"
-  - "distribution_major_version"
-  - "distribution_version"
-  - "os_family"
-  # from subset "virtual"
-  - "virtualization_role"
-  - "virtualization_type"
-  # from subset "hardware" (provides memtotal_mb and processor_* for profiles)
-  - "hardware"
-
-
-# Concrete ansible_facts key names the role actually consumes. Used to decide
-# whether facts must be (re)gathered: unlike __sysctl_linux_used_facts (which
-# contains gather_subset tokens like "hardware" that are never fact keys), every
-# entry here is a real key in ansible_facts, so it can be checked for presence.
-__sysctl_linux_required_fact_keys:
-  - "distribution"
-  - "distribution_major_version"
-  - "distribution_version"
-  - "os_family"
-  - "virtualization_role"
-  - "virtualization_type"
-  - "memtotal_mb"
+  distribution:
+    - "distribution"
+    - "distribution_major_version"
+    - "distribution_version"
+    - "os_family"
+  virtual:
+    - "virtualization_role"
+    - "virtualization_type"
+  # Profile auto-calculation (vars/profiles/*.yml) derives values from
+  # ansible_facts['memtotal_mb'], which is only provided by "hardware" (there is
+  # no fine-grained memory subset).
+  hardware:
+    - "memtotal_mb"
 
 
 # List of platforms this role supports and was designed for.

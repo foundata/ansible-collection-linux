@@ -6,7 +6,8 @@
 
 ---
 
-# List of facts used by the role (gathered on a best-effort basis if needed).
+# Facts used by the role (gathered on a best-effort basis if needed), as a
+# mapping of "gather_subset" name to the ansible_facts keys it provides.
 #
 # To identify which subset a fact belongs to during development, you can use
 # the following snippet:
@@ -16,14 +17,15 @@
 #       - '!min'
 #       - '<subset_name, see parameter doc for details>'
 __auto_update_linux_used_facts:
-  # from subset "distribution"
-  - "distribution"
-  - "distribution_major_version"
-  - "distribution_version"
-  - "os_family"
-  # from subset "service_mgr" (the role manages systemd timers and gates several
-  # tasks on ansible_facts['service_mgr']); needed under reduced fact sets.
-  - "service_mgr"
+  distribution:
+    - "distribution"
+    - "distribution_major_version"
+    - "distribution_version"
+    - "os_family"
+  # The role manages systemd timers and gates several tasks on
+  # ansible_facts['service_mgr']; needed under reduced fact sets.
+  service_mgr:
+    - "service_mgr"
 
 
 # List of platforms this role supports and was designed for.

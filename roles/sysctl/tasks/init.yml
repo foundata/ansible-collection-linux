@@ -4,14 +4,10 @@
 
 - name: "Init | Gather role-specific facts"
   ansible.builtin.setup:
-    gather_subset: "{{ __sysctl_linux_used_facts }}"
+    gather_subset: "{{ __sysctl_linux_used_facts.keys() | ansible.builtin.list }}"
   when:
-    # Check the concrete fact keys the role consumes, not the gather_subset
-    # tokens: "hardware" (in __sysctl_linux_used_facts) is never a fact key, so
-    # checking the token list would always trigger a (re)gather. This keeps the
-    # skip-when-already-available optimization while still working under
-    # gather_facts: false.
-    - not (__sysctl_linux_required_fact_keys is subset(ansible_facts.keys()))
+    - not ((__sysctl_linux_used_facts.values() | ansible.builtin.flatten)
+           is ansible.builtin.subset(ansible_facts.keys()))
 
 
 - name: "Init | Include role meta data"
