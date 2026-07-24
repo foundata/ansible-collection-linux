@@ -92,6 +92,72 @@ sudo_linux_autoupgrade: false
 # - Required: No
 # - Default: []
 # - List elements: dict
+# - Dict attributes:
+#   - name:
+#     Identifier for the rule. Must be unique within `sudo_linux_rules`. It is
+#     used to build the drop-in filenames, so use only `a-z`, `A-Z`, `0-9`,
+#     underscore (`_`) and hyphen (`-`).
+#
+#     Dots (`.`) are intentionally not allowed: sudo ignores any file in
+#     `/etc/sudoers.d` whose name contains a `.`, so a dotted rule name would
+#     silently produce a drop-in that is never applied.
+#     - Type: str
+#     - Required: Yes
+#   - state:
+#     Whether the rule should be `present` or `absent`. Setting `absent` removes
+#     the drop-in files belonging to this rule's grantees.
+#     - Type: str
+#     - Required: No
+#     - Default: present
+#     - Choices: present, absent
+#   - users:
+#     User names this rule applies to. At least one entry across `users` and
+#     `groups` is required for a `present` rule.
+#     - Type: list
+#     - Required: No
+#     - List elements: str
+#   - groups:
+#     Group names this rule applies to (rendered with a leading `%` in the
+#     sudoers file but do not put `%` here in the definition). At least one
+#     entry across `users` and `groups` is required for a `present` rule.
+#     - Type: list
+#     - Required: No
+#     - List elements: str
+#   - commands:
+#     Commands the grantees may run, as absolute paths or the special value
+#     `ALL`. Required for a `present` rule.
+#     - Type: list
+#     - Required: No
+#     - List elements: str
+#   - runas:
+#     Target identity the commands may be run as, i.e. the `(runas)` part of the
+#     sudoers specification (for example `ALL`, `root`, or `ALL:ALL` to also
+#     allow selecting a group). Falls back to
+#     `sudo_linux_rule_defaults['runas']`.
+#     - Type: str
+#     - Required: No
+#   - nopassword:
+#     If `true`, the grantees are not prompted for a password (`NOPASSWD`).
+#     Falls back to `sudo_linux_rule_defaults['nopassword']` (which defaults to
+#     `false`, i.e. a password is required).
+#     - Type: bool
+#     - Required: No
+#   - setenv:
+#     If `true`, allow the grantees to set environment variables on the command
+#     line (`SETENV`). Falls back to `sudo_linux_rule_defaults['setenv']`.
+#     - Type: bool
+#     - Required: No
+#   - noexec:
+#     If `true`, prevent the run commands from executing further commands
+#     (`NOEXEC`). Falls back to `sudo_linux_rule_defaults['noexec']`.
+#     - Type: bool
+#     - Required: No
+#   - host:
+#     Host part of the sudoers specification, restricting the rule to matching
+#     hosts. Falls back to `sudo_linux_rule_defaults['host']` (which defaults to
+#     `ALL`).
+#     - Type: str
+#     - Required: No
 sudo_linux_rules: []
 
 # Default values applied to every entry in `sudo_linux_rules` that does not set
