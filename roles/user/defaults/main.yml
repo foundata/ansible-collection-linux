@@ -78,6 +78,199 @@ user_linux_account_defaults: {}
 # - Required: No
 # - Default: []
 # - List elements: dict
+# - Dict attributes:
+#   - name:
+#     Login name of the account. Must be unique within `user_linux_accounts`.
+#     Use only characters accepted by the platform's `useradd`.
+#
+#     There is no single universal Linux username regex, but the clearest
+#     written rules are in `man useradd`, ` ` man adduser.conf`, and your local
+#     `/etc/adduser.conf` (if existing).
+#
+#     Typically safe are usernames matching the `^[a-z_][a-z0-9_-]*\$?$` regex:
+#     lowercase letters, digits, underscores and hyphens, not starting with a
+#     hyphen or digit, no dots).
+#     - Type: str
+#     - Required: Yes
+#   - state:
+#     Whether the account should be `present` or `absent`. Setting `absent`
+#     deletes the user and its data (home directory and mail spool).
+#     - Type: str
+#     - Required: No
+#     - Default: present
+#     - Choices: present, absent
+#   - uid: Numeric user ID (UID) to assign. If unset, the next free UID in the
+#     platform's range is chosen automatically.
+#     - Type: int
+#     - Required: No
+#   - comment:
+#     GECOS field, usually the full name or a description of the account.
+#     - Type: str
+#     - Required: No
+#   - shell: Login shell for the account. Falls back to
+#     `user_linux_account_defaults['shell']`.
+#     - Type: str
+#     - Required: No
+#   - umask:
+#     Umask used when the account's home directory is created. Falls back to
+#     `user_linux_account_defaults['umask']`. Octal string, e.g. `0027`.
+#     - Type: str
+#     - Required: No
+#   - system:
+#     If `true`, create the account as a system account (UID below the `UID_MIN`
+#     from `/etc/login.defs`). System accounts are never targeted by
+#     `user_linux_accounts_delete_unmanaged`.
+#     - Type: bool
+#     - Required: No
+#   - local: If `true`, manage the account in the local files only (using
+#     `luseradd`/`lusermod`/`luserdel`), bypassing NSS lookups. Relevant only on
+#     hosts whose NSS is backed by a directory (SSSD, LDAP, ...), where it
+#     prevents collisions with directory users; ignored otherwise. Passed
+#     through to `ansible.builtin.user`.
+#     - Type: bool
+#     - Required: No
+#   - seuser:
+#     SELinux user mapping for the account (the SELinux user the Linux user is
+#     confined to, e.g. `staff_u`). Relevant on SELinux-enforcing platforms
+#     (RHEL/Fedora), ignored on others. Passed through to
+#     `ansible.builtin.user`.
+#     - Type: str
+#     - Required: No
+#   - group: Primary group of the account. If unset, the platform creates a
+#     user-private group named after the account.
+#     - Type: str
+#     - Required: No
+#   - groups:
+#     Supplementary, additional groups the account is a member of. As groups
+#     must already exist: declare them either in `user_linux_groups` (which is
+#     applied before `user_linux_accounts` automatically so you do not have to
+#     care about the order) or ensure they are present by other means.
+#     - Type: list
+#     - Required: No
+#     - List elements: str
+#   - groups_append:
+#     If `true`, the supplementary `groups` are added to the account's existing
+#     memberships. If `false`, `groups` becomes authoritative and memberships
+#     not listed are removed.
+#     - Type: bool
+#     - Required: No
+#   - expires:
+#     Account expiration date as a UNIX timestamp (seconds since the epoch).
+#     After this date the account is disabled. Use `-1` to remove an existing
+#     expiration. This is the account expiry (`chage -E`), not password aging
+#     (see `password.expire_*`).
+#     - Type: float
+#     - Required: No
+#   - home: Home directory settings for the account.
+#     - Type: dict
+#     - Required: No
+#     - Dict attributes:
+#       - path: Absolute path of the home directory. Defaults to the platform's
+#         convention (usually `/home/<name>`).
+#         - Type: str
+#         - Required: No
+#       - create:
+#         Whether to create the home directory for new accounts. Falls back to
+#         `user_linux_account_defaults['home']['create']`.
+#         - Type: bool
+#         - Required: No
+#       - move:
+#         If `true` and `path` differs from the account's current home, the
+#         existing home directory is moved to the new location.
+#         - Type: bool
+#         - Required: No
+#       - skeleton:
+#         Skeleton directory whose contents are copied into a newly created home
+#         directory (defaults to the platform's `/etc/skel`).
+#         - Type: str
+#         - Required: No
+#   - password: Password and password-aging settings for the account.
+#     - Type: dict
+#     - Required: No
+#     - Dict attributes:
+#       - hash:
+#         Pre-hashed password in crypt format (for example a `$6$...` SHA-512
+#         hash). Plain-text passwords are rejected by the role.
+#
+#         Generate a hash on the command line with `mkpasswd --method=sha-512`
+#         (Debian/Ubuntu: package `whois`; RHEL/Fedora: `mkpasswd`), or within
+#         Ansible via the `ansible.builtin.password_hash` filter, e.g.
+#         `{\{ 'mysecret' | ansible.builtin.password_hash('sha512') }\}`.
+#         - Type: str
+#         - Required: No
+#       - lock:
+#         If `true`, lock the account's password (the hash is kept but login via
+#         password is disabled).
+#         - Type: bool
+#         - Required: No
+#       - update:
+#         When the password hash is applied: `on_create` only sets it for new
+#         accounts, `always` enforces it on every run. Falls back to
+#         `user_linux_account_defaults['password']['update']`.
+#         - Type: str
+#         - Required: No
+#         - Choices: on_create, always
+#       - expire_min:
+#         Minimum number of days between password changes (`chage -m`).
+#         - Type: int
+#         - Required: No
+#       - expire_max:
+#         Maximum number of days a password remains valid (`chage -M`).
+#         - Type: int
+#         - Required: No
+#       - expire_warn:
+#         Number of days of warning before a password expires (`chage -W`).
+#         - Type: int
+#         - Required: No
+#   - ssh_authorized_keys:
+#     SSH public keys to install in the account's `authorized_keys` file. Each
+#     entry is a dictionary with the key itself and optional restrictions.
+#
+#     Whether keys not listed here are removed is controlled by
+#     `ssh_authorized_keys_delete_unmanaged`. When that is `true` (the default)
+#     the listed keys are authoritative. As a safety measure, an account with an
+#     empty or unset `ssh_authorized_keys` is left untouched, so omitting the
+#     key list never wipes an existing `authorized_keys`.
+#
+#     Example:
+#
+#     ```yaml
+#     ssh_authorized_keys:
+#       - key: "ssh-ed25519 AAAAC3Nz... u1337@foundata.com"
+#       - key: "ssh-ed25519 AAAAC3Nz... backup@foundata.com"
+#         options: 'restrict,command="/usr/bin/rrsync -ro /srv/backup",from="10.0.0.0/8"'
+#     ```
+#     - Type: list
+#     - Required: No
+#     - List elements: dict
+#     - Dict attributes:
+#       - key:
+#         A single SSH public key, in the usual `authorized_keys` form (`<type>
+#         <base64> [comment]`).
+#         - Type: str
+#         - Required: Yes
+#       - options:
+#         Optional OpenSSH `authorized_keys` option string prepended to the key,
+#         restricting how it may be used (for example `from="10.0.0.0/8"`,
+#         `command="..."`, `restrict`, `expiry-time="..."`). See the
+#         `AUTHORIZED_KEYS FILE FORMAT` section of `man sshd` for the full list.
+#         - Type: str
+#         - Required: No
+#       - state:
+#         Whether the key should be `present` or `absent`. Only meaningful when
+#         `ssh_authorized_keys_delete_unmanaged` is `false` (otherwise unlisted
+#         keys are removed regardless).
+#         - Type: str
+#         - Required: No
+#         - Default: present
+#         - Choices: present, absent
+#   - ssh_authorized_keys_delete_unmanaged:
+#     If `true`, the account's `authorized_keys` is managed authoritatively:
+#     keys not present in `ssh_authorized_keys` are removed. If `false`, listed
+#     keys are ensured present but other keys are left in place. Falls back to
+#     `user_linux_account_defaults['ssh_authorized_keys_delete_unmanaged']`.
+#     - Type: bool
+#     - Required: No
 user_linux_accounts: []
 
 # Default values applied to every entry in `user_linux_groups` that does not set
@@ -128,6 +321,25 @@ user_linux_group_defaults: {}
 # - Required: No
 # - Default: []
 # - List elements: dict
+# - Dict attributes:
+#   - name: Name of the group. Must be unique within `user_linux_groups`.
+#     - Type: str
+#     - Required: Yes
+#   - state: Whether the group should be `present` or `absent`.
+#     - Type: str
+#     - Required: No
+#     - Default: present
+#     - Choices: present, absent
+#   - gid:
+#     Numeric group ID (GID) to assign. If unset, the next free GID is chosen
+#     automatically.
+#     - Type: int
+#     - Required: No
+#   - system:
+#     If `true`, create the group as a system group (GID below the platform's
+#     range for regular groups).
+#     - Type: bool
+#     - Required: No
 user_linux_groups: []
 
 # If `true`, local user accounts that are not listed in `user_linux_accounts`
