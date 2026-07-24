@@ -1,0 +1,12 @@
+---
+
+bugfixes:
+  - >
+    The comment written into neutralized distribution config files contained a
+    stray double quote in the Debian hint (``dpkg -S '<file>'"``), so the
+    suggested command could not be copied and pasted as-is. The quote is
+    removed.
+  - >
+    ``reboot`` and ``sysctl`` roles - The same notice named the wrong role
+    (``foundata.linux.run``, which does not exist) when explaining which role
+    cleared the file. It now names the actual role.

@@ -37,11 +37,11 @@
       {{ item['value'] }} Managed by Ansible (foundata.linux.reboot)
       {{ item['value'] }}
       {{ item['value'] }} Content intentionally cleared. The original distribution file conflicted
-      {{ item['value'] }} with configuration managed by the foundata.linux.run role.
+      {{ item['value'] }} with configuration managed by the foundata.linux.reboot role.
       {{ item['value'] }}
       {{ item['value'] }} To restore the original file content, reinstall the owning package:
       {% if (ansible_facts['os_family'] | ansible.builtin.lower) == 'debian' %}
-      {{ item['value'] }}   dpkg -S '{{ item['key'] }}'"  # find the package that owns this file
+      {{ item['value'] }}   dpkg -S '{{ item['key'] }}'  # find the package that owns this file
       {{ item['value'] }}   apt-get install --reinstall <package>  # reinstall it to restore the original
       {% elif (ansible_facts['os_family'] | ansible.builtin.lower) == 'suse' %}
       {{ item['value'] }}   rpm -qf '{{ item['key'] }}'  # find the package that owns this file
