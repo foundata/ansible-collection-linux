@@ -276,4 +276,25 @@ auto_update_linux_notify_email: ""
 # - Type: dict
 # - Required: No
 # - Default: {}
+# - Dict attributes:
+#   - unattended-upgrades:
+#     Extra `unattended-upgrades` configuration for Debian/Ubuntu. Flat
+#     dictionary; keys are full apt option names (e.g.
+#     `Unattended-Upgrade::MinimalSteps`), rendered verbatim as `KEY "VALUE";`
+#     lines.
+#     - Type: dict
+#     - Required: No
+#   - dnf-automatic:
+#     Extra `dnf`/`dnf5` automatic configuration for RHEL/Fedora. Dictionary
+#     keyed by `/etc/dnf/automatic.conf` section name (`commands`, `emitters`,
+#     `email`, `base`, ...); each value is a flat dictionary of `key: value`
+#     pairs for that section.
+#     - Type: dict
+#     - Required: No
+#   - os-update:
+#     Extra `os-update` configuration for openSUSE Leap. Flat dictionary; keys
+#     are os-update variable names (e.g. `RESTART_SERVICES`), rendered verbatim
+#     as `KEY="VALUE"` lines in `/etc/os-update.conf`.
+#     - Type: dict
+#     - Required: No
 auto_update_linux_extra_config: {}
