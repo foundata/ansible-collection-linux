@@ -610,8 +610,9 @@ SSH public keys to install in the account's `authorized_keys` file. Each
 entry is a dictionary with the key itself and optional restrictions.
 
 Whether keys not listed here are removed is controlled by
-`ssh_authorized_keys_delete_unmanaged`. When that is `true` (the default)
-the listed keys are authoritative. As a safety measure, an account with an
+`ssh_authorized_keys_delete_unmanaged`. It is `false` by default, so keys
+that are already present but not listed here are kept; set it to `true` to
+make the listed keys authoritative. As a safety measure, an account with an
 empty or unset `ssh_authorized_keys` is left untouched, so omitting the
 key list never wipes an existing `authorized_keys`.
 
@@ -668,8 +669,9 @@ keys are removed regardless).
 [*⇑ Back to ToC ⇑*](#toc)
 
 If `true`, the account's `authorized_keys` is managed authoritatively:
-keys not present in `ssh_authorized_keys` are removed. If `false`, listed
-keys are ensured present but other keys are left in place. Falls back to
+keys not present in `ssh_authorized_keys` are removed. If `false` (the
+built-in default), listed keys are ensured present but other keys are left
+in place. Falls back to
 `user_linux_account_defaults['ssh_authorized_keys_delete_unmanaged']`.
 
 - **Type**: `bool`

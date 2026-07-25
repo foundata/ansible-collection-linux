@@ -1,0 +1,11 @@
+---
+
+bugfixes:
+  - >
+    ``user`` - Corrected the documentation of
+    ``ssh_authorized_keys_delete_unmanaged``, which claimed that ``true`` was the
+    default. The built-in default is ``false``, so keys that are present on an
+    account but not listed in ``ssh_authorized_keys`` are kept unless the option
+    is enabled explicitly. The previous wording suggested that unlisted keys were
+    removed out of the box. Only the documentation was wrong, the behaviour is
+    unchanged.
