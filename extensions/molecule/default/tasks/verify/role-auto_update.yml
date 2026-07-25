@@ -88,6 +88,7 @@
       - "systemctl"
       - "show"
       - "--property=TimersCalendar"
+      - "--property=TimersMonotonic"
       - "{{ __auto_update_linux_systemd_timer_unit_name }}"
   register: __testing_timer_calendar
   changed_when:
@@ -99,6 +100,8 @@
     that:
       - "'03:30:00' in __testing_timer_calendar['stdout']"
       - "(__testing_timer_calendar['stdout'] | ansible.builtin.regex_findall('OnCalendar=') | ansible.builtin.length) == 1"
+      # the configured monotonic trigger must survive next to the calendar one
+      - "'OnActiveUSec=' in __testing_timer_calendar['stdout']"
     fail_msg: >-
       The timer '{{ __auto_update_linux_systemd_timer_unit_name }}' has an
       unexpected effective schedule: the drop-in must replace the vendor

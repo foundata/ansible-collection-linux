@@ -11,6 +11,10 @@
       auto_update_linux_service_state: "enabled"
       auto_update_linux_timer_settings:
         OnCalendar: "*-*-* 03:30:00"
+        # A second trigger of a different kind: all trigger directives share one
+        # list in systemd, so this guards against a reset that wipes the
+        # calendar trigger rendered before it.
+        OnActiveSec: "7d"
         RandomizedDelaySec: "30m"
       auto_update_linux_reboot_timer_settings:
         OnCalendar: "*-*-* 04:30:00"

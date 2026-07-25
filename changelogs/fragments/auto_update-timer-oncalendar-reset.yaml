@@ -6,5 +6,9 @@ bugfixes:
     directive, so the drop-in's schedule accumulated on top of the vendor unit
     (for example ``apt-daily-upgrade.timer`` and ``dnf-automatic.timer`` at
     ``*-*-* 6:00``), and updates kept running on the vendor schedule regardless
-    of ``auto_update_linux_timer_settings``. The drop-in now emits an empty
-    reset line before each list-typed directive.
+    of ``auto_update_linux_timer_settings``. The drop-in now emits exactly one
+    empty reset line before the configured trigger directives. All trigger
+    directives (``OnCalendar``, ``OnActiveSec``, ``OnBootSec``, ...) share a
+    single trigger list, so one reset per directive would make each reset wipe
+    the triggers rendered before it and only the last configured trigger would
+    survive.
