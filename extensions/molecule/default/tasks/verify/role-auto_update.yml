@@ -55,6 +55,30 @@
     loop_var: "__testing_needle"
 
 
+# All trigger directives share one list in systemd, so the drop-in must carry
+# exactly ONE empty reset line: a second one would wipe the triggers rendered
+# before it. The two configured OnCalendar values must therefore appear as two
+# assignments after that single reset.
+- name: "Molecule | Verify | Assert the timer drop-in carries exactly one trigger reset"
+  vars:
+    __testing_timer_dropin_decoded: "{{ __testing_timer_dropin_content['content'] | ansible.builtin.b64decode }}"
+  ansible.builtin.assert:
+    that:
+      - >-
+        (__testing_timer_dropin_decoded | ansible.builtin.regex_findall('(?m)^OnCalendar=$')
+         | ansible.builtin.length) == 1
+      - >-
+        (__testing_timer_dropin_decoded | ansible.builtin.regex_findall('(?m)^OnCalendar=.+$')
+         | ansible.builtin.length) == 2
+    fail_msg: >-
+      The rendered timer drop-in must contain exactly one empty 'OnCalendar=' reset line
+      followed by the two configured expressions.
+      Actual content: {{ __testing_timer_dropin_decoded }}
+    success_msg: >-
+      The rendered timer drop-in carries exactly one trigger reset followed by both
+      configured OnCalendar expressions.
+
+
 - name: "Molecule | Verify | Get enablement state of the automatic update timer"
   ansible.builtin.command:
     argv:
@@ -99,9 +123,11 @@
   ansible.builtin.assert:
     that:
       - "'03:30:00' in __testing_timer_calendar['stdout']"
-      - "(__testing_timer_calendar['stdout'] | ansible.builtin.regex_findall('OnCalendar=') | ansible.builtin.length) == 1"
+      - "'05:00:00' in __testing_timer_calendar['stdout']"
+      # both configured expressions, and nothing from the vendor unit
+      - "(__testing_timer_calendar['stdout'] | ansible.builtin.regex_findall('OnCalendar=') | ansible.builtin.length) == 2"
       # the configured monotonic trigger must survive next to the calendar one
-      - "'OnActiveUSec=' in __testing_timer_calendar['stdout']"
+      - "'OnActiveUSec=1w' in __testing_timer_calendar['stdout']"
     fail_msg: >-
       The timer '{{ __auto_update_linux_systemd_timer_unit_name }}' has an
       unexpected effective schedule: the drop-in must replace the vendor

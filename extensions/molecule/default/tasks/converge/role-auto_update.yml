@@ -10,7 +10,11 @@
       auto_update_linux_reboot: "scheduled"
       auto_update_linux_service_state: "enabled"
       auto_update_linux_timer_settings:
-        OnCalendar: "*-*-* 03:30:00"
+        # A list renders one assignment per item after the single shared reset,
+        # so this also guards that repeatable triggers are not stringified.
+        OnCalendar:
+          - "*-*-* 03:30:00"
+          - "Sat,Sun 05:00"
         # A second trigger of a different kind: all trigger directives share one
         # list in systemd, so this guards against a reset that wipes the
         # calendar trigger rendered before it.

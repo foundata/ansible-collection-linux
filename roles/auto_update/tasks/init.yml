@@ -141,3 +141,62 @@
   loop_control:
     loop_var: "__auto_update_linux_effective_var"
     label: "{{ __auto_update_linux_effective_var }}"
+
+
+# The timer templates accept a list for the repeatable trigger directives and
+# render one assignment per item. Everything else must be a scalar: a list for a
+# non-repeatable directive, an empty list, or a boolean/mapping for a trigger
+# would otherwise be stringified into an invalid systemd value, or produce an
+# enabled timer with no trigger at all.
+- name: "Init | Assert the timer settings use supported value types"
+  ansible.builtin.assert:
+    that:
+      - (__auto_update_linux_timer_value_offenders_0 | ansible.builtin.length) == 0
+      - (__auto_update_linux_timer_value_offenders_1 | ansible.builtin.length) == 0
+    fail_msg: >-
+      Unsupported timer setting value(s):
+      {{ (__auto_update_linux_timer_value_offenders_0
+          + __auto_update_linux_timer_value_offenders_1) | ansible.builtin.join(', ') }}.
+      Repeatable trigger directives ({{ __auto_update_linux_timer_trigger_directives | ansible.builtin.join(', ') }})
+      take a string or a non-empty list of strings, all other directives take a scalar.
+    success_msg: "All timer settings use supported value types."
+  vars:
+    __auto_update_linux_timer_trigger_directives:
+      - "OnCalendar"
+      - "OnActiveSec"
+      - "OnBootSec"
+      - "OnStartupSec"
+      - "OnUnitActiveSec"
+      - "OnUnitInactiveSec"
+    __auto_update_linux_timer_value_offenders_0: >-
+      {%- set ns = namespace(items=[]) -%}
+      {%- for k, v in (__auto_update_linux_effective_timer_settings | ansible.builtin.default({})).items() -%}
+      {%-   set is_list = (v is ansible.builtin.iterable)
+                           and (v is not ansible.builtin.string)
+                           and (v is not ansible.builtin.mapping) -%}
+      {%-   if is_list and (k not in __auto_update_linux_timer_trigger_directives) -%}
+      {%-     set _ = ns.items.append(k ~ " (a list is only supported for the repeatable trigger directives)") -%}
+      {%-   elif is_list and ((v | ansible.builtin.length) == 0) -%}
+      {%-     set _ = ns.items.append(k ~ " (empty list: configure at least one value or omit the directive)") -%}
+      {%-   elif (k in __auto_update_linux_timer_trigger_directives)
+                  and ((v is ansible.builtin.boolean) or (v is ansible.builtin.mapping)) -%}
+      {%-     set _ = ns.items.append(k ~ " (trigger directives take a string or a list of strings)") -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ ns.items }}
+    __auto_update_linux_timer_value_offenders_1: >-
+      {%- set ns = namespace(items=[]) -%}
+      {%- for k, v in (__auto_update_linux_effective_reboot_timer_settings | ansible.builtin.default({})).items() -%}
+      {%-   set is_list = (v is ansible.builtin.iterable)
+                           and (v is not ansible.builtin.string)
+                           and (v is not ansible.builtin.mapping) -%}
+      {%-   if is_list and (k not in __auto_update_linux_timer_trigger_directives) -%}
+      {%-     set _ = ns.items.append(k ~ " (a list is only supported for the repeatable trigger directives)") -%}
+      {%-   elif is_list and ((v | ansible.builtin.length) == 0) -%}
+      {%-     set _ = ns.items.append(k ~ " (empty list: configure at least one value or omit the directive)") -%}
+      {%-   elif (k in __auto_update_linux_timer_trigger_directives)
+                  and ((v is ansible.builtin.boolean) or (v is ansible.builtin.mapping)) -%}
+      {%-     set _ = ns.items.append(k ~ " (trigger directives take a string or a list of strings)") -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ ns.items }}

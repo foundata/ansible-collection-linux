@@ -28,8 +28,10 @@
       'OnUnitInactiveSec',
     ]
 -%}
-{#- Only reset when a trigger is actually configured, so a drop-in that just
-    tweaks e.g. RandomizedDelaySec leaves the vendor trigger alone. -#}
+{#- Only reset when a trigger is actually configured. The role's internal
+    defaults always carry an OnCalendar, so with the public settings mapping
+    this branch is currently always taken; the guard keeps the template correct
+    if it is ever rendered with a mapping that configures no trigger at all. -#}
 {%- set tpl_timer_ns = namespace(has_trigger=false) -%}
 {%- for key in (tpl_timer_settings | default({})).keys() -%}
 {%-   if key in tpl_timer_trigger_directives -%}
@@ -41,6 +43,18 @@
 {% if tpl_timer_ns.has_trigger %}
 OnCalendar=
 {% endif %}
+{#- Repeatable trigger directives accept a list: one assignment per item, all
+    of them after the single shared reset above. Every other value is rendered
+    as a single assignment. Unsupported combinations (a list for a
+    non-repeatable directive, an empty list, a boolean or mapping for a trigger)
+    are rejected in the role's init tasks rather than silently mis-rendered. -#}
 {% for key, value in (tpl_timer_settings | default({})).items() %}
+{% if (key in tpl_timer_trigger_directives) and (value is ansible.builtin.iterable)
+      and (value is not ansible.builtin.string) and (value is not ansible.builtin.mapping) %}
+{% for tpl_timer_entry in value %}
+{{ key }}={{ tpl_timer_entry }}
+{% endfor %}
+{% else %}
 {{ key }}={{ value | ternary('true', 'false') if value is ansible.builtin.boolean else value }}
+{% endif %}
 {% endfor %}
