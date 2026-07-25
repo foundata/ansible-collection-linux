@@ -138,6 +138,32 @@ argument_specs:
             - `Persistent`: Ensures missed timer runs are executed at the next boot if
               the system was powered off. Defaults to `true`.
 
+          Value contract for the six repeatable trigger directives (`OnCalendar`,
+          `OnActiveSec`, `OnBootSec`, `OnStartupSec`, `OnUnitActiveSec`,
+          `OnUnitInactiveSec`):
+
+          - They also accept a YAML list and render one assignment per entry, so
+            several expressions of the same directive can be combined:
+            ```yaml
+            OnCalendar:
+              - "Mon..Fri 03:00"
+              - "Sat,Sun 05:00"
+            ```
+          - An empty list drops the role's built-in default for that directive
+            (e.g. to run a purely monotonic timer without a calendar schedule).
+            At least one trigger must remain overall.
+          - The monotonic trigger directives (all except `OnCalendar`) also accept
+            plain numbers, which systemd reads as seconds.
+          - The boolean event trigger directives `OnClockChange` and
+            `OnTimezoneChange` are supported as well and take `true`/`false`
+            only. A `true` value counts as a remaining trigger, so an
+            event-only timer (all repeatable triggers dropped via empty lists)
+            is a valid configuration.
+          - Anything else is rejected: mappings, booleans, `null` and empty strings
+            for repeatable trigger directives, non-booleans for the event trigger
+            directives, unusable list entries, and lists for non-repeatable
+            directives (those take a single scalar).
+
           Special cases:
 
           - For boolean values, use `true`/`false` (these will be converted to strings
@@ -198,6 +224,32 @@ argument_specs:
               across systems. Defaults to `30m`.
             - `Persistent`: Run a missed check at the next boot if the system was
               powered off (even though . Defaults to `true`.
+
+          Value contract for the six repeatable trigger directives (`OnCalendar`,
+          `OnActiveSec`, `OnBootSec`, `OnStartupSec`, `OnUnitActiveSec`,
+          `OnUnitInactiveSec`):
+
+          - They also accept a YAML list and render one assignment per entry, so
+            several expressions of the same directive can be combined:
+            ```yaml
+            OnCalendar:
+              - "Mon..Fri 03:00"
+              - "Sat,Sun 05:00"
+            ```
+          - An empty list drops the role's built-in default for that directive
+            (e.g. to run a purely monotonic timer without a calendar schedule).
+            At least one trigger must remain overall.
+          - The monotonic trigger directives (all except `OnCalendar`) also accept
+            plain numbers, which systemd reads as seconds.
+          - The boolean event trigger directives `OnClockChange` and
+            `OnTimezoneChange` are supported as well and take `true`/`false`
+            only. A `true` value counts as a remaining trigger, so an
+            event-only timer (all repeatable triggers dropped via empty lists)
+            is a valid configuration.
+          - Anything else is rejected: mappings, booleans, `null` and empty strings
+            for repeatable trigger directives, non-booleans for the event trigger
+            directives, unusable list entries, and lists for non-repeatable
+            directives (those take a single scalar).
 
           Special cases:
 

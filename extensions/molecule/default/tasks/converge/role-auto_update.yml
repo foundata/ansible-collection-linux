@@ -19,9 +19,15 @@
         # list in systemd, so this guards against a reset that wipes the
         # calendar trigger rendered before it.
         OnActiveSec: "7d"
+        # boolean event trigger, guarding the third value kind of the contract
+        OnClockChange: true
         RandomizedDelaySec: "30m"
       auto_update_linux_reboot_timer_settings:
-        OnCalendar: "*-*-* 04:30:00"
+        # A list renders one assignment per item, guarding the list contract on
+        # the role-owned reboot unit as well.
+        OnCalendar:
+          - "*-*-* 04:30:00"
+          - "Sat,Sun 05:15"
         RandomizedDelaySec: "45m"
       auto_update_linux_exclude:
         - "vim"

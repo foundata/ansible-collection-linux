@@ -55,7 +55,8 @@
     loop_var: "__testing_needle"
 
 
-# All trigger directives share one list in systemd, so the drop-in must carry
+# The repeatable time-trigger directives share one list in systemd, so the
+# drop-in must carry
 # exactly ONE empty reset line: a second one would wipe the triggers rendered
 # before it. The two configured OnCalendar values must therefore appear as two
 # assignments after that single reset.
@@ -113,6 +114,7 @@
       - "show"
       - "--property=TimersCalendar"
       - "--property=TimersMonotonic"
+      - "--property=OnClockChange"
       - "{{ __auto_update_linux_systemd_timer_unit_name }}"
   register: __testing_timer_calendar
   changed_when:
@@ -128,6 +130,8 @@
       - "(__testing_timer_calendar['stdout'] | ansible.builtin.regex_findall('OnCalendar=') | ansible.builtin.length) == 2"
       # the configured monotonic trigger must survive next to the calendar one
       - "'OnActiveUSec=1w' in __testing_timer_calendar['stdout']"
+      # the boolean event trigger must be effective as well
+      - "'OnClockChange=yes' in __testing_timer_calendar['stdout']"
     fail_msg: >-
       The timer '{{ __auto_update_linux_systemd_timer_unit_name }}' has an
       unexpected effective schedule: the drop-in must replace the vendor
@@ -293,6 +297,7 @@
   loop:
     - "[Timer]"
     - "OnCalendar=*-*-* 04:30:00"
+    - "OnCalendar=Sat,Sun 05:15"
     - "RandomizedDelaySec=45m"
   loop_control:
     loop_var: "__testing_needle"
@@ -341,7 +346,8 @@
   ansible.builtin.assert:
     that:
       - "'04:30:00' in __testing_reboot_timer_calendar['stdout']"
-      - "(__testing_reboot_timer_calendar['stdout'] | ansible.builtin.regex_findall('OnCalendar=') | ansible.builtin.length) == 1"
+      - "'05:15:00' in __testing_reboot_timer_calendar['stdout']"
+      - "(__testing_reboot_timer_calendar['stdout'] | ansible.builtin.regex_findall('OnCalendar=') | ansible.builtin.length) == 2"
     fail_msg: >-
       The reboot timer '{{ __auto_update_linux_reboot_timer_unit_name }}' has no or an unexpected
       effective schedule. Got '{{ __testing_reboot_timer_calendar['stdout'] }}'.
@@ -403,3 +409,317 @@
           - __auto_update_linux_effective_reboot_timer_settings['BazDirective'] == "qux"
         fail_msg: "__auto_update_linux_effective_reboot_timer_settings did not merge defaults and user values as expected."
         success_msg: "__auto_update_linux_effective_reboot_timer_settings merged defaults and user values correctly."
+
+
+## Timer settings validation (init-only)
+#
+# The init tasks must reject timer settings the templates cannot render into a
+# valid unit, and an empty list must be the supported way to drop a built-in
+# trigger default. Each rejection case runs the role's init with one invalid
+# mapping and expects the run to fail inside the validation; the positive case
+# proves the empty-list removal is accepted and reaches the effective settings.
+
+- name: "Molecule | Verify | Run timer settings rejection checks (init-only)"
+  ansible.builtin.include_tasks:
+    file: "{{ (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.default('../../default')) }}/tasks/verify/checks/timer-settings-reject.yml"
+  vars:
+    __testing_reject_case: "{{ item }}"
+  loop:
+    - label: "empty string trigger"
+      varname: "auto_update_linux_timer_settings"
+      settings:
+        OnCalendar: ""
+    - label: "invalid list member"
+      varname: "auto_update_linux_timer_settings"
+      settings:
+        OnCalendar:
+          - "daily"
+          - true
+    - label: "list for non-repeatable directive"
+      varname: "auto_update_linux_timer_settings"
+      settings:
+        RandomizedDelaySec:
+          - "30m"
+    - label: "mapping for non-repeatable directive"
+      varname: "auto_update_linux_timer_settings"
+      settings:
+        RandomizedDelaySec:
+          bad: "value"
+    - label: "no trigger left"
+      varname: "auto_update_linux_timer_settings"
+      settings:
+        OnCalendar: []
+    - label: "non-boolean event trigger"
+      varname: "auto_update_linux_timer_settings"
+      settings:
+        OnClockChange: "true"
+    - label: "event triggers false and no other trigger"
+      varname: "auto_update_linux_timer_settings"
+      settings:
+        OnCalendar: []
+        OnClockChange: false
+        OnTimezoneChange: false
+    - label: "mapping trigger on the reboot timer"
+      varname: "auto_update_linux_reboot_timer_settings"
+      settings:
+        OnCalendar:
+          bad: "value"
+  loop_control:
+    label: "{{ item['label'] }}"
+
+
+- name: "Molecule | Verify | Timer settings: apply an empty-list removal with a monotonic trigger"
+  ansible.builtin.set_fact:
+    __testing_timer_settings_saved: "{{ auto_update_linux_timer_settings | ansible.builtin.default({}) }}"
+    auto_update_linux_timer_settings:
+      OnCalendar: []
+      OnBootSec: "10min"
+
+
+- name: "Molecule | Verify | Timer settings: include the role's init (must accept the removal)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.auto_update"
+    tasks_from: "init"
+
+
+- name: "Molecule | Verify | Timer settings: assert the removal reached the effective settings"
+  ansible.builtin.assert:
+    that:
+      - (__auto_update_linux_effective_timer_settings['OnCalendar'] | ansible.builtin.length) == 0
+      - "__auto_update_linux_effective_timer_settings['OnBootSec'] == '10min'"
+    fail_msg: >-
+      The empty-list removal did not reach the effective timer settings.
+      Got: {{ __auto_update_linux_effective_timer_settings }}
+    success_msg: >-
+      An empty OnCalendar list drops the built-in default while the monotonic
+      trigger remains.
+
+
+- name: "Molecule | Verify | Timer settings: restore the saved settings"
+  ansible.builtin.set_fact:
+    auto_update_linux_timer_settings: "{{ __testing_timer_settings_saved }}"
+
+
+- name: "Molecule | Verify | Timer settings: apply an event-only configuration"
+  ansible.builtin.set_fact:
+    __testing_timer_settings_saved: "{{ auto_update_linux_timer_settings | ansible.builtin.default({}) }}"
+    auto_update_linux_timer_settings:
+      OnCalendar: []
+      OnClockChange: true
+
+
+- name: "Molecule | Verify | Timer settings: include the role's init (must accept the event-only timer)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.auto_update"
+    tasks_from: "init"
+
+
+- name: "Molecule | Verify | Timer settings: assert the event-only configuration reached the effective settings"
+  ansible.builtin.assert:
+    that:
+      - (__auto_update_linux_effective_timer_settings['OnCalendar'] | ansible.builtin.length) == 0
+      - __auto_update_linux_effective_timer_settings['OnClockChange'] | ansible.builtin.bool
+    fail_msg: >-
+      The event-only timer configuration did not reach the effective settings.
+      Got: {{ __auto_update_linux_effective_timer_settings }}
+    success_msg: >-
+      An event-only timer (all repeatable triggers dropped, OnClockChange true)
+      is accepted.
+
+
+- name: "Molecule | Verify | Timer settings: restore the saved settings again"
+  ansible.builtin.set_fact:
+    auto_update_linux_timer_settings: "{{ __testing_timer_settings_saved }}"
+
+
+## Timer settings: event-only timer applied to the system (integration)
+#
+# The init-only positive case above proves acceptance, but not the rendered
+# result. Re-run the role with an event-only configuration and ask systemd:
+# the drop-in must carry the single reset and nothing else next to the event
+# trigger, and the unit must end up with empty calendar/monotonic trigger
+# lists while OnClockChange is active. This is the path that would regress if
+# the reset detection stopped counting event triggers.
+
+- name: "Molecule | Verify | Timer settings | event-only integration: save the current settings"
+  ansible.builtin.set_fact:
+    __testing_timer_settings_saved: "{{ auto_update_linux_timer_settings | ansible.builtin.default({}) }}"
+    auto_update_linux_timer_settings:
+      OnCalendar: []
+      OnClockChange: true
+
+
+- name: "Molecule | Verify | Timer settings | event-only integration: apply the role"
+  ansible.builtin.include_role:
+    name: "foundata.linux.auto_update"
+
+
+- name: "Molecule | Verify | Timer settings | event-only integration: run pending handlers (daemon-reload)"
+  ansible.builtin.meta: flush_handlers
+
+
+- name: "Molecule | Verify | Timer settings | event-only integration: read the rendered drop-in"
+  ansible.builtin.slurp:
+    src: "{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}"
+  register: __testing_timer_eventonly_dropin
+
+
+- name: "Molecule | Verify | Timer settings | event-only integration: assert the rendered drop-in"
+  vars:
+    __testing_timer_eventonly_decoded: "{{ __testing_timer_eventonly_dropin['content'] | ansible.builtin.b64decode }}"
+  ansible.builtin.assert:
+    that:
+      # exactly the single shared reset, no calendar or monotonic assignment
+      - >-
+        (__testing_timer_eventonly_decoded
+         | ansible.builtin.regex_findall('(?m)^OnCalendar=$') | ansible.builtin.length) == 1
+      - >-
+        (__testing_timer_eventonly_decoded
+         | ansible.builtin.regex_findall('(?m)^On\w+=.+$')
+         | ansible.builtin.reject('match', '^OnClockChange=')
+         | ansible.builtin.list | ansible.builtin.length) == 0
+      - "'OnClockChange=true' in __testing_timer_eventonly_decoded"
+    fail_msg: >-
+      The event-only drop-in must contain exactly one empty 'OnCalendar=' reset and the
+      event trigger, nothing else. Actual content: {{ __testing_timer_eventonly_decoded }}
+    success_msg: "The event-only drop-in carries the single reset and the event trigger."
+
+
+- name: "Molecule | Verify | Timer settings | event-only integration: get the parsed unit properties"
+  ansible.builtin.command:
+    argv:
+      - "systemctl"
+      - "show"
+      - "--property=TimersCalendar"
+      - "--property=TimersMonotonic"
+      - "--property=OnClockChange"
+      - "{{ __auto_update_linux_systemd_timer_unit_name }}"
+  register: __testing_timer_eventonly_props
+  changed_when:
+    - false
+
+
+- name: "Molecule | Verify | Timer settings | event-only integration: assert the effective unit state"
+  ansible.builtin.assert:
+    that:
+      # Both trigger lists must be empty: the reset removed the vendor schedule.
+      # "systemctl show" omits empty properties unless --all is given, so assert
+      # the absence of the non-empty form ("TimersCalendar={ ... }"), which is
+      # robust across systemd versions.
+      - "'TimersCalendar={' not in __testing_timer_eventonly_props['stdout']"
+      - "'TimersMonotonic={' not in __testing_timer_eventonly_props['stdout']"
+      - "'OnClockChange=yes' in __testing_timer_eventonly_props['stdout']"
+    fail_msg: >-
+      The event-only timer does not have the expected effective state (empty trigger
+      lists, active OnClockChange). Got: {{ __testing_timer_eventonly_props['stdout'] }}
+    success_msg: "The event-only timer is effective: empty trigger lists, OnClockChange active."
+
+
+- name: "Molecule | Verify | Timer settings | event-only integration: restore the saved settings"
+  ansible.builtin.set_fact:
+    auto_update_linux_timer_settings: "{{ __testing_timer_settings_saved }}"
+
+
+- name: "Molecule | Verify | Timer settings | event-only integration: re-apply the role with the restored settings"
+  ansible.builtin.include_role:
+    name: "foundata.linux.auto_update"
+
+
+- name: "Molecule | Verify | Timer settings | event-only integration: run pending handlers again"
+  ansible.builtin.meta: flush_handlers
+
+
+## Timer settings: triggerless settings accepted while the timer is unmanaged
+#
+# The "keeps at least one trigger" check mirrors the conditions under which the
+# config tasks manage the timer. Prove the mirroring: with auto_update_linux_service_state set to unmanaged (and scheduled reboots off)
+# the same triggerless settings that are rejected above must pass init.
+
+- name: "Molecule | Verify | Timer settings | unmanaged: save the current settings and flags"
+  ansible.builtin.set_fact:
+    __testing_timer_settings_saved: "{{ auto_update_linux_timer_settings | ansible.builtin.default({}) }}"
+    __testing_timer_state_saved: "{{ auto_update_linux_service_state | ansible.builtin.default('enabled') }}"
+    __testing_timer_reboot_saved: "{{ auto_update_linux_reboot | ansible.builtin.default('never') }}"
+    __testing_timer_reboot_settings_saved: "{{ auto_update_linux_reboot_timer_settings | ansible.builtin.default({}) }}"
+    auto_update_linux_timer_settings:
+      OnCalendar: []
+    auto_update_linux_service_state: "unmanaged"
+    auto_update_linux_reboot: "never"
+    auto_update_linux_reboot_timer_settings:
+      OnCalendar: []
+
+
+- name: "Molecule | Verify | Timer settings | unmanaged: include the role's init (must accept triggerless settings)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.auto_update"
+    tasks_from: "init"
+
+
+- name: "Molecule | Verify | Timer settings | unmanaged: assert the triggerless settings were in effect"
+  ansible.builtin.assert:
+    that:
+      - (__auto_update_linux_effective_timer_settings['OnCalendar'] | ansible.builtin.length) == 0
+    fail_msg: >-
+      The triggerless settings were not in effect during the init run, the acceptance
+      is vacuous. Got: {{ __auto_update_linux_effective_timer_settings }}
+    success_msg: >-
+      Triggerless settings pass init while the timer is not managed, so the trigger
+      check mirrors the management conditions.
+
+
+- name: "Molecule | Verify | Timer settings | unmanaged: restore the saved settings and flags"
+  ansible.builtin.set_fact:
+    auto_update_linux_timer_settings: "{{ __testing_timer_settings_saved }}"
+    auto_update_linux_service_state: "{{ __testing_timer_state_saved }}"
+    auto_update_linux_reboot: "{{ __testing_timer_reboot_saved }}"
+    auto_update_linux_reboot_timer_settings: "{{ __testing_timer_reboot_settings_saved }}"
+
+
+## Timer settings: triggerless settings accepted on a non-systemd service manager
+#
+# The unmanaged case above disables conditions that partly existed before the
+# gating fix. The service-manager condition is newly mirrored on both trigger
+# checks, so it needs its own case: with the service state enabled and
+# scheduled reboots on (the converge state), a non-systemd service manager
+# alone must make triggerless settings pass for the update AND the reboot
+# timer. Passing ansible_facts as an include variable shadows the magic mapping
+# for that include only, so the real gathered facts stay untouched and nothing
+# needs restoring.
+
+- name: "Molecule | Verify | Timer settings | non-systemd: save the settings and build the fact override"
+  ansible.builtin.set_fact:
+    __testing_timer_settings_saved: "{{ auto_update_linux_timer_settings | ansible.builtin.default({}) }}"
+    __testing_timer_reboot_settings_saved: "{{ auto_update_linux_reboot_timer_settings | ansible.builtin.default({}) }}"
+    __testing_facts_override: "{{ ansible_facts | ansible.builtin.combine({'service_mgr': 'openrc'}) }}"
+    auto_update_linux_timer_settings:
+      OnCalendar: []
+    auto_update_linux_reboot_timer_settings:
+      OnCalendar: []
+
+
+- name: "Molecule | Verify | Timer settings | non-systemd: include the role's init (must accept triggerless settings)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.auto_update"
+    tasks_from: "init"
+  vars:
+    ansible_facts: "{{ __testing_facts_override }}"
+
+
+- name: "Molecule | Verify | Timer settings | non-systemd: assert the triggerless settings were in effect for both timers"
+  ansible.builtin.assert:
+    that:
+      - (__auto_update_linux_effective_timer_settings['OnCalendar'] | ansible.builtin.length) == 0
+      - (__auto_update_linux_effective_reboot_timer_settings['OnCalendar'] | ansible.builtin.length) == 0
+    fail_msg: >-
+      The triggerless settings were not in effect during the init run, the acceptance
+      is vacuous. Got: {{ __auto_update_linux_effective_timer_settings }} and
+      {{ __auto_update_linux_effective_reboot_timer_settings }}
+    success_msg: >-
+      Triggerless settings pass init for both timers on a non-systemd service manager,
+      so the trigger checks mirror the management conditions.
+
+
+- name: "Molecule | Verify | Timer settings | non-systemd: restore the saved settings"
+  ansible.builtin.set_fact:
+    auto_update_linux_timer_settings: "{{ __testing_timer_settings_saved }}"
+    auto_update_linux_reboot_timer_settings: "{{ __testing_timer_reboot_settings_saved }}"

@@ -8,10 +8,13 @@
   - Keys are written as "Directive=Value".
   - If a value is boolean, it is rendered as "true" or "false".
   - All other value types are rendered as-is (stringified by Jinja).
-  - All trigger directives (OnCalendar, OnActiveSec, OnBootSec, ...) feed ONE
-    shared trigger list in systemd, and assigning the empty string to any single
-    one of them resets that complete list, not just the directive it is assigned
-    to. This file is a drop-in over a vendor timer that already ships its own
+  - The six repeatable time-trigger directives (OnCalendar, OnActiveSec,
+    OnBootSec, OnStartupSec, OnUnitActiveSec, OnUnitInactiveSec) feed ONE
+    shared trigger list in systemd, and assigning the empty string to any
+    single one of them resets that complete list, not just the directive it is
+    assigned to. The boolean event triggers OnClockChange and OnTimezoneChange
+    are independent of that list: the reset does not clear them, they are only
+    disabled by an explicit false assignment. This file is a drop-in over a vendor timer that already ships its own
     trigger (e.g. apt-daily-upgrade.timer or dnf-automatic.timer at
     "*-*-* 6:00"), so exactly ONE reset line is emitted before the configured
     directives to drop the vendor trigger. Emitting a reset per directive would
@@ -28,13 +31,26 @@
       'OnUnitInactiveSec',
     ]
 -%}
+{%- set tpl_timer_event_trigger_directives = [
+      'OnClockChange',
+      'OnTimezoneChange',
+    ]
+-%}
 {#- Only reset when a trigger is actually configured. The role's internal
     defaults always carry an OnCalendar, so with the public settings mapping
     this branch is currently always taken; the guard keeps the template correct
     if it is ever rendered with a mapping that configures no trigger at all. -#}
 {%- set tpl_timer_ns = namespace(has_trigger=false) -%}
-{%- for key in (tpl_timer_settings | default({})).keys() -%}
+{%- for key, value in (tpl_timer_settings | default({})).items() -%}
 {%-   if key in tpl_timer_trigger_directives -%}
+{%-     set tpl_timer_is_seq = (value is ansible.builtin.iterable)
+                               and (value is not ansible.builtin.string)
+                               and (value is not ansible.builtin.mapping) -%}
+{%-     if (not tpl_timer_is_seq) or ((value | ansible.builtin.length) > 0) -%}
+{%-       set tpl_timer_ns.has_trigger = true -%}
+{%-     endif -%}
+{%-   elif (key in tpl_timer_event_trigger_directives)
+           and (value is ansible.builtin.boolean) and value -%}
 {%-     set tpl_timer_ns.has_trigger = true -%}
 {%-   endif -%}
 {%- endfor -%}
@@ -44,10 +60,16 @@
 OnCalendar=
 {% endif %}
 {#- Repeatable trigger directives accept a list: one assignment per item, all
-    of them after the single shared reset above. Every other value is rendered
-    as a single assignment. Unsupported combinations (a list for a
-    non-repeatable directive, an empty list, a boolean or mapping for a trigger)
-    are rejected in the role's init tasks rather than silently mis-rendered. -#}
+    of them after the single shared reset above. An empty list renders nothing
+    and thereby drops the built-in default for that directive. Every other
+    value is rendered as a single assignment. Unsupported values (mappings,
+    null, booleans or empty strings for triggers, lists for non-repeatable
+    directives, unusable list members, a configuration whose triggers were all
+    dropped) are rejected in the role's init tasks rather than silently
+    mis-rendered. The boolean event trigger directives OnClockChange and
+    OnTimezoneChange render as plain assignments; a true value counts as a
+    trigger, so an event-only timer still gets the reset line that drops the
+    vendor schedule. -#}
 {% for key, value in (tpl_timer_settings | default({})).items() %}
 {% if (key in tpl_timer_trigger_directives) and (value is ansible.builtin.iterable)
       and (value is not ansible.builtin.string) and (value is not ansible.builtin.mapping) %}

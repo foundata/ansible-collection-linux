@@ -1,0 +1,21 @@
+---
+
+minor_changes:
+  - >
+    ``auto_update`` role - ``auto_update_linux_timer_settings`` and
+    ``auto_update_linux_reboot_timer_settings`` now accept a YAML list for the
+    repeatable systemd trigger directives (``OnCalendar``, ``OnActiveSec``,
+    ``OnBootSec``, ``OnStartupSec``, ``OnUnitActiveSec``,
+    ``OnUnitInactiveSec``), rendering one assignment per entry so several
+    expressions of the same directive can be combined. An empty list drops the
+    role's built-in default for that directive (e.g. to run a purely monotonic
+    timer without a calendar schedule); at least one trigger must remain. The
+    monotonic trigger directives also accept plain numbers (seconds).
+    The boolean event trigger directives ``OnClockChange`` and
+    ``OnTimezoneChange`` are supported and count as a trigger when ``true``, so
+    an event-only timer is a valid configuration. Unsupported values -
+    mappings, booleans, ``null`` or empty strings for repeatable trigger
+    directives, non-booleans for the event trigger directives, unusable list
+    entries, and lists for non-repeatable directives - are now rejected with an
+    explanatory message instead of being silently rendered into an invalid
+    unit.

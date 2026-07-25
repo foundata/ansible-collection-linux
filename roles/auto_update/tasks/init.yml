@@ -143,11 +143,19 @@
     label: "{{ __auto_update_linux_effective_var }}"
 
 
-# The timer templates accept a list for the repeatable trigger directives and
-# render one assignment per item. Everything else must be a scalar: a list for a
-# non-repeatable directive, an empty list, or a boolean/mapping for a trigger
-# would otherwise be stringified into an invalid systemd value, or produce an
-# enabled timer with no trigger at all.
+# The timer templates accept the following values per directive. The six
+# repeatable trigger directives take a non-empty string, a number (except
+# OnCalendar, which takes calendar expression strings) or a list of such
+# values; an empty list is the supported way to drop the role's built-in
+# default for that directive (e.g. to run a purely monotonic timer without a
+# calendar schedule). The boolean event trigger directives OnClockChange and
+# OnTimezoneChange take true or false, and a true value counts as a trigger,
+# so an event-only timer is a valid configuration. Every other directive takes
+# a single scalar. Everything else - mappings, null, booleans or empty strings
+# for repeatable triggers, non-booleans for event triggers, unusable list
+# members, lists for non-repeatable directives - would be stringified into an
+# invalid systemd value or produce an enabled timer without any trigger, so it
+# is rejected here instead of silently mis-rendered.
 - name: "Init | Assert the timer settings use supported value types"
   ansible.builtin.assert:
     that:
@@ -155,10 +163,14 @@
       - (__auto_update_linux_timer_value_offenders_1 | ansible.builtin.length) == 0
     fail_msg: >-
       Unsupported timer setting value(s):
-      {{ (__auto_update_linux_timer_value_offenders_0
-          + __auto_update_linux_timer_value_offenders_1) | ansible.builtin.join(', ') }}.
-      Repeatable trigger directives ({{ __auto_update_linux_timer_trigger_directives | ansible.builtin.join(', ') }})
-      take a string or a non-empty list of strings, all other directives take a scalar.
+      {{ (__auto_update_linux_timer_value_offenders_0 + __auto_update_linux_timer_value_offenders_1) | ansible.builtin.join(', ') }}.
+      Repeatable trigger directives
+      ({{ __auto_update_linux_timer_trigger_directives | ansible.builtin.join(', ') }})
+      take a non-empty string, a number (except OnCalendar) or a list of such
+      values (an empty list drops the built-in default); the event trigger
+      directives
+      ({{ __auto_update_linux_timer_event_trigger_directives | ansible.builtin.join(', ') }})
+      take true or false; all other directives take a single scalar.
     success_msg: "All timer settings use supported value types."
   vars:
     __auto_update_linux_timer_trigger_directives:
@@ -168,35 +180,167 @@
       - "OnStartupSec"
       - "OnUnitActiveSec"
       - "OnUnitInactiveSec"
+    __auto_update_linux_timer_event_trigger_directives:
+      - "OnClockChange"
+      - "OnTimezoneChange"
     __auto_update_linux_timer_value_offenders_0: >-
       {%- set ns = namespace(items=[]) -%}
       {%- for k, v in (__auto_update_linux_effective_timer_settings | ansible.builtin.default({})).items() -%}
-      {%-   set is_list = (v is ansible.builtin.iterable)
-                           and (v is not ansible.builtin.string)
-                           and (v is not ansible.builtin.mapping) -%}
-      {%-   if is_list and (k not in __auto_update_linux_timer_trigger_directives) -%}
-      {%-     set _ = ns.items.append(k ~ " (a list is only supported for the repeatable trigger directives)") -%}
-      {%-   elif is_list and ((v | ansible.builtin.length) == 0) -%}
-      {%-     set _ = ns.items.append(k ~ " (empty list: configure at least one value or omit the directive)") -%}
-      {%-   elif (k in __auto_update_linux_timer_trigger_directives)
-                  and ((v is ansible.builtin.boolean) or (v is ansible.builtin.mapping)) -%}
-      {%-     set _ = ns.items.append(k ~ " (trigger directives take a string or a list of strings)") -%}
+      {%-   set is_seq = (v is ansible.builtin.iterable)
+                          and (v is not ansible.builtin.string)
+                          and (v is not ansible.builtin.mapping) -%}
+      {%-   if k in __auto_update_linux_timer_event_trigger_directives -%}
+      {%-     if v is not ansible.builtin.boolean -%}
+      {%-       set _ = ns.items.append(k ~ " (takes true or false)") -%}
+      {%-     endif -%}
+      {%-   elif k not in __auto_update_linux_timer_trigger_directives -%}
+      {%-     if is_seq or (v is ansible.builtin.mapping) or (v is none) -%}
+      {%-       set _ = ns.items.append(k ~ " (takes a single scalar value)") -%}
+      {%-     endif -%}
+      {%-   elif (v is ansible.builtin.boolean) or (v is ansible.builtin.mapping) or (v is none) -%}
+      {%-     set _ = ns.items.append(k ~ " (takes a non-empty string or a list of them)") -%}
+      {%-   elif (v is ansible.builtin.string) and ((v | ansible.builtin.trim | ansible.builtin.length) == 0) -%}
+      {%-     set _ = ns.items.append(k ~ " (empty string; use an empty list to drop the built-in default)") -%}
+      {%-   elif (v is ansible.builtin.number) and (k == 'OnCalendar') -%}
+      {%-     set _ = ns.items.append(k ~ " (takes a calendar expression string)") -%}
+      {%-   elif is_seq -%}
+      {%-     for e in v -%}
+      {%-       set e_seq = (e is ansible.builtin.iterable) and (e is not ansible.builtin.string) -%}
+      {%-       if (e is ansible.builtin.boolean) or e_seq or (e is none)
+                    or ((e is ansible.builtin.string) and ((e | ansible.builtin.trim | ansible.builtin.length) == 0))
+                    or ((e is ansible.builtin.number) and (k == 'OnCalendar')) -%}
+      {%-         set _ = ns.items.append(k ~ " (list entry " ~ loop.index ~ " is not a usable trigger value)") -%}
+      {%-       endif -%}
+      {%-     endfor -%}
       {%-   endif -%}
       {%- endfor -%}
       {{ ns.items }}
     __auto_update_linux_timer_value_offenders_1: >-
       {%- set ns = namespace(items=[]) -%}
       {%- for k, v in (__auto_update_linux_effective_reboot_timer_settings | ansible.builtin.default({})).items() -%}
-      {%-   set is_list = (v is ansible.builtin.iterable)
-                           and (v is not ansible.builtin.string)
-                           and (v is not ansible.builtin.mapping) -%}
-      {%-   if is_list and (k not in __auto_update_linux_timer_trigger_directives) -%}
-      {%-     set _ = ns.items.append(k ~ " (a list is only supported for the repeatable trigger directives)") -%}
-      {%-   elif is_list and ((v | ansible.builtin.length) == 0) -%}
-      {%-     set _ = ns.items.append(k ~ " (empty list: configure at least one value or omit the directive)") -%}
-      {%-   elif (k in __auto_update_linux_timer_trigger_directives)
-                  and ((v is ansible.builtin.boolean) or (v is ansible.builtin.mapping)) -%}
-      {%-     set _ = ns.items.append(k ~ " (trigger directives take a string or a list of strings)") -%}
+      {%-   set is_seq = (v is ansible.builtin.iterable)
+                          and (v is not ansible.builtin.string)
+                          and (v is not ansible.builtin.mapping) -%}
+      {%-   if k in __auto_update_linux_timer_event_trigger_directives -%}
+      {%-     if v is not ansible.builtin.boolean -%}
+      {%-       set _ = ns.items.append(k ~ " (takes true or false)") -%}
+      {%-     endif -%}
+      {%-   elif k not in __auto_update_linux_timer_trigger_directives -%}
+      {%-     if is_seq or (v is ansible.builtin.mapping) or (v is none) -%}
+      {%-       set _ = ns.items.append(k ~ " (takes a single scalar value)") -%}
+      {%-     endif -%}
+      {%-   elif (v is ansible.builtin.boolean) or (v is ansible.builtin.mapping) or (v is none) -%}
+      {%-     set _ = ns.items.append(k ~ " (takes a non-empty string or a list of them)") -%}
+      {%-   elif (v is ansible.builtin.string) and ((v | ansible.builtin.trim | ansible.builtin.length) == 0) -%}
+      {%-     set _ = ns.items.append(k ~ " (empty string; use an empty list to drop the built-in default)") -%}
+      {%-   elif (v is ansible.builtin.number) and (k == 'OnCalendar') -%}
+      {%-     set _ = ns.items.append(k ~ " (takes a calendar expression string)") -%}
+      {%-   elif is_seq -%}
+      {%-     for e in v -%}
+      {%-       set e_seq = (e is ansible.builtin.iterable) and (e is not ansible.builtin.string) -%}
+      {%-       if (e is ansible.builtin.boolean) or e_seq or (e is none)
+                    or ((e is ansible.builtin.string) and ((e | ansible.builtin.trim | ansible.builtin.length) == 0))
+                    or ((e is ansible.builtin.number) and (k == 'OnCalendar')) -%}
+      {%-         set _ = ns.items.append(k ~ " (list entry " ~ loop.index ~ " is not a usable trigger value)") -%}
+      {%-       endif -%}
+      {%-     endfor -%}
       {%-   endif -%}
       {%- endfor -%}
       {{ ns.items }}
+
+
+# Mirrors the conditions under which the automatic update timer is actually managed in the
+# config tasks, so settings the role will not render are not rejected.
+- name: "Init | Assert the automatic update timer keeps at least one trigger"
+  ansible.builtin.assert:
+    that:
+      - __auto_update_linux_timer_update_has_trigger | ansible.builtin.bool
+    fail_msg: >-
+      The merged timer settings for the automatic update timer configure no trigger at all
+      (e.g. every repeatable trigger was dropped via an empty list and no event
+      trigger is true). The timer would be enabled but never fire; configure at
+      least one trigger.
+    success_msg: "The automatic update timer keeps at least one trigger."
+  vars:
+    __auto_update_linux_timer_trigger_directives:
+      - "OnCalendar"
+      - "OnActiveSec"
+      - "OnBootSec"
+      - "OnStartupSec"
+      - "OnUnitActiveSec"
+      - "OnUnitInactiveSec"
+    __auto_update_linux_timer_event_trigger_directives:
+      - "OnClockChange"
+      - "OnTimezoneChange"
+    __auto_update_linux_timer_update_has_trigger: >-
+      {%- set ns = namespace(found=false) -%}
+      {%- for k, v in (__auto_update_linux_effective_timer_settings | ansible.builtin.default({})).items() -%}
+      {%-   if k in __auto_update_linux_timer_trigger_directives -%}
+      {%-     set is_seq = (v is ansible.builtin.iterable)
+                            and (v is not ansible.builtin.string)
+                            and (v is not ansible.builtin.mapping) -%}
+      {%-     if is_seq -%}
+      {%-       if (v | ansible.builtin.length) > 0 -%}{%- set ns.found = true -%}{%- endif -%}
+      {%-     elif (v is ansible.builtin.string) -%}
+      {%-       if (v | ansible.builtin.trim | ansible.builtin.length) > 0 -%}{%- set ns.found = true -%}{%- endif -%}
+      {%-     elif (v is ansible.builtin.number) and (v is not ansible.builtin.boolean) -%}
+      {%-       set ns.found = true -%}
+      {%-     endif -%}
+      {%-   elif (k in __auto_update_linux_timer_event_trigger_directives)
+                 and (v is ansible.builtin.boolean) and v -%}
+      {%-     set ns.found = true -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ ns.found }}
+  when:
+    - auto_update_linux_service_state != 'unmanaged'
+    - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
+    - (__auto_update_linux_systemd_timer_unit_name | ansible.builtin.length) > 0
+
+
+# Mirrors the conditions under which the scheduled reboot timer is actually managed in the
+# config tasks, so settings the role will not render are not rejected.
+- name: "Init | Assert the scheduled reboot timer keeps at least one trigger"
+  ansible.builtin.assert:
+    that:
+      - __auto_update_linux_timer_reboot_has_trigger | ansible.builtin.bool
+    fail_msg: >-
+      The merged timer settings for the scheduled reboot timer configure no trigger at all
+      (e.g. every repeatable trigger was dropped via an empty list and no event
+      trigger is true). The timer would be enabled but never fire; configure at
+      least one trigger.
+    success_msg: "The scheduled reboot timer keeps at least one trigger."
+  vars:
+    __auto_update_linux_timer_trigger_directives:
+      - "OnCalendar"
+      - "OnActiveSec"
+      - "OnBootSec"
+      - "OnStartupSec"
+      - "OnUnitActiveSec"
+      - "OnUnitInactiveSec"
+    __auto_update_linux_timer_event_trigger_directives:
+      - "OnClockChange"
+      - "OnTimezoneChange"
+    __auto_update_linux_timer_reboot_has_trigger: >-
+      {%- set ns = namespace(found=false) -%}
+      {%- for k, v in (__auto_update_linux_effective_reboot_timer_settings | ansible.builtin.default({})).items() -%}
+      {%-   if k in __auto_update_linux_timer_trigger_directives -%}
+      {%-     set is_seq = (v is ansible.builtin.iterable)
+                            and (v is not ansible.builtin.string)
+                            and (v is not ansible.builtin.mapping) -%}
+      {%-     if is_seq -%}
+      {%-       if (v | ansible.builtin.length) > 0 -%}{%- set ns.found = true -%}{%- endif -%}
+      {%-     elif (v is ansible.builtin.string) -%}
+      {%-       if (v | ansible.builtin.trim | ansible.builtin.length) > 0 -%}{%- set ns.found = true -%}{%- endif -%}
+      {%-     elif (v is ansible.builtin.number) and (v is not ansible.builtin.boolean) -%}
+      {%-       set ns.found = true -%}
+      {%-     endif -%}
+      {%-   elif (k in __auto_update_linux_timer_event_trigger_directives)
+                 and (v is ansible.builtin.boolean) and v -%}
+      {%-     set ns.found = true -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ ns.found }}
+  when:
+    - auto_update_linux_reboot == 'scheduled'
+    - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'

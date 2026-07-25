@@ -19,8 +19,9 @@ Documentation=https://foundata.com/en/projects/ansible-collection-linux/
 
 [Timer]
 {# Same value contract as the drop-in template: repeatable trigger directives
-   accept a list and render one assignment per item. No reset line is needed
-   here, this is a role-owned unit without a vendor trigger to replace. #}
+   accept a list and render one assignment per item, and an empty list drops
+   the built-in default for that directive. No reset line is needed here, this
+   is a role-owned unit without a vendor trigger to replace. #}
 {% for key, value in (tpl_reboot_timer_settings | default({})).items() %}
 {% if (key in tpl_timer_trigger_directives) and (value is ansible.builtin.iterable)
       and (value is not ansible.builtin.string) and (value is not ansible.builtin.mapping) %}

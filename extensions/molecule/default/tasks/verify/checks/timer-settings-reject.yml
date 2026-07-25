@@ -1,0 +1,49 @@
+# Included in a loop from role-auto_update.yml, once per __testing_reject_case
+# ({varname, label, settings}). Applies invalid timer settings, runs the role's
+# init and expects it to fail in the timer settings validation. The previous
+# value is restored afterwards, so later tasks keep seeing the converge state.
+
+- name: "Molecule | Verify | Timer reject | save the current settings: {{ __testing_reject_case['label'] }}"
+  ansible.builtin.set_fact:
+    __testing_reject_saved: "{{ lookup('ansible.builtin.vars', __testing_reject_case['varname'], default={}) }}"
+
+
+- name: "Molecule | Verify | Timer reject | apply the invalid settings: {{ __testing_reject_case['label'] }}"
+  ansible.builtin.set_fact:
+    "{{ __testing_reject_case['varname'] }}": "{{ __testing_reject_case['settings'] }}"
+
+
+- name: "Molecule | Verify | Timer reject | run init and expect rejection: {{ __testing_reject_case['label'] }}"
+  block:
+
+    - name: "Molecule | Verify | Timer reject | include the role's init: {{ __testing_reject_case['label'] }}"
+      ansible.builtin.include_role:
+        name: "foundata.linux.auto_update"
+        tasks_from: "init"
+
+    - name: "Molecule | Verify | Timer reject | fail because the settings were accepted: {{ __testing_reject_case['label'] }}"
+      ansible.builtin.fail:
+        msg: >-
+          The invalid timer settings '{{ __testing_reject_case['settings'] }}' for
+          '{{ __testing_reject_case['varname'] }}' were accepted by the role's init.
+
+  rescue:
+
+    - name: "Molecule | Verify | Timer reject | assert init failed in the timer validation: {{ __testing_reject_case['label'] }}"
+      ansible.builtin.assert:
+        that:
+          - >-
+            (ansible_failed_task['name'] | ansible.builtin.default(''))
+            is ansible.builtin.search('timer settings use supported value types|keeps at least one trigger')
+        fail_msg: >-
+          The run failed, but not in the timer settings validation as expected
+          (failed task: '{{ ansible_failed_task['name'] | ansible.builtin.default('unknown') }}').
+        success_msg: >-
+          The invalid timer settings were rejected by the role's init
+          ('{{ ansible_failed_task['name'] | ansible.builtin.default('') }}').
+
+  always:
+
+    - name: "Molecule | Verify | Timer reject | restore the saved settings: {{ __testing_reject_case['label'] }}"
+      ansible.builtin.set_fact:
+        "{{ __testing_reject_case['varname'] }}": "{{ __testing_reject_saved }}"
