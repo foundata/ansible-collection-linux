@@ -170,7 +170,7 @@
         that:
           - __testing_active_params['results'][0]['stdout'] == "0"
           - __testing_active_params['results'][1]['stdout'] == "1"
-          - __testing_active_params['results'][1]['stdout'] == "12288"
+          - __testing_active_params['results'][2]['stdout'] == "12288"
         fail_msg: "Active kernel parameters do not match expected values."
         success_msg: "All active kernel parameters have the expected values."
 
