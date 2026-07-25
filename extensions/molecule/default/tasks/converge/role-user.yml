@@ -26,6 +26,26 @@
             - key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMULmKMeqE3+4OVsbn6Ec0/sCQDJc8ktt6zfFIYyHzLV molecule_2@example.com"
           ssh_authorized_keys_delete_unmanaged: true
         - name: "molecule_testuser2"
+          # password aging, applied via chage by the role
+          password:
+            hash: "$6$moleculetest$nbNgUKgZym1gtdQmBAwjkcGE/SLsIl7pHLZ/K2w9c8fZdwfqRwvohaOkAE2LbvmO3FqI9fFo5KO6CLw/lESui0"
+            expire_min: 7
+            expire_max: 90
+            expire_warn: 14
+        - name: "molecule_lockeduser"
+          # a locked account keeps its hash but gets it prefixed with "!"
+          password:
+            hash: "$6$moleculetest$nbNgUKgZym1gtdQmBAwjkcGE/SLsIl7pHLZ/K2w9c8fZdwfqRwvohaOkAE2LbvmO3FqI9fFo5KO6CLw/lESui0"
+            lock: true
+        - name: "molecule_keyabsent"
+          # per-key removal is only meaningful without the exclusive purge, so
+          # this account keeps ssh_authorized_keys_delete_unmanaged at its
+          # built-in default (false) and the unmanaged key seeded in prepare
+          # must survive.
+          ssh_authorized_keys:
+            - key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL5q4ynPj/1K0shilgXcOUS6UK4H1SxftAxdWqznRon2 molecule_keep@example.com"
+            - key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPCKwsfPvV0FPdHtrqpD2M3kq7hqzZQSACqe91lubnBz molecule_remove@example.com"
+              state: "absent"
         - name: "molecule_keyuser"
           ssh_authorized_keys:
             - key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKR6FdXomFQ1h6RmzQxN4GWmqgV/GXE9RNOBh0iMQgEQ molecule_key@example.com"

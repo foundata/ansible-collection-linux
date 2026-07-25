@@ -126,3 +126,27 @@
     user: "molecule_keyuser"
     key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILmFhCG3dipt7baMWEJOo9chtWBt+rpTsltkYcnd4jcu molecule_stray@example.com"
     state: "present"
+
+
+# Counterpart to molecule_keyuser: that account runs with
+# ssh_authorized_keys_delete_unmanaged set to true (exclusive purge), this one
+# with false. Both keys are seeded here so the role has something to actually
+# remove (a per-key "state: absent" against a non-existent key would pass
+# vacuously) and something it must keep its hands off.
+- name: "Molecule | Prepare | user | Create an account for per-key removal without exclusive purge"
+  ansible.builtin.user:
+    name: "molecule_keyabsent"
+    shell: "/bin/bash"
+    state: "present"
+
+
+- name: "Molecule | Prepare | user | Add the authorized_keys the role must remove and preserve"
+  ansible.posix.authorized_key:
+    user: "molecule_keyabsent"
+    key: "{{ item }}"
+    state: "present"
+  loop:
+    # removed by the role via a per-key "state: absent"
+    - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPCKwsfPvV0FPdHtrqpD2M3kq7hqzZQSACqe91lubnBz molecule_remove@example.com"
+    # unmanaged: must survive because delete_unmanaged is false for this account
+    - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGo3ZYAUdoTQIf26vXtpPF5hoQ8OuLo5Ufcs+ZZE26Je molecule_stray@example.com"

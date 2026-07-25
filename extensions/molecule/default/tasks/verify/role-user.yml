@@ -19,12 +19,13 @@
     }}
 
 
-- name: "Molecule | Verify | user | Gather the passwd and group databases"
+- name: "Molecule | Verify | user | Gather the passwd, group and shadow databases"
   ansible.builtin.getent:
     database: "{{ item }}"
   loop:
     - "passwd"
     - "group"
+    - "shadow"
 
 
 - name: "Molecule | Verify | user | Assert accounts and groups are in their expected state"
@@ -35,6 +36,8 @@
       - "ansible_facts['getent_passwd']['molecule_testuser1'][1] == '4001'"
       - "'molecule_testuser2' in ansible_facts['getent_passwd']"
       - "'molecule_keyuser' in ansible_facts['getent_passwd']"
+      - "'molecule_lockeduser' in ansible_facts['getent_passwd']"
+      - "'molecule_keyabsent' in ansible_facts['getent_passwd']"
       # supplementary group membership
       - "'molecule_testuser1' in (ansible_facts['getent_group']['molecule_testops'][2] | ansible.builtin.default(''))"
       - "ansible_facts['getent_group']['molecule_testops'][1] == '4321'"
@@ -49,6 +52,58 @@
       - "ansible_facts['user_id'] in ansible_facts['getent_passwd']"
     fail_msg: "Accounts or groups are not in the expected state after running the role."
     success_msg: "All accounts and groups are in the expected state."
+
+
+# The getent module keys each entry by its first field and keeps the remaining
+# ones as a list, so for /etc/shadow (name:hash:lastchg:min:max:warn:...) index
+# 0 is the hash and 2/3/4 are the aging fields chage maintains.
+- name: "Molecule | Verify | user | Assert the password hash, lock state and aging fields reached /etc/shadow"
+  vars:
+    __testing_expected_hash: "$6$moleculetest$nbNgUKgZym1gtdQmBAwjkcGE/SLsIl7pHLZ/K2w9c8fZdwfqRwvohaOkAE2LbvmO3FqI9fFo5KO6CLw/lESui0"
+    __testing_testuser1_shadow: "{{ ansible_facts['getent_shadow']['molecule_testuser1'] }}"
+    __testing_testuser2_shadow: "{{ ansible_facts['getent_shadow']['molecule_testuser2'] }}"
+    __testing_locked_shadow: "{{ ansible_facts['getent_shadow']['molecule_lockeduser'] }}"
+  ansible.builtin.assert:
+    that:
+      # the configured hash is stored verbatim and is not locked
+      - "__testing_testuser1_shadow[0] == __testing_expected_hash"
+      # locking keeps the hash but disables password login by prefixing it
+      - "__testing_locked_shadow[0] == ('!' ~ __testing_expected_hash)"
+      # password aging (chage -m / -M / -W)
+      - "__testing_testuser2_shadow[2] == '7'"
+      - "__testing_testuser2_shadow[3] == '90'"
+      - "__testing_testuser2_shadow[4] == '14'"
+    fail_msg: >-
+      The password hash, lock state or aging fields in /etc/shadow do not match the
+      configured values.
+    success_msg: >-
+      The password hash is stored verbatim, the locked account keeps its hash behind a
+      '!' prefix and the aging fields match the configured values.
+
+
+- name: "Molecule | Verify | user | Read authorized_keys of molecule_keyabsent"
+  ansible.builtin.slurp:
+    src: "/home/molecule_keyabsent/.ssh/authorized_keys"
+  register: __testing_keyabsent_keys
+
+
+- name: "Molecule | Verify | user | Assert per-key removal keeps unmanaged keys (delete_unmanaged is false)"
+  vars:
+    __testing_keyabsent_ak: "{{ __testing_keyabsent_keys['content'] | ansible.builtin.b64decode }}"
+  ansible.builtin.assert:
+    that:
+      # the managed key is present
+      - "'AAAAC3NzaC1lZDI1NTE5AAAAIL5q4ynPj/1K0shilgXcOUS6UK4H1SxftAxdWqznRon2' in __testing_keyabsent_ak"
+      # the key declared with "state: absent" was removed
+      - "'AAAAC3NzaC1lZDI1NTE5AAAAIPCKwsfPvV0FPdHtrqpD2M3kq7hqzZQSACqe91lubnBz' not in __testing_keyabsent_ak"
+      # the unmanaged key survived, as delete_unmanaged is false for this account
+      - "'AAAAC3NzaC1lZDI1NTE5AAAAIGo3ZYAUdoTQIf26vXtpPF5hoQ8OuLo5Ufcs+ZZE26Je' in __testing_keyabsent_ak"
+    fail_msg: >-
+      The authorized_keys of molecule_keyabsent are wrong: the key declared with
+      'state: absent' must be gone while the managed and the unmanaged keys must remain.
+    success_msg: >-
+      The key declared with 'state: absent' was removed while the managed and the
+      unmanaged key were kept.
 
 
 - name: "Molecule | Verify | user | Stat the home directory of molecule_testuser1"
