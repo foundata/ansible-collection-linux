@@ -1,0 +1,11 @@
+---
+
+security_fixes:
+  - >
+    ``user`` - Malformed ``user_linux_uid_min`` or ``user_linux_uid_max`` values
+    (for example ``"1o00"``) were silently converted to ``0``, which could widen
+    the UID range used by ``user_linux_accounts_delete_unmanaged`` and make
+    system accounts candidates for deletion. The role now fails fast when these
+    variables are neither empty nor a non-negative integer, and additionally
+    fails when the effective ``UID_MIN`` is greater than the effective
+    ``UID_MAX``.

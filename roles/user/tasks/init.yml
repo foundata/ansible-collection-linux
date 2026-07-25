@@ -171,6 +171,27 @@
     label: "{{ __user_linux_pw_item['name'] }}"
 
 
+- name: "Init | Assert user_linux_uid_min and user_linux_uid_max are empty or non-negative integers"
+  ansible.builtin.assert:
+    that:
+      # "| int" silently turns malformed values (e.g. "1o00") into 0, which
+      # would widen the reaping range down to system accounts. Fail fast on
+      # anything that is neither empty nor a plain non-negative integer.
+      - >-
+        ((user_linux_uid_min | string | ansible.builtin.length) == 0)
+        or ((user_linux_uid_min | string) is ansible.builtin.match('^[0-9]+$'))
+      - >-
+        ((user_linux_uid_max | string | ansible.builtin.length) == 0)
+        or ((user_linux_uid_max | string) is ansible.builtin.match('^[0-9]+$'))
+    fail_msg: >-
+      user_linux_uid_min and user_linux_uid_max must be empty (to read the value from
+      login.defs) or a non-negative integer. Got user_linux_uid_min={{ user_linux_uid_min | string }},
+      user_linux_uid_max={{ user_linux_uid_max | string }}.
+    success_msg: "user_linux_uid_min and user_linux_uid_max are empty or non-negative integers."
+  when:
+    - user_linux_accounts_delete_unmanaged | ansible.builtin.bool
+
+
 - name: "Init | Read login.defs (only when reaping; tolerate a missing file)"
   ansible.builtin.slurp:
     src: "{{ __user_linux_login_defs_path }}"
@@ -201,5 +222,19 @@
         else (((__user_linux_login_defs_raw['content'] | ansible.builtin.default('') | ansible.builtin.b64decode
                 | ansible.builtin.regex_findall('(?m)^\s*UID_MAX\s+(\d+)')) + ['60000']) | first | int)
       }}
+  when:
+    - user_linux_accounts_delete_unmanaged | ansible.builtin.bool
+
+
+- name: "Init | Assert the effective UID range is sane (UID_MIN <= UID_MAX)"
+  ansible.builtin.assert:
+    that:
+      - (__user_linux_uid_min_effective | int) <= (__user_linux_uid_max_effective | int)
+    fail_msg: >-
+      The effective UID range for account reaping is invalid:
+      UID_MIN={{ __user_linux_uid_min_effective }} is greater than
+      UID_MAX={{ __user_linux_uid_max_effective }}. Check user_linux_uid_min,
+      user_linux_uid_max and /etc/login.defs.
+    success_msg: "Effective UID range for account reaping: {{ __user_linux_uid_min_effective }}-{{ __user_linux_uid_max_effective }}."
   when:
     - user_linux_accounts_delete_unmanaged | ansible.builtin.bool

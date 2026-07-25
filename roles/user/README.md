@@ -825,6 +825,8 @@ Lower bound (inclusive) of the UID range that
 `user_linux_accounts_delete_unmanaged` considers to be regular user accounts.
 An empty string (the default) means the value is read from `UID_MIN` in
 `/etc/login.defs` (falling back to `1000` if it cannot be determined).
+Any other value must be a non-negative integer; the role fails on
+malformed values instead of silently misinterpreting them.
 
 - **Type**: `raw`
 - **Required**: No
@@ -840,7 +842,8 @@ Upper bound (inclusive) of the UID range that
 `user_linux_accounts_delete_unmanaged` considers to be regular user
 accounts. An empty string (the default) means the value is read from
 `UID_MAX` in `/etc/login.defs` (falling back to `60000` if it cannot be
-determined).
+determined). Any other value must be a non-negative integer; the role
+fails on malformed values instead of silently misinterpreting them.
 
 - **Type**: `raw`
 - **Required**: No
