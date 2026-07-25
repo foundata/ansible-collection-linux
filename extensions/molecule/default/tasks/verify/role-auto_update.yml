@@ -293,6 +293,37 @@
     success_msg: "The reboot timer '{{ __auto_update_linux_reboot_timer_unit_name }}' is enabled."
 
 
+# The role owns this unit completely, so there is no vendor schedule to
+# accumulate with and no reset is needed. The parsed schedule is still worth
+# asserting: the checks above only prove that the expected text is in the file
+# and that the unit is enabled, which both hold even when systemd rejected the
+# OnCalendar expression or never reloaded the unit. In that case the timer stays
+# enabled and simply never fires.
+- name: "Molecule | Verify | Get the effective calendar schedule of the scheduled reboot timer"
+  ansible.builtin.command:
+    argv:
+      - "systemctl"
+      - "show"
+      - "--property=TimersCalendar"
+      - "{{ __auto_update_linux_reboot_timer_unit_name }}"
+  register: __testing_reboot_timer_calendar
+  changed_when:
+    - false
+
+
+- name: "Molecule | Verify | Assert the scheduled reboot timer runs on the configured schedule"
+  ansible.builtin.assert:
+    that:
+      - "'04:30:00' in __testing_reboot_timer_calendar['stdout']"
+      - "(__testing_reboot_timer_calendar['stdout'] | ansible.builtin.regex_findall('OnCalendar=') | ansible.builtin.length) == 1"
+    fail_msg: >-
+      The reboot timer '{{ __auto_update_linux_reboot_timer_unit_name }}' has no or an unexpected
+      effective schedule. Got '{{ __testing_reboot_timer_calendar['stdout'] }}'.
+    success_msg: >-
+      The reboot timer '{{ __auto_update_linux_reboot_timer_unit_name }}' runs on the configured
+      schedule ('{{ __testing_reboot_timer_calendar['stdout'] }}').
+
+
 ## Regression tests: init-only merged variable evaluation
 #
 # Re-run the role's init with controlled inputs and assert the merged timer
