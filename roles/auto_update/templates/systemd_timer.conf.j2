@@ -41,7 +41,7 @@
     this branch is currently always taken; the guard keeps the template correct
     if it is ever rendered with a mapping that configures no trigger at all. -#}
 {%- set tpl_timer_ns = namespace(has_trigger=false) -%}
-{%- for key, value in (tpl_timer_settings | default({})).items() -%}
+{%- for key, value in (tpl_timer_settings | ansible.builtin.default({})).items() -%}
 {%-   if key in tpl_timer_trigger_directives -%}
 {%-     set tpl_timer_is_seq = (value is ansible.builtin.iterable)
                                and (value is not ansible.builtin.string)
@@ -70,13 +70,13 @@ OnCalendar=
     OnTimezoneChange render as plain assignments; a true value counts as a
     trigger, so an event-only timer still gets the reset line that drops the
     vendor schedule. -#}
-{% for key, value in (tpl_timer_settings | default({})).items() %}
+{% for key, value in (tpl_timer_settings | ansible.builtin.default({})).items() %}
 {% if (key in tpl_timer_trigger_directives) and (value is ansible.builtin.iterable)
       and (value is not ansible.builtin.string) and (value is not ansible.builtin.mapping) %}
 {% for tpl_timer_entry in value %}
 {{ key }}={{ tpl_timer_entry }}
 {% endfor %}
 {% else %}
-{{ key }}={{ value | ternary('true', 'false') if value is ansible.builtin.boolean else value }}
+{{ key }}={{ value | ansible.builtin.ternary('true', 'false') if value is ansible.builtin.boolean else value }}
 {% endif %}
 {% endfor %}

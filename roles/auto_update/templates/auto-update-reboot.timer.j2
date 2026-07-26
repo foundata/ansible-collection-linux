@@ -22,14 +22,14 @@ Documentation=https://foundata.com/en/projects/ansible-collection-linux/
    accept a list and render one assignment per item, and an empty list drops
    the built-in default for that directive. No reset line is needed here, this
    is a role-owned unit without a vendor trigger to replace. #}
-{% for key, value in (tpl_reboot_timer_settings | default({})).items() %}
+{% for key, value in (tpl_reboot_timer_settings | ansible.builtin.default({})).items() %}
 {% if (key in tpl_timer_trigger_directives) and (value is ansible.builtin.iterable)
       and (value is not ansible.builtin.string) and (value is not ansible.builtin.mapping) %}
 {% for tpl_timer_entry in value %}
 {{ key }}={{ tpl_timer_entry }}
 {% endfor %}
 {% else %}
-{{ key }}={{ value | ternary('true', 'false') if value is ansible.builtin.boolean else value }}
+{{ key }}={{ value | ansible.builtin.ternary('true', 'false') if value is ansible.builtin.boolean else value }}
 {% endif %}
 {% endfor %}
 

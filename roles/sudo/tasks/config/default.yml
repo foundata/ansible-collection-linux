@@ -117,7 +117,7 @@
     __sudo_linux_defaults_has_content: >-
       {{
         (sudo_linux_defaults | ansible.builtin.default([]) | ansible.builtin.length) > 0
-        or (sudo_linux_extra_content | ansible.builtin.default('') | trim | ansible.builtin.length) > 0
+        or (sudo_linux_extra_content | ansible.builtin.default('') | ansible.builtin.trim | ansible.builtin.length) > 0
       }}
 
 

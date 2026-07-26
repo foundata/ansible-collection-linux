@@ -10,17 +10,17 @@
 # {{ ansible_managed }}
 
 Unattended-Upgrade::Origins-Pattern {
-{% for origin in __auto_update_linux_apt_origins_security | default([]) %}
+{% for origin in __auto_update_linux_apt_origins_security | ansible.builtin.default([]) %}
     "{{ origin }}";
 {% endfor %}
 {% if auto_update_linux_type == 'all' %}
-{% for origin in __auto_update_linux_apt_origins_all_extra | default([]) %}
+{% for origin in __auto_update_linux_apt_origins_all_extra | ansible.builtin.default([]) %}
     "{{ origin }}";
 {% endfor %}
 {% endif %}
 };
 
-{% if (auto_update_linux_exclude | length) > 0 %}
+{% if (auto_update_linux_exclude | ansible.builtin.length) > 0 %}
 Unattended-Upgrade::Package-Blacklist {
 {% for pkg in auto_update_linux_exclude %}
     "{{ pkg }}";
@@ -29,12 +29,12 @@ Unattended-Upgrade::Package-Blacklist {
 {% endif %}
 Unattended-Upgrade::Download-Only "{{ 'true' if auto_update_linux_apply in ['download', 'notify'] else 'false' }}";
 Unattended-Upgrade::Automatic-Reboot "{{ 'true' if auto_update_linux_reboot == 'immediate' else 'false' }}";
-{% if (auto_update_linux_notify_email | length) > 0 %}
+{% if (auto_update_linux_notify_email | ansible.builtin.length) > 0 %}
 Unattended-Upgrade::Mail "{{ auto_update_linux_notify_email }}";
 Unattended-Upgrade::MailReport "on-change";
 {% endif %}
-{% set _extra = auto_update_linux_extra_config['unattended-upgrades'] | default({}) %}
-{% if (_extra | length) > 0 %}
+{% set _extra = auto_update_linux_extra_config['unattended-upgrades'] | ansible.builtin.default({}) %}
+{% if (_extra | ansible.builtin.length) > 0 %}
 
 // Additional options from auto_update_linux_extra_config['unattended-upgrades']
 {% for key, value in _extra.items() %}

@@ -7,4 +7,4 @@
 -#}
 # {{ ansible_managed }}
 APT::Periodic::Update-Package-Lists "1";
-APT::Periodic::Unattended-Upgrade "{{ tpl_unattended_upgrade | default('1') }}";
+APT::Periodic::Unattended-Upgrade "{{ tpl_unattended_upgrade | ansible.builtin.default('1') }}";

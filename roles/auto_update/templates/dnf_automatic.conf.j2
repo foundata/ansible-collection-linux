@@ -7,8 +7,8 @@
   merged on top so it takes precedence.
 -#}
 # {{ ansible_managed }}
-{% set extra = auto_update_linux_extra_config['dnf-automatic'] | default({}) %}
-{% set emit_via = 'email' if (auto_update_linux_notify_email | length) > 0
+{% set extra = auto_update_linux_extra_config['dnf-automatic'] | ansible.builtin.default({}) %}
+{% set emit_via = 'email' if (auto_update_linux_notify_email | ansible.builtin.length) > 0
    else ('motd' if auto_update_linux_apply == 'notify' else 'stdio') %}
 {% set sections = {
      'commands': {
@@ -21,16 +21,16 @@
        'emit_via': emit_via,
      },
    } %}
-{% if (auto_update_linux_exclude | length) > 0 %}
-{%   set sections = sections | ansible.builtin.combine({'base': {'exclude': auto_update_linux_exclude | join(' ')}}) %}
+{% if (auto_update_linux_exclude | ansible.builtin.length) > 0 %}
+{%   set sections = sections | ansible.builtin.combine({'base': {'exclude': auto_update_linux_exclude | ansible.builtin.join(' ')}}) %}
 {% endif %}
-{% if (auto_update_linux_notify_email | length) > 0 %}
+{% if (auto_update_linux_notify_email | ansible.builtin.length) > 0 %}
 {%   set sections = sections | ansible.builtin.combine({'email': {'email_from': 'root', 'email_to': auto_update_linux_notify_email}}) %}
 {% endif %}
-{% set section_names = ((sections.keys() | list) + (extra.keys() | list)) | unique %}
+{% set section_names = ((sections.keys() | ansible.builtin.list) + (extra.keys() | ansible.builtin.list)) | ansible.builtin.unique %}
 {% for section in section_names %}
 [{{ section }}]
-{% set merged = (sections[section] | default({})) | ansible.builtin.combine(extra[section] | default({})) %}
+{% set merged = (sections[section] | ansible.builtin.default({})) | ansible.builtin.combine(extra[section] | ansible.builtin.default({})) %}
 {% for key, value in merged.items() %}
 {{ key }} = {{ value }}
 {% endfor %}

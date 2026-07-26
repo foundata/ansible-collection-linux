@@ -106,10 +106,10 @@ SSH key restrictions are applied per account):
           - name: "ahaerter"
             comment: "A. Haerter (foundata)"
             groups:
-              - "{{ (ansible_facts['os_family'] == 'Debian') | ternary('sudo', 'wheel') }}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
+              - "{{ (ansible_facts['os_family'] == 'Debian') | ansible.builtin.ternary('sudo', 'wheel') }}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
               - "webops"
             password:
-              hash: "{{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }}"
+              hash: "{{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | ansible.builtin.trim }}"
             ssh_authorized_keys:
               - key: "ssh-ed25519 AAAAC3Nz... foo@example.com"
 
@@ -118,7 +118,7 @@ SSH key restrictions are applied per account):
             groups:
               - "webops"
             password:
-              hash: "{{ lookup('ansible.builtin.unvault', 'secrets/jdoe-hash.vault') | trim }}"
+              hash: "{{ lookup('ansible.builtin.unvault', 'secrets/jdoe-hash.vault') | ansible.builtin.trim }}"
             ssh_authorized_keys:
               # Only allow this key from the office network.
               - key: "ssh-ed25519 AAAAC3Nz... jdoe@example.com"
@@ -312,9 +312,9 @@ user_linux_accounts:
     state: "present"
     comment: "Andreas Haerter (foundata)"
     groups:
-      - "{\{ (ansible_facts['os_family'] == 'Debian') | ternary('sudo', 'wheel') }\}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
+      - "{\{ (ansible_facts['os_family'] == 'Debian') | ansible.builtin.ternary('sudo', 'wheel') }\}" # 'sudo' on Debian/Ubuntu, 'wheel' elsewhere
     password:
-      hash: "{\{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | trim }\}"
+      hash: "{\{ lookup('ansible.builtin.unvault', 'secrets/ahaerter-hash.vault') | ansible.builtin.trim }\}"
       update: "always"
     ssh_authorized_keys:
       - key: "ssh-ed25519 AAAAC3Nz..."

@@ -5,7 +5,7 @@
 {% for __sudo_linux_default in sudo_linux_defaults | ansible.builtin.default([]) %}
 Defaults {{ __sudo_linux_default }}
 {% endfor %}
-{% if (sudo_linux_extra_content | ansible.builtin.default('') | trim | length) > 0 %}
+{% if (sudo_linux_extra_content | ansible.builtin.default('') | ansible.builtin.trim | ansible.builtin.length) > 0 %}
 
-{{ sudo_linux_extra_content | trim }}
+{{ sudo_linux_extra_content | ansible.builtin.trim }}
 {% endif %}

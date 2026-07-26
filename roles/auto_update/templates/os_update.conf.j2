@@ -10,7 +10,7 @@
 # {{ ansible_managed }}
 UPDATE_CMD="{{ 'security' if auto_update_linux_type == 'security' else 'auto' }}"
 REBOOT_CMD="{{ 'auto' if auto_update_linux_reboot == 'immediate' else 'none' }}"
-{% set extra = auto_update_linux_extra_config['os-update'] | default({}) %}
+{% set extra = auto_update_linux_extra_config['os-update'] | ansible.builtin.default({}) %}
 {% for key, value in extra.items() %}
 {{ key }}="{{ value }}"
 {% endfor %}

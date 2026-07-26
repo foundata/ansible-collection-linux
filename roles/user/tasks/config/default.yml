@@ -259,8 +259,8 @@
         __user_linux_reap_candidates: >-
           {%- set __ns = namespace(names=[]) -%}
           {%- for __pw in (ansible_facts['getent_passwd'] | ansible.builtin.default({}) | ansible.builtin.dict2items) -%}
-          {%-   if ((__pw['value'][1] | int) >= (__user_linux_uid_min_effective | int))
-                  and ((__pw['value'][1] | int) <= (__user_linux_uid_max_effective | int))
+          {%-   if ((__pw['value'][1] | ansible.builtin.int) >= (__user_linux_uid_min_effective | ansible.builtin.int))
+                  and ((__pw['value'][1] | ansible.builtin.int) <= (__user_linux_uid_max_effective | ansible.builtin.int))
                   and (__pw['key'] not in __user_linux_reap_protected) -%}
           {%-     set _ = __ns.names.append(__pw['key']) -%}
           {%-   endif -%}

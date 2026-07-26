@@ -53,10 +53,10 @@
     __user_linux_matched_versions: >-
       {{
         __user_linux_supported_platforms
-        | ansible.builtin.selectattr('name', 'match', __user_linux_platform_names_regex, ignorecase=true)
+        | ansible.builtin.selectattr('name', 'ansible.builtin.match', __user_linux_platform_names_regex, ignorecase=true)
         | ansible.builtin.map(attribute='versions')
         | ansible.builtin.flatten
-        | ansible.builtin.select('match', __user_linux_platform_versions_regex, ignorecase=true)
+        | ansible.builtin.select('ansible.builtin.match', __user_linux_platform_versions_regex, ignorecase=true)
         | ansible.builtin.list
       }}
   when:
@@ -178,15 +178,15 @@
       # would widen the reaping range down to system accounts. Fail fast on
       # anything that is neither empty nor a plain non-negative integer.
       - >-
-        ((user_linux_uid_min | string | ansible.builtin.length) == 0)
-        or ((user_linux_uid_min | string) is ansible.builtin.match('^[0-9]+$'))
+        ((user_linux_uid_min | ansible.builtin.string | ansible.builtin.length) == 0)
+        or ((user_linux_uid_min | ansible.builtin.string) is ansible.builtin.match('^[0-9]+$'))
       - >-
-        ((user_linux_uid_max | string | ansible.builtin.length) == 0)
-        or ((user_linux_uid_max | string) is ansible.builtin.match('^[0-9]+$'))
+        ((user_linux_uid_max | ansible.builtin.string | ansible.builtin.length) == 0)
+        or ((user_linux_uid_max | ansible.builtin.string) is ansible.builtin.match('^[0-9]+$'))
     fail_msg: >-
       user_linux_uid_min and user_linux_uid_max must be empty (to read the value from
-      login.defs) or a non-negative integer. Got user_linux_uid_min={{ user_linux_uid_min | string }},
-      user_linux_uid_max={{ user_linux_uid_max | string }}.
+      login.defs) or a non-negative integer. Got user_linux_uid_min={{ user_linux_uid_min | ansible.builtin.string }},
+      user_linux_uid_max={{ user_linux_uid_max | ansible.builtin.string }}.
     success_msg: "user_linux_uid_min and user_linux_uid_max are empty or non-negative integers."
   when:
     - user_linux_accounts_delete_unmanaged | ansible.builtin.bool
@@ -210,17 +210,17 @@
     # "+ ['<fallback>']" guarantees a value when there is no matching line.
     __user_linux_uid_min_effective: >-
       {{
-        (user_linux_uid_min | int)
-        if ((user_linux_uid_min | string | ansible.builtin.length) > 0)
+        (user_linux_uid_min | ansible.builtin.int)
+        if ((user_linux_uid_min | ansible.builtin.string | ansible.builtin.length) > 0)
         else (((__user_linux_login_defs_raw['content'] | ansible.builtin.default('') | ansible.builtin.b64decode
-                | ansible.builtin.regex_findall('(?m)^\s*UID_MIN\s+(\d+)')) + ['1000']) | first | int)
+                | ansible.builtin.regex_findall('(?m)^\s*UID_MIN\s+(\d+)')) + ['1000']) | ansible.builtin.first | ansible.builtin.int)
       }}
     __user_linux_uid_max_effective: >-
       {{
-        (user_linux_uid_max | int)
-        if ((user_linux_uid_max | string | ansible.builtin.length) > 0)
+        (user_linux_uid_max | ansible.builtin.int)
+        if ((user_linux_uid_max | ansible.builtin.string | ansible.builtin.length) > 0)
         else (((__user_linux_login_defs_raw['content'] | ansible.builtin.default('') | ansible.builtin.b64decode
-                | ansible.builtin.regex_findall('(?m)^\s*UID_MAX\s+(\d+)')) + ['60000']) | first | int)
+                | ansible.builtin.regex_findall('(?m)^\s*UID_MAX\s+(\d+)')) + ['60000']) | ansible.builtin.first | ansible.builtin.int)
       }}
   when:
     - user_linux_accounts_delete_unmanaged | ansible.builtin.bool
@@ -229,7 +229,7 @@
 - name: "Init | Assert the effective UID range is sane (UID_MIN <= UID_MAX)"
   ansible.builtin.assert:
     that:
-      - (__user_linux_uid_min_effective | int) <= (__user_linux_uid_max_effective | int)
+      - (__user_linux_uid_min_effective | ansible.builtin.int) <= (__user_linux_uid_max_effective | ansible.builtin.int)
     fail_msg: >-
       The effective UID range for account reaping is invalid:
       UID_MIN={{ __user_linux_uid_min_effective }} is greater than

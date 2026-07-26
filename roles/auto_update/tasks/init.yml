@@ -53,10 +53,10 @@
     __auto_update_linux_matched_versions: >-
       {{
         __auto_update_linux_supported_platforms
-        | ansible.builtin.selectattr('name', 'match', __auto_update_linux_platform_names_regex, ignorecase=true)
+        | ansible.builtin.selectattr('name', 'ansible.builtin.match', __auto_update_linux_platform_names_regex, ignorecase=true)
         | ansible.builtin.map(attribute='versions')
         | ansible.builtin.flatten
-        | ansible.builtin.select('match', __auto_update_linux_platform_versions_regex, ignorecase=true)
+        | ansible.builtin.select('ansible.builtin.match', __auto_update_linux_platform_versions_regex, ignorecase=true)
         | ansible.builtin.list
       }}
   when:
