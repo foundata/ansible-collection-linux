@@ -127,7 +127,9 @@ sysctl_linux_autoupgrade: false
 # - Type: list
 # - Required: No
 # - Default: []
-# - Choices: web, postgresql, mysql, redis, elasticsearch, file, virtualization, container, router, router_v4only, router_v6only, hardening-default, hardening-extra
+# - Choices: web, postgresql, mysql, redis, elasticsearch, file, virtualization,
+#   container, router, router_v4only, router_v6only, hardening-default,
+#   hardening-extra
 # - List elements: str
 sysctl_linux_profile: []
 
