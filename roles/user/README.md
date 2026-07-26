@@ -222,7 +222,7 @@ It might be useful and faster to only call parts of the role by using tags:
 
 - `user_linux_config`: Manage the local groups, user accounts and SSH `authorized_keys`.
 
-There are also tags usually not meant to be called directly but listed for the sake of completeness and edge cases:
+There are also tags that are generally not intended to be called directly but are included for completeness and to cover edge cases:
 
 - `user_linux_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
 
