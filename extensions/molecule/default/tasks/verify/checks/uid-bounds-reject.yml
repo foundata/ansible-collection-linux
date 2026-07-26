@@ -1,0 +1,44 @@
+# Include where useful: assert that the foundata.linux.user init rejects an
+# invalid UID bounds configuration for account reaping.
+#
+# Expects __testing_uid_bounds_case: {label, uid_min, uid_max, reason_pattern}
+# where reason_pattern must match the name of the init task expected to fail.
+
+- name: "Molecule | Verify | user | UID bounds: reject {{ __testing_uid_bounds_case['label'] }}"
+  block:
+
+    - name: "Molecule | Verify | user | UID bounds: apply the invalid bounds ({{ __testing_uid_bounds_case['label'] }})"
+      ansible.builtin.set_fact:
+        user_linux_uid_min: "{{ __testing_uid_bounds_case['uid_min'] }}"
+        user_linux_uid_max: "{{ __testing_uid_bounds_case['uid_max'] }}"
+
+    - name: "Molecule | Verify | user | UID bounds: include the role's init (must fail)"
+      ansible.builtin.include_role:
+        name: "foundata.linux.user"
+        tasks_from: "init"
+
+    - name: "Molecule | Verify | user | UID bounds: force a failure because init accepted the bounds"
+      ansible.builtin.fail:
+        msg: >-
+          The role's init accepted user_linux_uid_min={{ __testing_uid_bounds_case['uid_min'] }},
+          user_linux_uid_max={{ __testing_uid_bounds_case['uid_max'] }}
+          ({{ __testing_uid_bounds_case['label'] }}) although reaping is enabled.
+
+  rescue:
+
+    - name: "Molecule | Verify | user | UID bounds: assert the run failed in the expected validation ({{ __testing_uid_bounds_case['label'] }})"
+      ansible.builtin.assert:
+        that:
+          - (ansible_failed_task['name'] | ansible.builtin.default('')) is ansible.builtin.search(__testing_uid_bounds_case['reason_pattern'])
+        fail_msg: >-
+          The run failed, but not in the expected UID bounds validation
+          (failed task: '{{ ansible_failed_task['name'] | ansible.builtin.default('unknown') }}').
+        success_msg: >-
+          Invalid UID bounds ({{ __testing_uid_bounds_case['label'] }}) are rejected by the role's init.
+
+  always:
+
+    - name: "Molecule | Verify | user | UID bounds: restore the saved bounds"
+      ansible.builtin.set_fact:
+        user_linux_uid_min: "{{ __testing_uid_bounds_saved_min }}"
+        user_linux_uid_max: "{{ __testing_uid_bounds_saved_max }}"

@@ -149,3 +149,85 @@
       - "'AAAAC3NzaC1lZDI1NTE5AAAAILmFhCG3dipt7baMWEJOo9chtWBt+rpTsltkYcnd4jcu' not in __testing_keyuser_ak"
     fail_msg: "The authorized_keys files do not match the expected managed state."
     success_msg: "All authorized_keys files contain exactly the expected managed keys."
+
+
+## Reaping guardrails: UID bounds validation (init-only)
+#
+# Account reaping is destructive, so init validates the UID bounds before any
+# range is derived: malformed and negative values must be rejected (| int
+# would silently turn them into 0 and widen the range down to system
+# accounts), as must a reversed range. An explicitly configured low range is
+# honored as given (deliberate operator override; root, the connection user,
+# declared accounts and the exclude list stay protected separately) - the
+# acceptance check pins that no silent clamping or widening happens.
+
+- name: "Molecule | Verify | user | UID bounds: save the current bounds"
+  ansible.builtin.set_fact:
+    __testing_uid_bounds_saved_min: "{{ user_linux_uid_min }}"
+    __testing_uid_bounds_saved_max: "{{ user_linux_uid_max }}"
+
+
+- name: "Molecule | Verify | user | UID bounds: run the rejection checks"
+  ansible.builtin.include_tasks:
+    file: "{{ (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.default('../../default')) }}/tasks/verify/checks/uid-bounds-reject.yml"
+  vars:
+    __testing_uid_bounds_case: "{{ item }}"
+  loop:
+    - label: "a malformed minimum"
+      uid_min: "1o00"
+      uid_max: ""
+      reason_pattern: "empty or non-negative integers"
+    - label: "a negative minimum"
+      uid_min: "-1"
+      uid_max: ""
+      reason_pattern: "empty or non-negative integers"
+    - label: "a negative maximum"
+      uid_min: ""
+      uid_max: "-5"
+      reason_pattern: "empty or non-negative integers"
+    - label: "a reversed range"
+      uid_min: "5000"
+      uid_max: "2000"
+      reason_pattern: "UID range is sane"
+  loop_control:
+    label: "{{ item['label'] }}"
+
+
+- name: "Molecule | Verify | user | UID bounds: apply an explicit zero-based system range"
+  ansible.builtin.set_fact:
+    user_linux_uid_min: "0"
+    user_linux_uid_max: "999"
+
+
+- name: "Molecule | Verify | user | UID bounds: include the role's init (must accept the explicit range)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.user"
+    tasks_from: "init"
+    public: true
+
+
+- name: "Molecule | Verify | user | UID bounds: assert the explicit range is honored exactly"
+  ansible.builtin.assert:
+    that:
+      - (__user_linux_uid_min_effective | int) == 0
+      - (__user_linux_uid_max_effective | int) == 999
+    fail_msg: >-
+      An explicitly configured reaping range 0-999 was not honored as given
+      (effective: {{ __user_linux_uid_min_effective }}-{{ __user_linux_uid_max_effective }}).
+      Silent clamping or widening of a destructive range must not happen.
+    success_msg: >-
+      An explicitly configured zero-based system range is honored exactly
+      (deliberate operator override; the protected account set still applies).
+
+
+- name: "Molecule | Verify | user | UID bounds: restore the saved bounds"
+  ansible.builtin.set_fact:
+    user_linux_uid_min: "{{ __testing_uid_bounds_saved_min }}"
+    user_linux_uid_max: "{{ __testing_uid_bounds_saved_max }}"
+
+
+- name: "Molecule | Verify | user | UID bounds: re-initialize the role with the restored bounds"
+  ansible.builtin.include_role:
+    name: "foundata.linux.user"
+    tasks_from: "init"
+    public: true
