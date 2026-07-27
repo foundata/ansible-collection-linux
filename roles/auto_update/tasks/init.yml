@@ -194,10 +194,10 @@
       {%-       set _ = ns.items.append(k ~ " (takes true or false)") -%}
       {%-     endif -%}
       {%-   elif k not in __auto_update_linux_timer_trigger_directives -%}
-      {%-     if is_seq or (v is ansible.builtin.mapping) or (v is none) -%}
+      {%-     if is_seq or (v is ansible.builtin.mapping) or (v is ansible.builtin.none) -%}
       {%-       set _ = ns.items.append(k ~ " (takes a single scalar value)") -%}
       {%-     endif -%}
-      {%-   elif (v is ansible.builtin.boolean) or (v is ansible.builtin.mapping) or (v is none) -%}
+      {%-   elif (v is ansible.builtin.boolean) or (v is ansible.builtin.mapping) or (v is ansible.builtin.none) -%}
       {%-     set _ = ns.items.append(k ~ " (takes a non-empty string or a list of them)") -%}
       {%-   elif (v is ansible.builtin.string) and ((v | ansible.builtin.trim | ansible.builtin.length) == 0) -%}
       {%-     set _ = ns.items.append(k ~ " (empty string; use an empty list to drop the built-in default)") -%}
@@ -206,7 +206,7 @@
       {%-   elif is_seq -%}
       {%-     for e in v -%}
       {%-       set e_seq = (e is ansible.builtin.iterable) and (e is not ansible.builtin.string) -%}
-      {%-       if (e is ansible.builtin.boolean) or e_seq or (e is none)
+      {%-       if (e is ansible.builtin.boolean) or e_seq or (e is ansible.builtin.none)
                     or ((e is ansible.builtin.string) and ((e | ansible.builtin.trim | ansible.builtin.length) == 0))
                     or ((e is ansible.builtin.number) and (k == 'OnCalendar')) -%}
       {%-         set _ = ns.items.append(k ~ " (list entry " ~ loop.index ~ " is not a usable trigger value)") -%}
@@ -226,10 +226,10 @@
       {%-       set _ = ns.items.append(k ~ " (takes true or false)") -%}
       {%-     endif -%}
       {%-   elif k not in __auto_update_linux_timer_trigger_directives -%}
-      {%-     if is_seq or (v is ansible.builtin.mapping) or (v is none) -%}
+      {%-     if is_seq or (v is ansible.builtin.mapping) or (v is ansible.builtin.none) -%}
       {%-       set _ = ns.items.append(k ~ " (takes a single scalar value)") -%}
       {%-     endif -%}
-      {%-   elif (v is ansible.builtin.boolean) or (v is ansible.builtin.mapping) or (v is none) -%}
+      {%-   elif (v is ansible.builtin.boolean) or (v is ansible.builtin.mapping) or (v is ansible.builtin.none) -%}
       {%-     set _ = ns.items.append(k ~ " (takes a non-empty string or a list of them)") -%}
       {%-   elif (v is ansible.builtin.string) and ((v | ansible.builtin.trim | ansible.builtin.length) == 0) -%}
       {%-     set _ = ns.items.append(k ~ " (empty string; use an empty list to drop the built-in default)") -%}
@@ -238,7 +238,7 @@
       {%-   elif is_seq -%}
       {%-     for e in v -%}
       {%-       set e_seq = (e is ansible.builtin.iterable) and (e is not ansible.builtin.string) -%}
-      {%-       if (e is ansible.builtin.boolean) or e_seq or (e is none)
+      {%-       if (e is ansible.builtin.boolean) or e_seq or (e is ansible.builtin.none)
                     or ((e is ansible.builtin.string) and ((e | ansible.builtin.trim | ansible.builtin.length) == 0))
                     or ((e is ansible.builtin.number) and (k == 'OnCalendar')) -%}
       {%-         set _ = ns.items.append(k ~ " (list entry " ~ loop.index ~ " is not a usable trigger value)") -%}

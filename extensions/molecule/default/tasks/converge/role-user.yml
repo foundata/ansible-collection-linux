@@ -68,7 +68,7 @@
     {{
       (__testing_state | ansible.builtin.default({}, true))
       | ansible.builtin.dict2items
-      | ansible.builtin.selectattr('key', 'match', '^user_linux_')
+      | ansible.builtin.selectattr('key', 'ansible.builtin.match', '^user_linux_')
       | ansible.builtin.list
     }}
 

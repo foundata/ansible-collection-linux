@@ -177,7 +177,7 @@
   ansible.builtin.replace:
     path: "{{ __sysctl_linux_config_file_path }}"
     # Notes on the regex:
-    # - ({{ __sysctl_linux_parameters_comment | join('|') }}) will result in something like
+    # - ({{ __sysctl_linux_parameters_comment | ansible.builtin.join('|') }}) will result in something like
     #   vm\.swappiness|net\.ipv4\.ip_forward (escaping is done )
     # - When options are joined with '|', an empty (whitespace-only) option would
     #   produce patterns like 'foo||bar', where '||' matches an empty string at any

@@ -71,7 +71,7 @@
     {{
       (__testing_state | ansible.builtin.default({}, true))
       | ansible.builtin.dict2items
-      | ansible.builtin.selectattr('key', 'match', '^sudo_linux_')
+      | ansible.builtin.selectattr('key', 'ansible.builtin.match', '^sudo_linux_')
       | ansible.builtin.list
     }}
 

@@ -1,0 +1,8 @@
+---
+
+trivial:
+  - >
+    ``auto_update``, ``reboot``, ``sysctl`` roles and molecule test code -
+    style only, no functional change: use FQCN for the remaining bare filter,
+    test, and lookup plugin references (e.g. ``is ansible.builtin.none``,
+    ``is ansible.builtin.failure``, ``lookup('ansible.builtin.env', ...)``).

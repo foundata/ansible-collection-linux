@@ -14,7 +14,7 @@
     {{
       (__testing_state | ansible.builtin.default({}, true))
       | ansible.builtin.dict2items
-      | ansible.builtin.selectattr('key', 'match', '^(user_linux_|__testing_)')
+      | ansible.builtin.selectattr('key', 'ansible.builtin.match', '^(user_linux_|__testing_)')
       | ansible.builtin.list
     }}
 
@@ -154,7 +154,7 @@
 ## Reaping guardrails: UID bounds validation (init-only)
 #
 # Account reaping is destructive, so init validates the UID bounds before any
-# range is derived: malformed and negative values must be rejected (| int
+# range is derived: malformed and negative values must be rejected (| ansible.builtin.int
 # would silently turn them into 0 and widen the range down to system
 # accounts), as must a reversed range. An explicitly configured low range is
 # honored as given (deliberate operator override; root, the connection user,
@@ -169,7 +169,9 @@
 
 - name: "Molecule | Verify | user | UID bounds: run the rejection checks"
   ansible.builtin.include_tasks:
-    file: "{{ (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.default('../../default')) }}/tasks/verify/checks/uid-bounds-reject.yml"
+    file: >-
+      {{ (lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY')
+          | ansible.builtin.default('../../default')) }}/tasks/verify/checks/uid-bounds-reject.yml
   vars:
     __testing_uid_bounds_case: "{{ item }}"
   loop:
@@ -209,8 +211,8 @@
 - name: "Molecule | Verify | user | UID bounds: assert the explicit range is honored exactly"
   ansible.builtin.assert:
     that:
-      - (__user_linux_uid_min_effective | int) == 0
-      - (__user_linux_uid_max_effective | int) == 999
+      - (__user_linux_uid_min_effective | ansible.builtin.int) == 0
+      - (__user_linux_uid_max_effective | ansible.builtin.int) == 999
     fail_msg: >-
       An explicitly configured reaping range 0-999 was not honored as given
       (effective: {{ __user_linux_uid_min_effective }}-{{ __user_linux_uid_max_effective }}).
