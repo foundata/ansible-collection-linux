@@ -198,6 +198,7 @@ user_linux_account_defaults: {}
 #         `{\{ 'mysecret' | ansible.builtin.password_hash('sha512') }\}`.
 #         - Type: str
 #         - Required: No
+#         - Sensitive: Yes (no_log, values are masked in logs)
 #       - lock:
 #         If `true`, lock the account's password (the hash is kept but login via
 #         password is disabled).

@@ -227,6 +227,7 @@ argument_specs:
                   `ansible.builtin.password_hash` filter, e.g.
                   `{\{ 'mysecret' | ansible.builtin.password_hash('sha512') }\}`.
                 type: "str"
+                no_log: true
               lock:
                 description: |
                   If `true`, lock the account's password (the hash is kept but login via

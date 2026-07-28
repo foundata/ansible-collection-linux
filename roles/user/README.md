@@ -551,6 +551,7 @@ RHEL/Fedora: `mkpasswd`), or within Ansible via the
 
 - **Type**: `str`
 - **Required**: No
+- **Sensitive**: Yes (`no_log`, values are masked in logs)
 
 ##### `user_linux_accounts['password']['lock']`<a id="variable-user_linux_accounts-sub-password-sub-lock"></a>
 
