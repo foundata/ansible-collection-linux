@@ -392,6 +392,11 @@ higher precedence over files with lower-numbered prefixes.
 If a non-default filename is used, any existing `/etc/sysctl.d/90-managed.conf`
 from previous Ansible runs will be removed automatically to prevent conflicts.
 
+Has to be a plain filename ending in `.conf` (`sysctl(8)` ignores other
+suffixes), starting with an alphanumeric character and containing only
+characters from `A-Za-z0-9._-` (no path separators); the role fails during
+initialization otherwise.
+
 - **Type**: `str`
 - **Required**: No
 - **Default**: `"90-managed.conf"`

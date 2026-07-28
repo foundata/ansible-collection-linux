@@ -1,0 +1,10 @@
+---
+
+security_fixes:
+  - >
+    ``sysctl`` role - ``sysctl_linux_config_dropin_file_name`` is now validated
+    to be a plain filename ending in ``.conf``. A value containing path
+    separators (such as ``../sysctl.conf``) could previously make the role
+    write to or remove files outside of ``/etc/sysctl.d/`` with root
+    privileges, and any suffix other than ``.conf`` is silently ignored by
+    ``sysctl(8)``.
