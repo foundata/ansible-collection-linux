@@ -1,17 +1,17 @@
 # Execute the collection role "sysctl" against all driver-created instances.
 #
-# No container detection is needed here: the role auto-detects containers and
-# skips live `sysctl -w` itself, so the converge does not opt out of verification
-# (gathering virtualization facts up front is left to the role's own init).
+# The molecule instances are virtual machines, so the role applies the values
+# to a real kernel (live `sysctl -w` included) and the verify stage asserts
+# them; nothing needs to be skipped or opted out.
 
 - name: "Molecule | Converge | Store sysctl_linux_* role parameters in __testing_state"
   ansible.builtin.include_tasks:
     file: "../tasks/state_update.yml"
   vars:
     __testing_state_update:
-      # sysctl_linux_verify is intentionally NOT set here: the role auto-disables
-      # live `sysctl -w` on detected containers, so converge must pass on the
-      # podman instances without the caller opting out (proves "container-aware").
+      # sysctl_linux_verify is intentionally NOT set here: on the VM instances
+      # the role's defaults apply and verify the live values (on containers it
+      # would auto-disable live `sysctl -w` itself, "container-aware").
       # A stacked profile list is selected so converge exercises the real stack:
       # hardening-default (shared hardening) + web (performance). This also checks
       # that profile-derived keys duplicated in the main config file (e.g.

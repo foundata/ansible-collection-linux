@@ -56,7 +56,7 @@
       user_linux_accounts_delete_unmanaged_exclude:
         - "molecule_keepme"
       # Narrow the reaping window to the test fixtures' UID band so unrelated
-      # accounts shipped in the container images are never touched. UID_MAX is
+      # accounts shipped in the instance images are never touched. UID_MAX is
       # left to /etc/login.defs to also exercise that derivation path.
       user_linux_uid_min: 4000
 

@@ -13,6 +13,18 @@
         commands:
           - "/usr/bin/uptime"
       sudo_linux_rules:
+        # The Molecule connection to the VM instances depends on passwordless
+        # sudo for the "molecule" account (granted via cloud-init in
+        # /etc/sudoers.d). With sudo_linux_delete_unmanaged the role owns
+        # /etc/sudoers.d exclusively and would reap that grant, so it is
+        # declared as a managed rule here to keep the connection working.
+        - name: "molecule_connection"
+          users:
+            - "molecule"
+          commands:
+            - "ALL"
+          runas: "ALL"
+          nopassword: true
         # Full admin access for a group (single grantee).
         - name: "molecule_admins"
           groups:
@@ -59,8 +71,9 @@
         - "timestamp_timeout=15"
       sudo_linux_extra_content: |
         Defaults:molecule_deployer !requiretty
-      # Authoritatively own /etc/sudoers.d (safe here: throwaway container,
-      # connected as root). Exercises the reaping + protected-list path.
+      # Authoritatively own /etc/sudoers.d (safe here: throwaway test instance,
+      # and the connection grant above is part of the managed rules). Exercises
+      # the reaping + protected-list path.
       sudo_linux_delete_unmanaged: true
 
 

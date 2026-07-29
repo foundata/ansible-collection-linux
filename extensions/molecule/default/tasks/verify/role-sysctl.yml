@@ -146,9 +146,10 @@
     - __testing_config_file['stat']['exists']
 
 
-- name: "Molecule | Verify | Verify kernel parameters (skipped in containerized systems due to read-only params)"
-  when:
-    - not __sysctl_linux_is_container
+# The molecule instances are virtual machines, so the applied values can be
+# asserted against the real kernel on every platform (containers would have to
+# skip this because of read-only system parameters).
+- name: "Molecule | Verify | Verify kernel parameters"
   block:
 
     - name: "Molecule | Verify | Get active kernel parameter values "
@@ -165,7 +166,7 @@
       changed_when:
         - false
 
-    - name: "Molecule | Verify | Assert active kernel parameters have expected values (skipped in containers due to read-only system params)"
+    - name: "Molecule | Verify | Assert active kernel parameters have expected values"
       ansible.builtin.assert:
         that:
           - __testing_active_params['results'][0]['stdout'] == "0"

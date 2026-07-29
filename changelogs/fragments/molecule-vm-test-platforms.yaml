@@ -1,0 +1,11 @@
+---
+
+minor_changes:
+  - >
+    The Molecule ``default`` scenario now runs all platforms as QEMU/KVM
+    virtual machines (per-platform ``type: libvirt`` backend selection via a
+    session libvirt daemon, without root privileges): the collection manages
+    kernel and system level state, so applied values are now verified against
+    a real kernel on every platform instead of being skipped in containers.
+    Commented container alternates remain in ``molecule.yml``. See
+    ``extensions/molecule/README.md`` for requirements and usage.

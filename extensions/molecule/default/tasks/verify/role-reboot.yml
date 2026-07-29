@@ -16,9 +16,10 @@
 
 
 - name: "Molecule | Verify | Assert reboot result fact has correct types (rebooted boolean, elapsed numeric)"
-  # In a container the reboot is skipped, so the result defaults apply. These
-  # were previously swapped (elapsed defaulted to a bool, rebooted to an int),
-  # which breaks strict-boolean conditionals like "when: reboot_linux_result['rebooted']".
+  # No reboot is pending on the VM instances, so the result defaults apply.
+  # These were previously swapped (elapsed defaulted to a bool, rebooted to an
+  # int), which breaks strict-boolean conditionals like
+  # "when: reboot_linux_result['rebooted']".
   ansible.builtin.assert:
     that:
       - reboot_linux_result['rebooted'] is ansible.builtin.boolean
