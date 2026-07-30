@@ -1,0 +1,8 @@
+---
+
+trivial:
+  - >
+    ``sudo`` role - Documented that sudo-rs platforms (Ubuntu 25.10+) only
+    implement a subset of the classic sudoers settings and their ``visudo``
+    rejects unknown ones (e.g. ``requiretty``) during the role's drop-in
+    validation.

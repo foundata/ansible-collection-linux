@@ -254,6 +254,11 @@ argument_specs:
             Defaults:ansible !requiretty
             Cmnd_Alias SERVICES = /usr/bin/systemctl
           ```
+
+          Note: platforms shipping `sudo-rs` (the default sudo on Ubuntu 25.10 and
+          later) only implement a subset of the classic sudoers settings; its
+          `visudo` rejects unknown ones (`requiretty` in the example above fails
+          there with "unknown setting"), which fails the run during validation.
         type: "str"
         default: ""
 
