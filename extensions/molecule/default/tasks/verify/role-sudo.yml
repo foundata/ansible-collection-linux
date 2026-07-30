@@ -161,7 +161,7 @@
       - "'Defaults env_reset' in __testing_sudo_defaults_content"
       - "'Defaults timestamp_timeout=15' in __testing_sudo_defaults_content"
       # verbatim sudo_linux_extra_content (a qualified Defaults the list cannot express)
-      - "'Defaults:molecule_deployer !requiretty' in __testing_sudo_defaults_content"
+      - "'Defaults:molecule_deployer env_keep += \"MOLECULE_CANARY\"' in __testing_sudo_defaults_content"
     fail_msg: "The global Defaults drop-in does not contain the expected directives."
     success_msg: "The global Defaults drop-in contains the expected directives and extra_content."
 

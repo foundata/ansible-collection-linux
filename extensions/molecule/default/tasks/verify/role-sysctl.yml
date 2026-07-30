@@ -23,7 +23,7 @@
 
 - name: "Molecule | Verify | Set other expected or needed facts"
   ansible.builtin.set_fact:
-    __sysctl_linux_config_dropin_file_path: "{{ __sysctl_linux_config_dropin_dir_path }}/90-custom-dropin.conf"
+    __sysctl_linux_config_dropin_file_path: "{{ __sysctl_linux_config_dropin_dir_path }}/zz-custom-dropin.conf"
 
 
 ## Drop-in config file
@@ -60,6 +60,14 @@
       The default sysctl drop-in configuration file '{{ __sysctl_linux_config_dropin_file_path }}' does not exist (valid as custom filename is used).
   when:
     - __sysctl_linux_config_dropin_file_path != __sysctl_linux_config_dropin_file_path_default
+
+
+- name: "Molecule | Verify | Check the legacy default drop-in file was removed"
+  ansible.builtin.stat:
+    path: "{{ __sysctl_linux_config_dropin_file_path_legacy }}"
+  register: __testing_dropin_file_legacy
+  failed_when:
+    - __testing_dropin_file_legacy['stat']['exists']
 
 
 - name: "Molecule | Verify | Read sysctl drop-in configuration file content"
@@ -679,6 +687,54 @@
           - (__sysctl_linux_effective_parameters['net.ipv4.conf.all.accept_redirects'] | ansible.builtin.int) == 0
         fail_msg: "net.ipv6.* keys were not dropped (or non-IPv6 keys were lost) when IPv6 is unavailable."
         success_msg: "net.ipv6.* keys are dropped when IPv6 is unavailable; non-IPv6 keys retained."
+
+
+## Container profile: full apply against the real kernel
+#
+# The earlier container-profile check is init-only (merged variables). The
+# molecule instances are virtual machines, so the module-dependent keys can
+# additionally be applied and asserted live: br_netfilter and nf_conntrack
+# get loaded and the net.bridge.* / net.netfilter.* keys have to reach the
+# kernel - exactly the part a container-based test backend could never cover.
+
+- name: "Molecule | Verify | Container profile apply: run the role with the container profile"
+  ansible.builtin.include_role:
+    name: "foundata.linux.sysctl"
+  vars:
+    sysctl_linux_profile:
+      - "container"
+    sysctl_linux_parameters: {}
+    sysctl_linux_config_dropin_file_name: "zz-custom-dropin.conf"
+
+
+- name: "Molecule | Verify | Container profile apply: read the live kernel values"
+  ansible.builtin.command:
+    argv:
+      - "sysctl"
+      - "-n"
+      - "net.ipv4.ip_forward"
+      - "net.bridge.bridge-nf-call-iptables"
+      - "net.bridge.bridge-nf-call-ip6tables"
+      - "net.netfilter.nf_conntrack_max"
+  register: __testing_container_apply_values
+  changed_when: false
+
+
+- name: "Molecule | Verify | Container profile apply: assert the module-dependent keys reached the kernel"
+  ansible.builtin.assert:
+    that:
+      - __testing_container_apply_values['stdout_lines'][0] == '1'
+      - __testing_container_apply_values['stdout_lines'][1] == '1'
+      - __testing_container_apply_values['stdout_lines'][2] == '1'
+      - (__testing_container_apply_values['stdout_lines'][3] | ansible.builtin.int)
+        == ((ansible_facts['memtotal_mb'] | ansible.builtin.int) * 32)
+    fail_msg: >-
+      The container profile did not reach the live kernel (values:
+      {{ __testing_container_apply_values['stdout_lines'] }}). br_netfilter or
+      nf_conntrack were not loaded, or the sysctl apply was skipped.
+    success_msg: >-
+      The container profile loaded br_netfilter and nf_conntrack and applied
+      the module-dependent keys to the live kernel.
 
 
 # Runs LAST: state=absent mutates the host (removes the drop-in, restores the

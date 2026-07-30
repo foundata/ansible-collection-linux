@@ -69,8 +69,12 @@
       sudo_linux_defaults:
         - "env_reset"
         - "timestamp_timeout=15"
+      # env_keep on purpose (not the classic "!requiretty"): Ubuntu 25.10+
+      # ships sudo-rs, whose visudo rejects settings it does not implement
+      # (such as requiretty), and the role validates every drop-in with
+      # visudo. env_keep is supported by classic sudo and sudo-rs alike.
       sudo_linux_extra_content: |
-        Defaults:molecule_deployer !requiretty
+        Defaults:molecule_deployer env_keep += "MOLECULE_CANARY"
       # Authoritatively own /etc/sudoers.d (safe here: throwaway test instance,
       # and the connection grant above is part of the managed rules). Exercises
       # the reaping + protected-list path.

@@ -57,11 +57,38 @@
   #     name) deletes the managed parameter, breaking idempotence.
   # The file name matches sysctl_linux_config_dropin_file_name in the converge.
   ansible.builtin.copy:
-    dest: "{{ __sysctl_linux_config_dropin_dir_path }}/90-custom-dropin.conf"
+    dest: "{{ __sysctl_linux_config_dropin_dir_path }}/zz-custom-dropin.conf"
     content: "net.ipv4.tcp_rfc1337 = 1\n  net.ipv4.tcp_syncookies = 0\n"
     owner: "root"
     group: "root"
     mode: "u=rw,g=r,o=r" # 0644
+
+
+- name: "Molecule | Prepare | sysctl | Seed a stale drop-in with the legacy default name"
+  # Simulates a deployment of an earlier role version, whose default drop-in
+  # name was 90-managed.conf ("90-" lost against distribution files like
+  # 99-protect-links.conf, hence the rename). The role has to remove it.
+  ansible.builtin.copy:
+    dest: "{{ __sysctl_linux_config_dropin_dir_path }}/90-managed.conf"
+    content: "net.ipv4.tcp_rfc1337 = 1\n"
+    owner: "root"
+    group: "root"
+    mode: "u=rw,g=r,o=r" # 0644
+
+
+- name: "Molecule | Prepare | sysctl | Install the extra kernel modules package (Enterprise Linux 10)"
+  # br_netfilter (needed by the container profile checks in the verify stage)
+  # lives in kernel-modules-extra on Enterprise Linux 10, which the cloud
+  # images do not ship. Version-matched to the running kernel: a bare package
+  # name would pull the newest kernel's build, which the running kernel
+  # cannot load.
+  ansible.builtin.package:
+    name: "kernel-modules-extra-{{ ansible_facts['kernel'] }}"
+    state: "present"
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - ansible_facts['distribution'] != 'Fedora'
+    - ansible_facts['distribution_major_version'] == '10'
 
 
 ## Fixtures for the foundata.linux.user role tests.
