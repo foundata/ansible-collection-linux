@@ -126,7 +126,11 @@ __sysctl_linux_config_dropin_dir_group: "root"
 __sysctl_linux_config_dropin_dir_mode: "u=rwx,g=rx,o=rx" # 0755
 
 __sysctl_linux_config_dropin_file_path: "{{ __sysctl_linux_config_dropin_dir_path }}/{{ sysctl_linux_config_dropin_file_name }}"
-__sysctl_linux_config_dropin_file_path_default: "{{ __sysctl_linux_config_dropin_dir_path }}/90-managed.conf" # needed to detect non-default names
+__sysctl_linux_config_dropin_file_path_default: "{{ __sysctl_linux_config_dropin_dir_path }}/zz-managed.conf" # needed to detect non-default names
+# Default name of earlier role versions, cleaned up on sight: with the old
+# "90-" prefix, distribution files sorting later (e.g. 99-protect-links.conf
+# on Debian and Ubuntu) silently overrode managed keys on reload and boot.
+__sysctl_linux_config_dropin_file_path_legacy: "{{ __sysctl_linux_config_dropin_dir_path }}/90-managed.conf"
 __sysctl_linux_config_dropin_file_owner: "{{ __sysctl_linux_config_file_owner }}"
 __sysctl_linux_config_dropin_file_group: "{{ __sysctl_linux_config_file_group }}"
 __sysctl_linux_config_dropin_file_mode: "{{ __sysctl_linux_config_file_mode }}"

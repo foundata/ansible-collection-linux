@@ -135,7 +135,7 @@ The following variables can be configured for this role:
 | `sysctl_linux_reload` | `bool` | No | `true` | If set to `true`, triggers `sysctl --system` after configuration changes to reload all sysctl configuration files following the proper precedence order. This ensures all drop-in files and possibly existing other sysctl configuration files not managed […](#variable-sysctl_linux_reload) |
 | `sysctl_linux_verify` | `bool` | No | `true` | If set to `true`, verifies the parameter value using the sysctl command and actively sets it in the running kernel using `sysctl -w` if the current value differs from the desired one.<br><br>When `false`, only writes the parameter to the […](#variable-sysctl_linux_verify) |
 | `sysctl_linux_ignore_unknown_key_errors` | `bool` | No | `false` | If set to `true`, ignores errors caused by unknown or unsupported kernel parameter keys. This is useful in container environments where certain parameters may not exist or be accessible.<br><br>Generally not recommended for bare-metal or VM […](#variable-sysctl_linux_ignore_unknown_key_errors) |
-| `sysctl_linux_config_dropin_file_name` | `str` | No | `"90-managed.conf"` | Filename of the drop-in configuration file to be placed in `/etc/sysctl.d/`. Defaults to `90-managed.conf`. The `90-` prefix ensures late loading and thus higher precedence over files with lower-numbered prefixes.<br><br>If a non-default filename is […](#variable-sysctl_linux_config_dropin_file_name) |
+| `sysctl_linux_config_dropin_file_name` | `str` | No | `"zz-managed.conf"` | Filename of the drop-in configuration file to be placed in `/etc/sysctl.d/`. Defaults to `zz-managed.conf`. `sysctl --system` and `systemd-sysctl` apply all `sysctl.d` files sorted by filename, later files overriding earlier ones, and distributions […](#variable-sysctl_linux_config_dropin_file_name) |
 
 ### `sysctl_linux_state`<a id="variable-sysctl_linux_state"></a>
 
@@ -386,11 +386,21 @@ parameters should be available.
 [*⇑ Back to ToC ⇑*](#toc)
 
 Filename of the drop-in configuration file to be placed in `/etc/sysctl.d/`.
-Defaults to `90-managed.conf`. The `90-` prefix ensures late loading and thus
-higher precedence over files with lower-numbered prefixes.
+Defaults to `zz-managed.conf`. `sysctl --system` and `systemd-sysctl` apply
+all `sysctl.d` files sorted by filename, later files overriding earlier
+ones, and distributions ship files up to the `99-` prefix (for example
+`99-protect-links.conf` on Debian and Ubuntu, which would silently reset
+managed keys like `fs.protected_fifos` on every reload and boot). The
+`zz` prefix sorts after every such file so the managed values actually
+hold. When choosing a custom name, keep it sorting after your
+distribution's `sysctl.d` files for the same reason. Conflicting entries
+in `/etc/sysctl.conf` (always applied last by `sysctl --system`) are
+handled separately: the role comments out managed keys there.
 
-If a non-default filename is used, any existing `/etc/sysctl.d/90-managed.conf`
-from previous Ansible runs will be removed automatically to prevent conflicts.
+If a non-default filename is used, any existing `/etc/sysctl.d/zz-managed.conf`
+from previous Ansible runs will be removed automatically to prevent
+conflicts (the same applies to `/etc/sysctl.d/90-managed.conf`, the
+default name of earlier role versions).
 
 Has to be a plain filename ending in `.conf` (`sysctl(8)` ignores other
 suffixes), starting with an alphanumeric character and containing only
@@ -399,7 +409,7 @@ initialization otherwise.
 
 - **Type**: `str`
 - **Required**: No
-- **Default**: `"90-managed.conf"`
+- **Default**: `"zz-managed.conf"`
 
 
 

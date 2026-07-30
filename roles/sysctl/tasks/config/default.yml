@@ -35,6 +35,16 @@
     - "sysctl_linux: reload"
 
 
+- name: "Config | Default | Remove the legacy default drop-in config file of earlier role versions"
+  ansible.builtin.file:
+    path: "{{ __sysctl_linux_config_dropin_file_path_legacy }}"
+    state: "absent"
+  when:
+    - __sysctl_linux_config_dropin_file_path != __sysctl_linux_config_dropin_file_path_legacy
+  notify:
+    - "sysctl_linux: reload"
+
+
 # No Jinja template file but ansible.posix.sysctl is used below, so {{ ansible_managed }}
 # cannot be applied. The header is therefore managed explicitly by a task.
 - name: "Config | Default | Ensure 'Ansible managed' header in sysctl drop-in config file"

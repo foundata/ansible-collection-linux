@@ -1,0 +1,16 @@
+---
+
+bugfixes:
+  - >
+    ``sysctl`` role - Managed values now actually take precedence over
+    distribution ``sysctl.d`` files. ``sysctl --system`` and ``systemd-sysctl``
+    apply files sorted by name, and distributions ship files up to the ``99-``
+    prefix (e.g. ``99-protect-links.conf`` on Debian 12 and Ubuntu 22.04/24.04
+    setting ``fs.protected_fifos = 1``), which silently overrode managed keys
+    from the role's former ``90-managed.conf`` drop-in on every reload and boot
+    and made runs permanently non-idempotent with the ``hardening-default``
+    profile. The default drop-in is now ``/etc/sysctl.d/zz-managed.conf``
+    (sorts after every distribution file); a leftover ``90-managed.conf`` from
+    earlier role versions is removed automatically. When using a custom
+    ``sysctl_linux_config_dropin_file_name``, choose a name sorting after your
+    distribution's files (see the updated documentation).

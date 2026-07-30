@@ -221,12 +221,21 @@ sysctl_linux_verify: true
 sysctl_linux_ignore_unknown_key_errors: false
 
 # Filename of the drop-in configuration file to be placed in `/etc/sysctl.d/`.
-# Defaults to `90-managed.conf`. The `90-` prefix ensures late loading and thus
-# higher precedence over files with lower-numbered prefixes.
+# Defaults to `zz-managed.conf`. `sysctl --system` and `systemd-sysctl` apply
+# all `sysctl.d` files sorted by filename, later files overriding earlier ones,
+# and distributions ship files up to the `99-` prefix (for example
+# `99-protect-links.conf` on Debian and Ubuntu, which would silently reset
+# managed keys like `fs.protected_fifos` on every reload and boot). The `zz`
+# prefix sorts after every such file so the managed values actually hold. When
+# choosing a custom name, keep it sorting after your distribution's `sysctl.d`
+# files for the same reason. Conflicting entries in `/etc/sysctl.conf` (always
+# applied last by `sysctl --system`) are handled separately: the role comments
+# out managed keys there.
 #
 # If a non-default filename is used, any existing
-# `/etc/sysctl.d/90-managed.conf` from previous Ansible runs will be removed
-# automatically to prevent conflicts.
+# `/etc/sysctl.d/zz-managed.conf` from previous Ansible runs will be removed
+# automatically to prevent conflicts (the same applies to
+# `/etc/sysctl.d/90-managed.conf`, the default name of earlier role versions).
 #
 # Has to be a plain filename ending in `.conf` (`sysctl(8)` ignores other
 # suffixes), starting with an alphanumeric character and containing only
@@ -235,5 +244,5 @@ sysctl_linux_ignore_unknown_key_errors: false
 #
 # - Type: str
 # - Required: No
-# - Default: 90-managed.conf
+# - Default: zz-managed.conf
 sysctl_linux_config_dropin_file_name: "90-managed.conf"

@@ -18,6 +18,7 @@
   loop:
     - "{{ __sysctl_linux_config_dropin_file_path }}"
     - "{{ __sysctl_linux_config_dropin_file_path_default }}"
+    - "{{ __sysctl_linux_config_dropin_file_path_legacy }}"
   notify:
     - "sysctl_linux: reload"
 
