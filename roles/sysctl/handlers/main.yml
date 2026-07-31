@@ -22,7 +22,7 @@
       - "{{ __sysctl_linux_sysctl_executable }}"
       - "--system"
   when:
-    - sysctl_linux_reload
+    - sysctl_linux_reload | ansible.builtin.bool
   # There is no sane way to check for changes when loading all values. However,
   # this is acceptable as this handler only get's triggered on change.
   changed_when:
@@ -45,7 +45,7 @@
   changed_when:
     - false # noqa: no-changed-when
   when:
-    - sysctl_linux_reload
+    - sysctl_linux_reload | ansible.builtin.bool
     - __sysctl_linux_is_container
     - __sysctl_reload_result is ansible.builtin.defined
     - __sysctl_reload_result['rc'] != 0 # comparing rc; failure test masked in containers in the previous handle
