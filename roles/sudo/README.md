@@ -298,7 +298,7 @@ sudo_linux_rules:
   # ("sudo" on Debian/Ubuntu, "wheel" on RHEL/Fedora/SUSE).
   - name: "admins"
     groups:
-      - "{\{ (ansible_facts['os_family'] == 'Debian') | ansible.builtin.ternary('sudo', 'wheel') }\}"
+      - "{\{ ((ansible_facts['os_family'] | ansible.builtin.lower) == 'debian') | ansible.builtin.ternary('sudo', 'wheel') }\}"
     commands:
       - "ALL"
     runas: "ALL"
