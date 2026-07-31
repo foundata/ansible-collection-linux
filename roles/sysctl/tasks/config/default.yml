@@ -99,7 +99,7 @@
     # parameters are typically read-only: there we only write the drop-in file so
     # the role does not fail before the (container-tolerant) reload handler runs.
     # sysctl_linux_verify still gates this on real hosts.
-    sysctl_set: "{{ sysctl_linux_verify and (not __sysctl_linux_is_container) }}"
+    sysctl_set: "{{ (sysctl_linux_verify | ansible.builtin.bool) and (not __sysctl_linux_is_container) }}"
     # reloading will be done by handler, following precedence
     reload: false
     ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | ansible.builtin.default(omit) }}"

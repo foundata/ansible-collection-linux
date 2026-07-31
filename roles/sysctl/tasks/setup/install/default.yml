@@ -14,7 +14,7 @@
 - name: "Setup | Install | Default | Install or upgrade packages"
   ansible.builtin.package:
     name: "{{ __sysctl_linux_packages_install }}"
-    state: "{{ 'latest' if sysctl_linux_autoupgrade else 'present' }}"
+    state: "{{ 'latest' if (sysctl_linux_autoupgrade | ansible.builtin.bool) else 'present' }}"
   when:
     - __sysctl_linux_packages_install is ansible.builtin.defined
     - (__sysctl_linux_packages_install | ansible.builtin.length) > 0
