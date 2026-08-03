@@ -22,15 +22,18 @@
 
 
 - name: "Molecule | Verify | Set other expected or needed facts"
+  # "__testing_" namespace on purpose: a fact named like the role's internal
+  # __sysctl_linux_config_dropin_file_path would shadow the role's own (lazy)
+  # computation in every later role include of this play.
   ansible.builtin.set_fact:
-    __sysctl_linux_config_dropin_file_path: "{{ __sysctl_linux_config_dropin_dir_path }}/zz-custom-dropin.conf"
+    __testing_sysctl_dropin_file_path: "{{ __sysctl_linux_config_dropin_dir_path }}/zz-custom-dropin.conf"
 
 
 ## Drop-in config file
 
 - name: "Molecule | Verify | Check if sysctl drop-in configuration file exists"
   ansible.builtin.stat:
-    path: "{{ __sysctl_linux_config_dropin_file_path }}"
+    path: "{{ __testing_sysctl_dropin_file_path }}"
   register: __testing_dropin_file
 
 
@@ -38,15 +41,15 @@
   ansible.builtin.assert:
     that:
       - __testing_dropin_file['stat']['exists']
-    fail_msg: "The sysctl drop-in configuration file '{{ __sysctl_linux_config_dropin_file_path }}' does not exist."
-    success_msg: "The sysctl drop-in configuration file '{{ __sysctl_linux_config_dropin_file_path }}' exists."
+    fail_msg: "The sysctl drop-in configuration file '{{ __testing_sysctl_dropin_file_path }}' does not exist."
+    success_msg: "The sysctl drop-in configuration file '{{ __testing_sysctl_dropin_file_path }}' exists."
 
 
 - name: "Molecule | Verify | Check if default sysctl drop-in configuration file does exists (if custom filename is used)"
   ansible.builtin.stat:
     path: "{{ __sysctl_linux_config_dropin_file_path_default }}"
   when:
-    - __sysctl_linux_config_dropin_file_path != __sysctl_linux_config_dropin_file_path_default
+    - __testing_sysctl_dropin_file_path != __sysctl_linux_config_dropin_file_path_default
   register: __testing_dropin_file_default
 
 
@@ -55,11 +58,11 @@
     that:
       - __testing_dropin_file_default['stat']['exists'] is ansible.builtin.false
     fail_msg: >-
-      The default sysctl drop-in configuration file '{{ __sysctl_linux_config_dropin_file_path }}' exists (even though a custom filename is used).
+      The default sysctl drop-in configuration file '{{ __testing_sysctl_dropin_file_path }}' exists (even though a custom filename is used).
     success_msg: >-
-      The default sysctl drop-in configuration file '{{ __sysctl_linux_config_dropin_file_path }}' does not exist (valid as custom filename is used).
+      The default sysctl drop-in configuration file '{{ __testing_sysctl_dropin_file_path }}' does not exist (valid as custom filename is used).
   when:
-    - __sysctl_linux_config_dropin_file_path != __sysctl_linux_config_dropin_file_path_default
+    - __testing_sysctl_dropin_file_path != __sysctl_linux_config_dropin_file_path_default
 
 
 - name: "Molecule | Verify | Check the legacy default drop-in file was removed"
@@ -72,7 +75,7 @@
 
 - name: "Molecule | Verify | Read sysctl drop-in configuration file content"
   ansible.builtin.slurp:
-    src: "{{ __sysctl_linux_config_dropin_file_path }}"
+    src: "{{ __testing_sysctl_dropin_file_path }}"
   register: __testing_dropin_content
 
 
@@ -759,7 +762,7 @@
 
     - name: "Molecule | Verify | Check the managed drop-in file was removed"
       ansible.builtin.stat:
-        path: "{{ __sysctl_linux_config_dropin_file_path }}"
+        path: "{{ __testing_sysctl_dropin_file_path }}"
       register: __testing_dropin_after_uninstall
 
 

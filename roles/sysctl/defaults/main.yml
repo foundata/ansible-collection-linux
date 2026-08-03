@@ -245,4 +245,4 @@ sysctl_linux_ignore_unknown_key_errors: false
 # - Type: str
 # - Required: No
 # - Default: zz-managed.conf
-sysctl_linux_config_dropin_file_name: "90-managed.conf"
+sysctl_linux_config_dropin_file_name: "zz-managed.conf"

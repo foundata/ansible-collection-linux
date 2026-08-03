@@ -1,0 +1,68 @@
+# Check the foundata.linux.sysctl DEFAULT drop-in file name.
+#
+# Regression background: the documented default file name (zz-managed.conf,
+# chosen so distribution files like 99-protect-links.conf cannot override
+# managed keys) once diverged from the actual value in defaults/main.yml
+# (90-managed.conf). Every other test passes a custom file name and
+# ansible-docsmith only validates the PRESENCE of defaults, not their values,
+# so nothing caught it. The defaults file is loaded directly (its value must
+# match the documentation) and the role then runs with exactly that value, so
+# a diverging default becomes visible both statically and on disk.
+# (A run with the pure default is not possible here: the converge-time
+# sysctl_linux_* set_fact variables survive even ansible.builtin.meta
+# clear_facts and would shadow the role default.)
+
+- name: "Molecule | Verify | sysctl default name | Load the role defaults from the installed collection"
+  ansible.builtin.include_vars:
+    file: "{{ lookup('ansible.builtin.env', 'HOME') }}/.ansible/collections/ansible_collections/foundata/linux/roles/sysctl/defaults/main.yml"
+    name: "__testing_sysctl_role_defaults"
+
+
+- name: "Molecule | Verify | sysctl default name | Assert the defaults value matches the documented default"
+  ansible.builtin.assert:
+    that:
+      - __testing_sysctl_role_defaults['sysctl_linux_config_dropin_file_name'] == 'zz-managed.conf'
+    fail_msg: >-
+      defaults/main.yml carries
+      '{{ __testing_sysctl_role_defaults['sysctl_linux_config_dropin_file_name'] }}'
+      as the drop-in file name: it diverges from the documented default
+      'zz-managed.conf', so default configurations lose against distribution
+      files like 99-protect-links.conf again.
+    success_msg: "The defaults value matches the documented zz-managed.conf."
+
+
+- name: "Molecule | Verify | sysctl default name | Include the foundata.linux.sysctl role with the defaults value"
+  ansible.builtin.include_role:
+    name: "foundata.linux.sysctl"
+  vars:
+    sysctl_linux_config_dropin_file_name: "{{ __testing_sysctl_role_defaults['sysctl_linux_config_dropin_file_name'] }}"
+    sysctl_linux_parameters:
+      "net.ipv4.tcp_syncookies": 1
+
+
+- name: "Molecule | Verify | sysctl default name | Get information about the drop-in files"
+  ansible.builtin.stat:
+    path: "/etc/sysctl.d/{{ item }}"
+  register: __testing_sysctl_defaultname_stat
+  loop:
+    - "zz-managed.conf"
+    - "90-managed.conf"
+
+
+- name: "Molecule | Verify | sysctl default name | Assert the documented default file name is used"
+  ansible.builtin.assert:
+    that:
+      - __testing_sysctl_defaultname_stat['results'][0]['stat']['exists']
+      - not __testing_sysctl_defaultname_stat['results'][1]['stat']['exists']
+    fail_msg: >-
+      The role did not create /etc/sysctl.d/zz-managed.conf when running with
+      the defaults value (or created the legacy 90-managed.conf).
+    success_msg: "The default drop-in file name is zz-managed.conf, as documented."
+
+
+- name: "Molecule | Verify | sysctl default name | Remove the deployment again (leave a clean state)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.sysctl"
+  vars:
+    sysctl_linux_config_dropin_file_name: "{{ __testing_sysctl_role_defaults['sysctl_linux_config_dropin_file_name'] }}"
+    sysctl_linux_state: "absent"

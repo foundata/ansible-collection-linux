@@ -1,0 +1,11 @@
+---
+
+bugfixes:
+  - >
+    ``sysctl`` - the drop-in precedence fix of an earlier release was not
+    effective for default configurations: the documentation said
+    ``zz-managed.conf`` but ``defaults/main.yml`` still carried
+    ``90-managed.conf``, so distribution files like ``99-protect-links.conf``
+    could still override managed keys (and a ``zz-managed.conf`` from a
+    previous run was even removed as a leftover). The default value now
+    matches the documentation.
