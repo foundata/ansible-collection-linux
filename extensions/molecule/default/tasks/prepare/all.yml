@@ -2,6 +2,20 @@
 # (e.g. verify) on all driver-created instances.
 
 
+# Bring the instance to the current package level BEFORE any role runs: the
+# auto_update role enables unattended-upgrades during converge and the
+# apt-daily catch-up timers fire shortly after boot, so a pending update
+# (e.g. a new kernel) would get installed in the background BETWEEN converge
+# and idempotence - and the reboot role then legitimately reboots on the
+# second run, failing the idempotence stage.
+- name: "Molecule | Prepare | Upgrade all packages (deterministic state for the idempotence stage)"
+  ansible.builtin.apt:
+    upgrade: "dist"
+    update_cache: true
+  when:
+    - (ansible_facts['os_family'] | ansible.builtin.lower) == 'debian'
+
+
 - name: "Molecule | Verify | Initialize the foundata.linux.sysctl role (without actually running it; get and expose variables)"
   ansible.builtin.include_role:
     name: "foundata.linux.sysctl"
