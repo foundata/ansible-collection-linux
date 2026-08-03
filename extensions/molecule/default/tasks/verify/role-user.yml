@@ -147,6 +147,9 @@
       # keyuser keeps the managed key but the stray key was purged (exclusive)
       - "'AAAAC3NzaC1lZDI1NTE5AAAAIKR6FdXomFQ1h6RmzQxN4GWmqgV/GXE9RNOBh0iMQgEQ' in __testing_keyuser_ak"
       - "'AAAAC3NzaC1lZDI1NTE5AAAAILmFhCG3dipt7baMWEJOo9chtWBt+rpTsltkYcnd4jcu' not in __testing_keyuser_ak"
+      # one key PER LINE (substring checks alone cannot see this): a broken
+      # newline join once collapsed both keys into a single invalid line
+      - (__testing_user1_ak.splitlines() | ansible.builtin.select('ansible.builtin.search', 'ssh-ed25519') | ansible.builtin.length) == 2
     fail_msg: "The authorized_keys files do not match the expected managed state."
     success_msg: "All authorized_keys files contain exactly the expected managed keys."
 

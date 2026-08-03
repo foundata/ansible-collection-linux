@@ -116,6 +116,10 @@
         __user_linux_account_defaults_effective
         | ansible.builtin.combine(__user_linux_account_item, recursive=true)
       }}
+    # YAML (not Jinja) escape processing yields the real newline character:
+    # Jinja string literals in task files keep '\n' as two characters, which
+    # would garble multi-key blobs into a single invalid line.
+    __user_linux_nl: "\n"
     # Build a newline-joined authorized_keys blob: each present entry rendered as
     # "<options> <key>" (options prepended only when set). Passed as a single key
     # so "exclusive" can manage the whole set authoritatively.
@@ -127,7 +131,7 @@
       {%-     set _ = __ns.lines.append(((__opt ~ ' ') if (__opt | ansible.builtin.length) > 0 else '') ~ __e['key']) -%}
       {%-   endif -%}
       {%- endfor -%}
-      {{ __ns.lines | ansible.builtin.join('\n') }}
+      {{ __ns.lines | ansible.builtin.join(__user_linux_nl) }}
   when:
     # 'state' is always populated from the internal defaults (and should raise an error if
     # missing.as it indicates broken defaults)

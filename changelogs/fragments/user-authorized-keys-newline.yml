@@ -1,0 +1,8 @@
+---
+
+bugfixes:
+  - >
+    ``user`` - accounts with more than one managed SSH key got their
+    ``authorized_keys`` entries joined with a literal ``\n`` text instead of
+    real newlines (a Jinja escape-handling pitfall), garbling the keys into
+    a single line.
