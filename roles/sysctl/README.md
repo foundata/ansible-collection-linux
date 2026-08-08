@@ -205,7 +205,8 @@ profile on to the hardening baseline and kernel hardening on top of the
 workload profile.
 
 The workload profiles (`web`, `postgresql`, `mysql`, `redis`, `elasticsearch`,
-`file`, `virtualization`, `container`, `router`/`router_v4only`/`router_v6only`)
+`file`, `virtualization`, `container`, `container-rootless`,
+`router`/`router_v4only`/`router_v6only`)
 tune for performance and reliability. Security hardening lives in separate, stackable
 profiles: `hardening-default` (shared safe network/kernel/filesystem defaults) and
 `hardening-extra` (stricter kernel hardening).
@@ -229,9 +230,16 @@ Available base profiles (alphabetical order):
 Available workload profiles (alphabetical order):
 
 - `container`: IP forwarding, bridge netfilter, connection tracking, neighbor
-  tables, inotify and keyring quotas. Recommended for OCI container hosts
-  (Docker, Podman incl. rootless, containerd/CRI-O). See
+  tables, inotify and keyring quotas. Recommended for container hosts with
+  rootful/bridged networking (Docker, rootful Podman/netavark,
+  containerd/CRI-O, Kubernetes nodes). For hosts running only rootless
+  containers with user-mode networking, use `container-rootless` instead. See
   [`container.md`](./vars/profiles/container.md) for details.
+- `container-rootless`: Per-UID inotify and kernel keyring quotas for hosts
+  running only rootless containers with user-mode networking (Podman with
+  pasta or slirp4netns). Such hosts do not bridge or NAT container traffic,
+  so no forwarding/bridge/conntrack keys and no kernel modules are needed. See
+  [`container-rootless.md`](./vars/profiles/container-rootless.md) for details.
 - `elasticsearch`: Mandatory `vm.max_map_count`, file limits and memory policy
   for Elasticsearch/OpenSearch. See
   [`elasticsearch.md`](./vars/profiles/elasticsearch.md) for details.
@@ -272,7 +280,7 @@ a reboot (or a manual `sysctl -w` / `modprobe -r`).
 - **Type**: `list`
 - **Required**: No
 - **Default**: `[]`
-- **Choices**: `web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`, `virtualization`, `container`, `router`, `router_v4only`, `router_v6only`, `hardening-default`, `hardening-extra`
+- **Choices**: `web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`, `virtualization`, `container`, `container-rootless`, `router`, `router_v4only`, `router_v6only`, `hardening-default`, `hardening-extra`
 - **List Elements**: `str`
 
 

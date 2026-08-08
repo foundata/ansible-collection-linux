@@ -1,0 +1,10 @@
+---
+
+minor_changes:
+  - >-
+    sysctl: new `container-rootless` profile with the per-UID inotify and
+    kernel keyring quotas for hosts running only rootless containers with
+    user-mode networking (Podman with pasta or slirp4netns). Such hosts never
+    bridge or NAT container traffic, so the forwarding/bridge/conntrack keys
+    and kernel modules of the `container` profile are unnecessary there; the
+    `container` profile documentation now states its rootful/bridged scope.

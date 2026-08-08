@@ -1,0 +1,56 @@
+# Coverage for the "container-rootless" profile: only the per-UID quota keys,
+# no networking machinery and no kernel modules (so it must converge even on
+# kernels that cannot load optional modules, e.g. EL10 cloud images).
+
+- name: "Molecule | Verify | sysctl rootless | Include the sysctl role with the container-rootless profile"
+  ansible.builtin.include_role:
+    name: "foundata.linux.sysctl"
+  vars:
+    sysctl_linux_profile: ["container-rootless"]
+    sysctl_linux_parameters: {}
+    sysctl_linux_config_dropin_file_name: "zz-testing-rootless.conf"
+
+
+- name: "Molecule | Verify | sysctl rootless | Read the rendered drop-in"
+  ansible.builtin.slurp:
+    src: "/etc/sysctl.d/zz-testing-rootless.conf"
+  register: __testing_sysctl_rootless_dropin
+
+
+- name: "Molecule | Verify | sysctl rootless | Decode the rendered drop-in"
+  ansible.builtin.set_fact:
+    __testing_sysctl_rootless_dropin_content: "{{ __testing_sysctl_rootless_dropin['content'] | ansible.builtin.b64decode }}"
+
+
+- name: "Molecule | Verify | sysctl rootless | Assert quota keys are present and networking machinery is absent"
+  ansible.builtin.assert:
+    that:
+      - >-
+        __testing_sysctl_rootless_dropin_content
+        is ansible.builtin.search('fs\.inotify\.max_user_watches')
+      - >-
+        __testing_sysctl_rootless_dropin_content
+        is ansible.builtin.search('kernel\.keys\.maxkeys')
+      - >-
+        not (__testing_sysctl_rootless_dropin_content
+             is ansible.builtin.search('net\.bridge\.|net\.netfilter\.|ip_forward|ip_unprivileged_port_start'))
+    fail_msg: >-
+      The container-rootless drop-in does not match the intended minimal key
+      set: {{ __testing_sysctl_rootless_dropin_content }}
+    success_msg: "The container-rootless profile renders only the per-UID quota keys."
+
+
+- name: "Molecule | Verify | sysctl rootless | Assert a live per-UID quota value"
+  ansible.builtin.command:
+    argv: ["sysctl", "-n", "fs.inotify.max_user_instances"]
+  changed_when:
+    - false
+  register: __testing_sysctl_rootless_live
+  failed_when:
+    - __testing_sysctl_rootless_live['stdout'] != '1024'
+
+
+- name: "Molecule | Verify | sysctl rootless | Remove the test drop-in"
+  ansible.builtin.file:
+    path: "/etc/sysctl.d/zz-testing-rootless.conf"
+    state: "absent"

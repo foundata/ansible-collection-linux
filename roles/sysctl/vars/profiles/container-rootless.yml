@@ -1,0 +1,45 @@
+# Variables for the sysctl profile "container-rootless"
+#
+# Tuning for hosts that run only rootless OCI containers with user-mode
+# networking (Podman with pasta or slirp4netns). Such hosts never bridge or
+# NAT container traffic - published ports are bound in userspace by the
+# container user - so none of the forwarding/bridge/conntrack machinery of the
+# "container" profile is needed, nor its kernel modules. What remains scarce
+# are the per-UID kernel quotas all containers of one rootless user share:
+# inotify instances/watches and kernel keyrings. See container-rootless.md for
+# the reasoning behind every value.
+#
+# This profile targets container host function only. For the shared security
+# hardening, stack the "hardening-default" profile (usually first), e.g.
+# sysctl_linux_profile: ["hardening-default", "container-rootless"].
+#
+# Note: binding privileged ports (80/443) rootlessly additionally needs
+# net.ipv4.ip_unprivileged_port_start lowered - a host-wide relaxation this
+# profile deliberately does NOT apply; set it via sysctl_linux_parameters if
+# needed.
+
+---
+
+# No kernel modules needed: all keys below are provided by the core kernel.
+__sysctl_linux_profile_modules: {}
+
+
+__sysctl_linux_profile_parameters:
+
+  ## inotify (per-UID quotas)
+
+  # Many containers multiply inotify consumers (config watchers, log tailers,
+  # supervisors) while the quotas are per UID - which all containers of the
+  # same rootless user share. Same values as the "container" and "file"
+  # profiles.
+  "fs.inotify.max_user_watches": 524288
+  "fs.inotify.max_user_instances": 1024
+
+  ## Kernel keyring (per-UID quotas)
+
+  # Each container gets its own session keyring, counted against the per-UID
+  # quota of the owning rootless user. The kernel defaults (200 keys, 20000
+  # bytes) fail around 200 containers; values from the Incus/LXD production
+  # guide.
+  "kernel.keys.maxkeys": 2000
+  "kernel.keys.maxbytes": 2000000
