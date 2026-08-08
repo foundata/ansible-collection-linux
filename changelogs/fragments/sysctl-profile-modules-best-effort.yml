@@ -1,0 +1,17 @@
+---
+
+bugfixes:
+  - >-
+    sysctl: kernel modules required by a profile are now loaded best effort on
+    every platform, as documented. Previously a load failure was fatal outside
+    of containers, which broke the `container` profile on Enterprise Linux 10
+    cloud images (their running kernel cannot load `br_netfilter`: the module
+    ships in `kernel-modules-extra`, which GenericCloud images do not
+    install). Parameters gated by an unloadable module are now skipped with a
+    notice on any platform, keeping the rendered configuration valid.
+
+minor_changes:
+  - >-
+    sysctl: new option `sysctl_linux_modules_required` (default `false`) to
+    fail the run instead when a profile kernel module cannot be loaded
+    (detected containers are still tolerated).

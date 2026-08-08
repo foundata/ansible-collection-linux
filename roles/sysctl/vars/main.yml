@@ -174,18 +174,43 @@ __sysctl_linux_profile_modules: []
 # profile auto-calculated values are already rendered eagerly during the
 # accumulation in tasks/load_profile.yml; the user-supplied parameters merged on
 # top here are resolved on access.
+__sysctl_linux_effective_parameters_unfiltered: >-
+  {{
+    (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
+    | ansible.builtin.combine(sysctl_linux_parameters | ansible.builtin.default({}))
+  }}
+
+
+# Key prefixes dropped from the effective parameters: net.ipv6.* when IPv6 is
+# unavailable, plus the prefixes gated by profile kernel modules that could
+# not be loaded (both determined in tasks/init.yml).
+__sysctl_linux_effective_parameters_dropped_prefixes: >-
+  {{
+    ((['net.ipv6.'] if (not (__sysctl_linux_ipv6_available | ansible.builtin.default(true))) else [])
+     + (__sysctl_linux_module_gated_prefixes_unavailable | ansible.builtin.default([])))
+  }}
+
+
 __sysctl_linux_effective_parameters: >-
   {{
-    (
-      (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
-      | ansible.builtin.combine(sysctl_linux_parameters | ansible.builtin.default({}))
+    ((__sysctl_linux_effective_parameters_unfiltered
       | ansible.builtin.dict2items
-      | ansible.builtin.rejectattr('key', 'ansible.builtin.match', '^net\.ipv6\.')
-      | ansible.builtin.items2dict
-    )
-    if (not (__sysctl_linux_ipv6_available | ansible.builtin.default(true)))
-    else (__sysctl_linux_profile_parameters | ansible.builtin.default({}))
-         | ansible.builtin.combine(sysctl_linux_parameters | ansible.builtin.default({}))
+      | ansible.builtin.rejectattr('key', 'ansible.builtin.match',
+          '(' ~ (__sysctl_linux_effective_parameters_dropped_prefixes
+                 | ansible.builtin.map('ansible.builtin.regex_escape')
+                 | ansible.builtin.join('|')) ~ ')')
+      | ansible.builtin.items2dict)
+     if ((__sysctl_linux_effective_parameters_dropped_prefixes | ansible.builtin.length) > 0)
+     else __sysctl_linux_effective_parameters_unfiltered)
+  }}
+
+
+# Convenience list of the parameter keys dropped by the filtering above (used
+# for user-facing notices).
+__sysctl_linux_effective_parameters_dropped_keys: >-
+  {{
+    (__sysctl_linux_effective_parameters_unfiltered.keys() | ansible.builtin.list)
+    | ansible.builtin.difference(__sysctl_linux_effective_parameters.keys() | ansible.builtin.list)
   }}
 
 

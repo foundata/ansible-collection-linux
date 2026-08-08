@@ -1,0 +1,232 @@
+# Regression test: profile kernel modules load best effort on EVERY platform.
+#
+# Background: the "container" profile depends on br_netfilter, which
+# Enterprise Linux 10 cloud images cannot load (br_netfilter.ko ships in
+# kernel-modules-extra, which GenericCloud images do not install). The role
+# used to hard-fail there despite its "best effort" claim. It must now
+# converge everywhere, drop the parameters gated by an unloadable module with
+# a notice, and only fail when sysctl_linux_modules_required is enabled.
+#
+# Coverage comes in two parts. The availability-adaptive checks below assert
+# both directions (keys present exactly where the module is loadable) on
+# whatever the platform provides - note the molecule VMs usually CAN load
+# every profile module (the prepare stage upgrades the kernel/module
+# packages), unlike the stock cloud images of the original incident. The
+# synthetic-negative section afterwards therefore forces the unloadable case
+# deterministically on every platform.
+
+- name: "Molecule | Verify | sysctl modules | Probe which profile kernel modules the running kernel can resolve"
+  ansible.builtin.command:
+    argv: ["modprobe", "-n", "{{ __testing_sysctl_module_item }}"]
+  changed_when:
+    - false
+  failed_when:
+    - false
+  loop:
+    - "br_netfilter"
+    - "nf_conntrack"
+  loop_control:
+    loop_var: "__testing_sysctl_module_item"
+  register: __testing_sysctl_module_probe
+
+
+- name: "Molecule | Verify | sysctl modules | Set module availability facts"
+  ansible.builtin.set_fact:
+    __testing_sysctl_brnf_available: "{{ __testing_sysctl_module_probe['results'][0]['rc'] == 0 }}"
+    __testing_sysctl_conntrack_available: "{{ __testing_sysctl_module_probe['results'][1]['rc'] == 0 }}"
+
+
+- name: "Molecule | Verify | sysctl modules | Show module availability"
+  ansible.builtin.debug:
+    msg: >-
+      Resolvable by the running kernel: br_netfilter={{ __testing_sysctl_brnf_available }},
+      nf_conntrack={{ __testing_sysctl_conntrack_available }}
+
+
+# Explicit empty sysctl_linux_parameters: converge-time set_fact variables
+# survive into verify and would otherwise leak into this run (include_role
+# vars beat set_fact).
+- name: "Molecule | Verify | sysctl modules | Include the sysctl role with the container profile (best effort default)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.sysctl"
+  vars:
+    sysctl_linux_profile: ["container"]
+    sysctl_linux_parameters: {}
+    sysctl_linux_config_dropin_file_name: "zz-testing-modules.conf"
+
+
+- name: "Molecule | Verify | sysctl modules | Read the rendered drop-in"
+  ansible.builtin.slurp:
+    src: "/etc/sysctl.d/zz-testing-modules.conf"
+  register: __testing_sysctl_modules_dropin
+
+
+- name: "Molecule | Verify | sysctl modules | Decode the rendered drop-in"
+  ansible.builtin.set_fact:
+    __testing_sysctl_modules_dropin_content: "{{ __testing_sysctl_modules_dropin['content'] | ansible.builtin.b64decode }}"
+
+
+- name: "Molecule | Verify | sysctl modules | Assert module-gated keys match the module availability"
+  ansible.builtin.assert:
+    that:
+      - >-
+        (__testing_sysctl_modules_dropin_content
+         is ansible.builtin.search('net\.bridge\.bridge-nf-call-iptables'))
+        == (__testing_sysctl_brnf_available | ansible.builtin.bool)
+      - >-
+        (__testing_sysctl_modules_dropin_content
+         is ansible.builtin.search('net\.netfilter\.nf_conntrack_max'))
+        == (__testing_sysctl_conntrack_available | ansible.builtin.bool)
+      # keys without module dependency are present regardless
+      - >-
+        __testing_sysctl_modules_dropin_content
+        is ansible.builtin.search('net\.ipv4\.ip_forward')
+    fail_msg: >-
+      The rendered drop-in does not match the module availability
+      (br_netfilter={{ __testing_sysctl_brnf_available }},
+      nf_conntrack={{ __testing_sysctl_conntrack_available }}):
+      {{ __testing_sysctl_modules_dropin_content }}
+    success_msg: "Module-gated keys are present exactly where their module is loadable."
+
+
+- name: "Molecule | Verify | sysctl modules | Check the live bridge netfilter value (module loaded and applied)"
+  ansible.builtin.command:
+    argv: ["sysctl", "-n", "net.bridge.bridge-nf-call-iptables"]
+  changed_when:
+    - false
+  register: __testing_sysctl_brnf_live
+  when:
+    - __testing_sysctl_brnf_available | ansible.builtin.bool
+
+
+- name: "Molecule | Verify | sysctl modules | Assert the live bridge netfilter value"
+  ansible.builtin.assert:
+    that:
+      - __testing_sysctl_brnf_live['stdout'] == '1'
+    fail_msg: "br_netfilter is loadable but net.bridge.bridge-nf-call-iptables is not applied."
+    success_msg: "br_netfilter got loaded and net.bridge.bridge-nf-call-iptables is applied."
+  when:
+    - __testing_sysctl_brnf_available | ansible.builtin.bool
+
+
+# sysctl_linux_modules_required: true must fail exactly on the platforms where
+# a profile module is unloadable, and change nothing on the others.
+- name: "Molecule | Verify | sysctl modules | Attempt a run with sysctl_linux_modules_required enabled"
+  block:
+
+    - name: "Molecule | Verify | sysctl modules | Include the sysctl role requiring the profile modules"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+      vars:
+        sysctl_linux_profile: ["container"]
+        sysctl_linux_parameters: {}
+        sysctl_linux_config_dropin_file_name: "zz-testing-modules.conf"
+        sysctl_linux_modules_required: true
+
+    - name: "Molecule | Verify | sysctl modules | Record that the required-modules run succeeded"
+      ansible.builtin.set_fact:
+        __testing_sysctl_required_failed: false
+
+  rescue:
+
+    - name: "Molecule | Verify | sysctl modules | Record that the required-modules run failed"
+      ansible.builtin.set_fact:
+        __testing_sysctl_required_failed: true
+
+
+- name: "Molecule | Verify | sysctl modules | Assert sysctl_linux_modules_required fails exactly on unloadable modules"
+  ansible.builtin.assert:
+    that:
+      - >-
+        (__testing_sysctl_required_failed | ansible.builtin.bool)
+        == (not ((__testing_sysctl_brnf_available | ansible.builtin.bool)
+                 and (__testing_sysctl_conntrack_available | ansible.builtin.bool)))
+    fail_msg: >-
+      sysctl_linux_modules_required=true
+      {{ 'failed although all modules are loadable' if (__testing_sysctl_required_failed | ansible.builtin.bool)
+         else 'did not fail although a module is unloadable' }}
+      (br_netfilter={{ __testing_sysctl_brnf_available }},
+      nf_conntrack={{ __testing_sysctl_conntrack_available }}).
+    success_msg: "sysctl_linux_modules_required behaves correctly for this platform."
+
+
+# Synthetic negative: the role-internal module map is overridden with a
+# module that cannot exist. include_role vars are role params (precedence
+# 20) and shadow the role's set_fact accumulator (precedence 19), so init
+# probes only the bogus mapping, which gates the net.bridge.* prefix. The
+# role must converge, drop those keys from the drop-in with a notice and
+# keep all others. (Ordering note: the net.netfilter.* keys stay writable
+# for the live-apply because the positive run above already loaded
+# nf_conntrack.)
+- name: "Molecule | Verify | sysctl modules | Include the sysctl role with an unloadable module mapping (synthetic negative)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.sysctl"
+  vars:
+    sysctl_linux_profile: ["container"]
+    sysctl_linux_parameters: {}
+    sysctl_linux_config_dropin_file_name: "zz-testing-modules.conf"
+    __sysctl_linux_profile_modules:
+      molecule_testing_nonexistent_module: ["net.bridge."]
+
+
+- name: "Molecule | Verify | sysctl modules | Read the drop-in after the synthetic negative run"
+  ansible.builtin.slurp:
+    src: "/etc/sysctl.d/zz-testing-modules.conf"
+  register: __testing_sysctl_neg_dropin
+
+
+- name: "Molecule | Verify | sysctl modules | Assert the gated keys were dropped and all others kept"
+  ansible.builtin.assert:
+    that:
+      - >-
+        not ((__testing_sysctl_neg_dropin['content'] | ansible.builtin.b64decode)
+             is ansible.builtin.search('net\.bridge\.'))
+      - >-
+        (__testing_sysctl_neg_dropin['content'] | ansible.builtin.b64decode)
+        is ansible.builtin.search('net\.netfilter\.nf_conntrack_max')
+      - >-
+        (__testing_sysctl_neg_dropin['content'] | ansible.builtin.b64decode)
+        is ansible.builtin.search('net\.ipv4\.ip_forward')
+    fail_msg: >-
+      The synthetic unloadable module did not drop exactly the net.bridge.*
+      keys: {{ __testing_sysctl_neg_dropin['content'] | ansible.builtin.b64decode }}
+    success_msg: "An unloadable module drops exactly the keys it gates; the run stays green."
+
+
+- name: "Molecule | Verify | sysctl modules | Attempt the synthetic negative with sysctl_linux_modules_required enabled"
+  block:
+
+    - name: "Molecule | Verify | sysctl modules | Include the sysctl role requiring the unloadable module"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+      vars:
+        sysctl_linux_profile: ["container"]
+        sysctl_linux_parameters: {}
+        sysctl_linux_config_dropin_file_name: "zz-testing-modules.conf"
+        sysctl_linux_modules_required: true
+        __sysctl_linux_profile_modules:
+          molecule_testing_nonexistent_module: ["net.bridge."]
+
+    - name: "Molecule | Verify | sysctl modules | Record that the synthetic required-modules run succeeded"
+      ansible.builtin.set_fact:
+        __testing_sysctl_required_neg_failed: false
+
+  rescue:
+
+    - name: "Molecule | Verify | sysctl modules | Record that the synthetic required-modules run failed"
+      ansible.builtin.set_fact:
+        __testing_sysctl_required_neg_failed: true
+
+
+- name: "Molecule | Verify | sysctl modules | Assert sysctl_linux_modules_required fails on the unloadable module"
+  ansible.builtin.assert:
+    that:
+      - __testing_sysctl_required_neg_failed | ansible.builtin.bool
+    fail_msg: "sysctl_linux_modules_required=true did not fail although the (synthetic) profile module is unloadable."
+    success_msg: "sysctl_linux_modules_required=true fails as intended when a profile module cannot be loaded."
+
+
+- name: "Molecule | Verify | sysctl modules | Remove the test drop-in"
+  ansible.builtin.file:
+    path: "/etc/sysctl.d/zz-testing-modules.conf"
+    state: "absent"

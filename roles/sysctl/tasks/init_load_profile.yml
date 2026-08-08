@@ -3,7 +3,7 @@
 #
 # This file gets included once per entry of sysctl_linux_profile by
 # tasks/init.yml. Profiles are stacked in list order: later profiles win on
-# conflicting parameter keys, and required kernel modules are unioned.
+# conflicting parameter keys, and kernel module mappings are merged.
 #
 # We use a separate include_tasks file (and include_vars) instead of an inline
 # "lookup('file') | from_yaml" in init.yml as include_vars templaates the values
@@ -40,7 +40,7 @@
       }}
     __sysctl_linux_profile_modules: >-
       {{
-        ((__sysctl_linux_profile_modules | ansible.builtin.default([]))
-         + (__sysctl_linux_profile_current['__sysctl_linux_profile_modules'] | ansible.builtin.default([])))
-        | ansible.builtin.unique
+        (__sysctl_linux_profile_modules | ansible.builtin.default({}))
+        | ansible.builtin.combine(__sysctl_linux_profile_current['__sysctl_linux_profile_modules']
+                                  | ansible.builtin.default({}))
       }}

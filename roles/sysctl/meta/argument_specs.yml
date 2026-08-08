@@ -55,7 +55,9 @@ argument_specs:
 
           Profiles are applied in the given order and, for a parameter set by more than
           one profile, the later profile wins. The required kernel modules (if any) of
-          all selected profiles are loaded automatically. An empty list (the default)
+          all selected profiles are loaded automatically - best effort by default:
+          when a module cannot be loaded, the parameters it gates are skipped with
+          a notice (see `sysctl_linux_modules_required`). An empty list (the default)
           applies no profile; and only explicit `sysctl_linux_parameters` are set then.
 
           A single profile is a one-element list, e.g. `["web"]`. Profiles can be
@@ -229,6 +231,22 @@ argument_specs:
           parameters should be available.
         type: "bool"
         default: false
+
+      sysctl_linux_modules_required:
+        description: |
+          Kernel modules required by the selected profiles are loaded best effort by
+          default: when a module cannot be loaded (e.g. containers, cloud images
+          whose running kernel lacks optional module packages like
+          `kernel-modules-extra`, custom kernels), the role skips the parameters
+          gated by that module with a notice and continues.
+
+          Set to `true` to fail the run instead when a profile kernel module cannot
+          be loaded. Use this when a silently degraded profile would be worse than a
+          failed run. Detected containers are still tolerated even then, as module
+          loading is not possible there by design.
+        type: "bool"
+        default: false
+        version_added: "1.2.0"
 
       sysctl_linux_config_dropin_file_name:
         description: |

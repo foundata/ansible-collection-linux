@@ -22,13 +22,13 @@
 
 ---
 
-# Kernel modules this profile depends on. nf_conntrack provides the
-# net.netfilter.nf_conntrack_* keys and br_netfilter the net.bridge.* keys
-# below; both are loaded best-effort by tasks/init.yml (tolerated if
-# unavailable, e.g. in containers).
+# Kernel modules this profile depends on, mapped to the parameter key
+# prefixes they gate. Loaded best-effort by tasks/init.yml: if a module
+# cannot be loaded, the keys under its prefixes are skipped with a notice
+# (see sysctl_linux_modules_required).
 __sysctl_linux_profile_modules:
-  - "nf_conntrack"
-  - "br_netfilter"
+  nf_conntrack: ["net.netfilter."]
+  br_netfilter: ["net.bridge."]
 
 
 __sysctl_linux_profile_parameters:

@@ -147,6 +147,7 @@ Manages Linux kernel parameters through `sysctl`, combining explicit overrides w
     - [`sysctl_linux_reload`](roles/sysctl/README.md#variable-sysctl_linux_reload)
     - [`sysctl_linux_verify`](roles/sysctl/README.md#variable-sysctl_linux_verify)
     - [`sysctl_linux_ignore_unknown_key_errors`](roles/sysctl/README.md#variable-sysctl_linux_ignore_unknown_key_errors)
+    - [`sysctl_linux_modules_required`](roles/sysctl/README.md#variable-sysctl_linux_modules_required)
     - [`sysctl_linux_config_dropin_file_name`](roles/sysctl/README.md#variable-sysctl_linux_config_dropin_file_name)
   - [Dependencies](roles/sysctl/README.md#dependencies)
   - [Compatibility](roles/sysctl/README.md#compatibility)

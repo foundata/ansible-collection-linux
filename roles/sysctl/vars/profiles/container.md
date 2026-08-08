@@ -12,7 +12,7 @@ The profile depends on two kernel modules, loaded best-effort (persistently, via
 - `nf_conntrack` provides the `net.netfilter.nf_conntrack_*` keys.
 - `br_netfilter` provides the `net.bridge.bridge-nf-call-*` keys.
 
-Where a module cannot be loaded (e.g. unprivileged containers) the load is tolerated and the keys are simply skipped/read-only, no failure.
+Where a module cannot be loaded, the load is tolerated on every platform and the keys it gates are skipped with a notice (set `sysctl_linux_modules_required: true` for a hard failure instead). This happens in unprivileged containers, but also on e.g. Enterprise Linux 10 cloud images, whose running kernel cannot load `br_netfilter` (the module ships in `kernel-modules-extra`, which GenericCloud images do not install).
 
 
 ## IP forwarding

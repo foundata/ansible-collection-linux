@@ -161,12 +161,13 @@
 
 # Profiles are stacked: each entry of the sysctl_linux_profile list is loaded in
 # order and merged into the accumulators __sysctl_linux_profile_parameters and
-# __sysctl_linux_profile_modules, so a later profile wins on a key set by an
-# earlier one and the required kernel modules are unioned.
+# __sysctl_linux_profile_modules (a mapping of kernel module name to the
+# parameter key prefixes it gates), so a later profile wins on a key set by an
+# earlier one and the module mappings are merged.
 - name: "Init | Reset accumulated sysctl profile parameters and modules"
   ansible.builtin.set_fact:
     __sysctl_linux_profile_parameters: {}
-    __sysctl_linux_profile_modules: []
+    __sysctl_linux_profile_modules: {}
 
 
 - name: "Init | Accumulate sysctl profile variables (listed order; last wins, kernel modules unioned)"
@@ -226,22 +227,72 @@
 
 
 # Load kernel modules a profile depends on (e.g. nf_conntrack for routers,
-# br_netfilter for virtualization) so module-gated kernel parameters
-# (net.netfilter.*, net.bridge.*) exist and can be set. Best effort: failures
-# are tolerated in containers, where module loading is typically not possible
-# and such parameters are read-only anyway.
-- name: "Init | Load kernel modules required by the selected profile (best effort)"
+# br_netfilter for bridged container hosts) so module-gated kernel parameters
+# (net.netfilter.*, net.bridge.*) exist and can be set. Best effort on every
+# platform: when a module cannot be loaded (containers, cloud images without
+# the kernel-modules-extra package, custom kernels), only the parameters it
+# gates are dropped from the run with a notice (see the following tasks and
+# vars/main.yml). Set sysctl_linux_modules_required: true to fail instead.
+# ignore_errors (not failed_when) on purpose: a failed_when override would
+# clear the per-item 'failed' flag the following tasks need to compute the
+# skip set.
+- name: "Init | Load kernel modules required by the selected profile (best effort by default)"
   community.general.modprobe:
-    name: "{{ item }}"
+    name: "{{ item['key'] }}"
     state: "present"
     persistent: "present"
   when:
     - sysctl_linux_state == 'present'
     - (__sysctl_linux_profile_modules | ansible.builtin.length) > 0
-  failed_when:
-    - __sysctl_linux_modprobe_result is ansible.builtin.failed
-    - not __sysctl_linux_is_container
-  loop: "{{ __sysctl_linux_profile_modules }}"
+  loop: "{{ __sysctl_linux_profile_modules | ansible.builtin.dict2items }}"
   loop_control:
-    label: "{{ item }}"
+    label: "{{ item['key'] }}"
   register: __sysctl_linux_modprobe_result
+  ignore_errors: true # noqa: ignore-errors
+
+
+- name: "Init | Determine kernel modules that could not be loaded (and the key prefixes they gate)"
+  ansible.builtin.set_fact:
+    __sysctl_linux_modules_unavailable: >-
+      {{
+        __sysctl_linux_modprobe_result['results'] | ansible.builtin.default([])
+        | ansible.builtin.select('ansible.builtin.failed')
+        | ansible.builtin.map(attribute='item') | ansible.builtin.map(attribute='key')
+        | ansible.builtin.list
+      }}
+    __sysctl_linux_module_gated_prefixes_unavailable: >-
+      {{
+        __sysctl_linux_modprobe_result['results'] | ansible.builtin.default([])
+        | ansible.builtin.select('ansible.builtin.failed')
+        | ansible.builtin.map(attribute='item') | ansible.builtin.map(attribute='value')
+        | ansible.builtin.flatten | ansible.builtin.unique
+        | ansible.builtin.list
+      }}
+
+
+- name: "Init | Notify when module-gated parameters are skipped (module unavailable)"
+  ansible.builtin.debug:
+    msg: >-
+      The following kernel module(s) required by the selected profile(s) could
+      not be loaded: {{ __sysctl_linux_modules_unavailable | ansible.builtin.join(', ') }}.
+      Skipping the module-gated parameter(s):
+      {{ __sysctl_linux_effective_parameters_dropped_keys | ansible.builtin.join(', ') }}.
+      Set 'sysctl_linux_modules_required: true' to fail instead.
+  when:
+    - (__sysctl_linux_modules_unavailable | ansible.builtin.length) > 0
+
+
+- name: "Init | Fail when required kernel modules could not be loaded"
+  ansible.builtin.fail:
+    msg: >-
+      'sysctl_linux_modules_required' is enabled and the following kernel
+      module(s) required by the selected profile(s) could not be loaded:
+      {{ __sysctl_linux_modules_unavailable | ansible.builtin.join(', ') }}.
+      Reported error(s):
+      {{ __sysctl_linux_modprobe_result['results'] | ansible.builtin.default([])
+         | ansible.builtin.select('ansible.builtin.failed')
+         | ansible.builtin.map(attribute='msg') | ansible.builtin.join(' / ') }}
+  when:
+    - sysctl_linux_modules_required | ansible.builtin.bool
+    - not __sysctl_linux_is_container
+    - (__sysctl_linux_modules_unavailable | ansible.builtin.length) > 0

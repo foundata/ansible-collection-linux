@@ -18,6 +18,7 @@ Choose one or more profiles for your workload (web server, the database engines,
   - [`sysctl_linux_reload`](#variable-sysctl_linux_reload)
   - [`sysctl_linux_verify`](#variable-sysctl_linux_verify)
   - [`sysctl_linux_ignore_unknown_key_errors`](#variable-sysctl_linux_ignore_unknown_key_errors)
+  - [`sysctl_linux_modules_required`](#variable-sysctl_linux_modules_required)
   - [`sysctl_linux_config_dropin_file_name`](#variable-sysctl_linux_config_dropin_file_name)
 <!-- ANSIBLE DOCSMITH TOC END -->
 - [Dependencies](#dependencies)
@@ -135,6 +136,7 @@ The following variables can be configured for this role:
 | `sysctl_linux_reload` | `bool` | No | `true` | If set to `true`, triggers `sysctl --system` after configuration changes to reload all sysctl configuration files following the proper precedence order. This ensures all drop-in files and possibly existing other sysctl configuration files not managed […](#variable-sysctl_linux_reload) |
 | `sysctl_linux_verify` | `bool` | No | `true` | If set to `true`, verifies the parameter value using the sysctl command and actively sets it in the running kernel using `sysctl -w` if the current value differs from the desired one.<br><br>When `false`, only writes the parameter to the […](#variable-sysctl_linux_verify) |
 | `sysctl_linux_ignore_unknown_key_errors` | `bool` | No | `false` | If set to `true`, ignores errors caused by unknown or unsupported kernel parameter keys. This is useful in container environments where certain parameters may not exist or be accessible.<br><br>Generally not recommended for bare-metal or VM […](#variable-sysctl_linux_ignore_unknown_key_errors) |
+| `sysctl_linux_modules_required` | `bool` | No | `false` | Kernel modules required by the selected profiles are loaded best effort by default: when a module cannot be loaded (e.g. containers, cloud images whose running kernel lacks optional module packages like `kernel-modules-extra`, custom kernels), the […](#variable-sysctl_linux_modules_required) |
 | `sysctl_linux_config_dropin_file_name` | `str` | No | `"zz-managed.conf"` | Filename of the drop-in configuration file to be placed in `/etc/sysctl.d/`. Defaults to `zz-managed.conf`. `sysctl --system` and `systemd-sysctl` apply all `sysctl.d` files sorted by filename, later files overriding earlier ones, and distributions […](#variable-sysctl_linux_config_dropin_file_name) |
 
 ### `sysctl_linux_state`<a id="variable-sysctl_linux_state"></a>
@@ -192,7 +194,9 @@ for specific workloads.
 
 Profiles are applied in the given order and, for a parameter set by more than
 one profile, the later profile wins. The required kernel modules (if any) of
-all selected profiles are loaded automatically. An empty list (the default)
+all selected profiles are loaded automatically - best effort by default:
+when a module cannot be loaded, the parameters it gates are skipped with
+a notice (see `sysctl_linux_modules_required`). An empty list (the default)
 applies no profile; and only explicit `sysctl_linux_parameters` are set then.
 
 A single profile is a one-element list, e.g. `["web"]`. Profiles can be
@@ -374,6 +378,27 @@ parameters may not exist or be accessible.
 
 Generally not recommended for bare-metal or VM deployments where all expected
 parameters should be available.
+
+- **Type**: `bool`
+- **Required**: No
+- **Default**: `false`
+
+
+
+### `sysctl_linux_modules_required`<a id="variable-sysctl_linux_modules_required"></a>
+
+[*⇑ Back to ToC ⇑*](#toc)
+
+Kernel modules required by the selected profiles are loaded best effort by
+default: when a module cannot be loaded (e.g. containers, cloud images
+whose running kernel lacks optional module packages like
+`kernel-modules-extra`, custom kernels), the role skips the parameters
+gated by that module with a notice and continues.
+
+Set to `true` to fail the run instead when a profile kernel module cannot
+be loaded. Use this when a silently degraded profile would be worse than a
+failed run. Detected containers are still tolerated even then, as module
+loading is not possible there by design.
 
 - **Type**: `bool`
 - **Required**: No
