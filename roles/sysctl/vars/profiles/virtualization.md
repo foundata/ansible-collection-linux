@@ -25,12 +25,12 @@ This profile targets performance; stack others for security hardening (see "Secu
 
 ## Security hardening
 
-This profile is optimized for performance and does **not** include security hardening. Stack [`hardening-default`](./hardening-default.md) to enable shared safe defaults for networking, kernel, and filesystem settings, for example `["hardening-default", "virtualization"]`. You can also add [`hardening-extra`](./hardening-extra.md) for stricter hardening, but it may break compatibility, so test thoroughly before using it in production. Note that `rp_filter` is managed by neither, strict reverse-path filtering frequently breaks bridged/routed guest traffic on a hypervisor.
+This profile is optimized for performance and does **not** include security hardening. Stack [`hardening-default`](./hardening-default.md) to enable shared safe defaults for networking, kernel, and filesystem settings, for example `["hardening-default", "virtualization"]`. You can also add [`hardening-extra`](./hardening-extra.md) for stricter hardening, but it may break compatibility, so test thoroughly before using it in production. Note that `rp_filter` is managed by neither: strict reverse-path filtering frequently breaks bridged/routed guest traffic on a hypervisor.
 
 
 ## Intentionally NOT set (policy / ineffective)
 
-- **Bridge netfilter** (`net.bridge.bridge-nf-call-iptables`/`-ip6tables`/`-arptables`) and the `br_netfilter` module: **left to the firewall layer**. Whether bridged guest traffic traverses the host's `iptables`/`nftables` is a firewall-policy decision owned by Proxmox VE's firewall, Docker, Kubernetes CNIs or your site firewall — not a generic tuning knob. Forcing it off would silently break those stacks; forcing it on imposes per-packet hook overhead. The kernel default (module not loaded → no bridge filtering) is left untouched; load and configure `br_netfilter` from whatever stack actually needs it.
+- **Bridge netfilter** (`net.bridge.bridge-nf-call-iptables`/`-ip6tables`/`-arptables`) and the `br_netfilter` module: **left to the firewall layer**. Whether bridged guest traffic traverses the host's `iptables`/`nftables` is a firewall-policy decision owned by Proxmox VE's firewall, Docker, Kubernetes CNIs or your site firewall, not a generic tuning knob. Forcing it off would silently break those stacks; forcing it on imposes per-packet hook overhead. The kernel default (module not loaded → no bridge filtering) is left untouched; load and configure `br_netfilter` from whatever stack actually needs it.
 - **`kernel.sched_migration_cost_ns`**: removed. It is a CFS-era knob, largely ineffective under the EEVDF scheduler (Linux ≥ 6.6) and mostly cargo-culted for KVM.
 
 
@@ -49,7 +49,7 @@ KSM (`/sys/kernel/mm/ksm/`) and HugePages (`/sys/kernel/mm/hugepages/`, or `vm.n
 
 - Linux kernel: `/proc/sys/vm/` (`overcommit_memory`, `swappiness`, `dirty_bytes`/`dirty_background_bytes`, `min_free_kbytes`): <https://docs.kernel.org/admin-guide/sysctl/vm.html>
 - Linux kernel: `/proc/sys/fs/` (`aio-max-nr`): <https://docs.kernel.org/admin-guide/sysctl/fs.html>
-- Red Hat: Optimizing virtual machine performance in RHEL 9 (the `tuned` `virtual-host` profile enables aggressive dirty-page writeback and `virtual-guest` lowers swappiness — the basis for the write-back and `swappiness` choices here): <https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_managing_virtualization/optimizing-virtual-machine-performance-in-rhel_configuring-and-managing-virtualization>
+- Red Hat: Optimizing virtual machine performance in RHEL 9 (the `tuned` `virtual-host` profile enables aggressive dirty-page writeback and `virtual-guest` lowers swappiness; the basis for the write-back and `swappiness` choices here): <https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_managing_virtualization/optimizing-virtual-machine-performance-in-rhel_configuring-and-managing-virtualization>
 - Proxmox VE: Dynamic Memory Management (KSM and ballooning; context for memory overcommit and the KSM scope note above): <https://pve.proxmox.com/wiki/Dynamic_Memory_Management>
 - Linux kernel: Kernel Samepage Merging (KSM), out of scope for this profile: <https://docs.kernel.org/admin-guide/mm/ksm.html>
 - Linux kernel: HugeTLB Pages (`vm.nr_hugepages` / `/sys/kernel/mm/hugepages`), out of scope for this profile: <https://docs.kernel.org/admin-guide/mm/hugetlbpage.html>

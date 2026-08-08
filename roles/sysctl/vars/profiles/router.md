@@ -23,7 +23,7 @@ The `router_v4only` / `router_v6only` variants set the off-direction explicitly 
 
 ### IPv6 caveat: Router Advertisements
 
-Enabling `net.ipv6.conf.all.forwarding` makes the kernel **stop accepting IPv6 Router Advertisements (RAs)** on interfaces. If this device learns its **upstream** IPv6 address/default route via RA (SLAAC on the WAN), that will break unless you set `net.ipv6.conf.<wan>.accept_ra=2` on that specific interface. This is interface-specific, so the profile does **not** set it globally — configure it for your WAN interface via `sysctl_linux_parameters` if needed.
+Enabling `net.ipv6.conf.all.forwarding` makes the kernel **stop accepting IPv6 Router Advertisements (RAs)** on interfaces. If this device learns its **upstream** IPv6 address/default route via RA (SLAAC on the WAN), that will break unless you set `net.ipv6.conf.<wan>.accept_ra=2` on that specific interface. This is interface-specific, so the profile does **not** set it globally; configure it for your WAN interface via `sysctl_linux_parameters` if needed.
 
 
 ## Auto-calculation
@@ -43,9 +43,9 @@ The connection-tracking table scales with RAM (`ansible_facts['memtotal_mb']`, i
 | `net.netfilter.nf_conntrack_max` | auto | Prevents "nf_conntrack: table full, dropping packet" when many flows traverse the device. |
 | `net.netfilter.nf_conntrack_buckets` | auto | Keep hash-bucket count proportional to table size for fast lookups. The canonical way to size the table is the `hashsize` module parameter at module load; this sysctl resizes it after load on current kernels. |
 
-These keys only exist when the `nf_conntrack` module is loaded. The role loads it best-effort (persistently, via `community.general.modprobe`) when this profile is selected. Where the module cannot be loaded (e.g. unprivileged containers) the load is tolerated and the keys are simply skipped/read-only — no failure.
+These keys only exist when the `nf_conntrack` module is loaded. The role loads it best-effort (persistently, via `community.general.modprobe`) when this profile is selected. Where the module cannot be loaded (e.g. unprivileged containers) the load is tolerated and the keys are simply skipped as read-only; nothing fails.
 
-The TCP `established` / `time_wait` conntrack timeouts are **left at their kernel defaults** (5 days / 2 minutes); the previous profile set those exact defaults, which was pure noise. The timeouts that actually matter for **VPN and NAT gateways are the UDP ones** — WireGuard, IPsec and OpenVPN are UDP-based. If idle tunnels are dropped from the table too aggressively, raise `net.netfilter.nf_conntrack_udp_timeout` and especially `net.netfilter.nf_conntrack_udp_timeout_stream` (default 120 s) via `sysctl_linux_parameters` to match your keepalive interval. This profile leaves them at the kernel defaults rather than guessing your VPN's keepalive.
+The TCP `established` / `time_wait` conntrack timeouts are **left at their kernel defaults** (5 days / 2 minutes); the previous profile set those exact defaults, which was pure noise. The timeouts that actually matter for **VPN and NAT gateways are the UDP ones**: WireGuard, IPsec and OpenVPN are UDP-based. If idle tunnels are dropped from the table too aggressively, raise `net.netfilter.nf_conntrack_udp_timeout` and especially `net.netfilter.nf_conntrack_udp_timeout_stream` (default 120 s) via `sysctl_linux_parameters` to match your keepalive interval. This profile leaves them at the kernel defaults rather than guessing your VPN's keepalive.
 
 
 ## Neighbor tables (ARP / NDP)
@@ -62,12 +62,12 @@ Routers on busy segments talk to many peers; the default thresholds (often 128/5
 
 ## Reverse-path filtering (`rp_filter`)
 
-`rp_filter` is the one security-relevant key this profile sets, because it is **functional** for a router, not a generic hardening default — which is why it lives here and not in `hardening-default`. It is set to **loose mode (`rp_filter=2`)**: forwarding devices frequently have asymmetric routes (a reply leaves via a different interface than the request arrived on), where strict mode (`1`) would wrongly drop valid traffic, while loose mode still rejects packets with an unroutable source. Note the kernel uses `max(conf.all.rp_filter, conf.<iface>.rp_filter)`, so setting `all`/`default` to `2` raises the effective minimum to loose across interfaces.
+`rp_filter` is the one security-relevant key this profile sets, because it is **functional** for a router, not a generic hardening default, which is why it lives here and not in `hardening-default`. It is set to **loose mode (`rp_filter=2`)**: forwarding devices frequently have asymmetric routes (a reply leaves via a different interface than the request arrived on), where strict mode (`1`) would wrongly drop valid traffic, while loose mode still rejects packets with an unroutable source. Note the kernel uses `max(conf.all.rp_filter, conf.<iface>.rp_filter)`, so setting `all`/`default` to `2` raises the effective minimum to loose across interfaces.
 
 
 ## Security hardening
 
-Apart from `rp_filter`, this profile targets routing function and applies no security hardening, Stack [`hardening-default`](./hardening-default.md) (ICMP/source-route hardening, no `send_redirects`, martian logging, ASLR, `fs.protected_*`, ...; also sets `send_redirects=0`, which is correct for a router, it should not nudge hosts via ICMP redirects) to enable shared safe defaults for networking, kernel, and filesystem settings, for example `["hardening-default", "router"]`. You can also add [`hardening-extra`](./hardening-extra.md) for stricter hardening, but it may break compatibility, so test thoroughly before using it in production.
+Apart from `rp_filter`, this profile targets routing function and applies no security hardening. Stack [`hardening-default`](./hardening-default.md) (ICMP/source-route hardening, no `send_redirects`, martian logging, ASLR, `fs.protected_*`, ...; also sets `send_redirects=0`, which is correct for a router: it should not nudge hosts via ICMP redirects) to enable shared safe defaults for networking, kernel, and filesystem settings, for example `["hardening-default", "router"]`. You can also add [`hardening-extra`](./hardening-extra.md) for stricter hardening, but it may break compatibility, so test thoroughly before using it in production.
 
 
 ## References

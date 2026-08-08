@@ -19,7 +19,7 @@ This profile targets performance; stack others for security hardening (see "Secu
 | Parameter | Value | Why |
 |-----------|-------|-----|
 | `vm.swappiness` | `10` | Avoid swapping the buffer pool while still allowing swap as a safety valve. |
-| `vm.vfs_cache_pressure` | `50` | Retain inode/dentry caches longer — many table handles. |
+| `vm.vfs_cache_pressure` | `50` | Retain inode/dentry caches longer: many table handles. |
 | `vm.zone_reclaim_mode` | `0` | Disable NUMA zone reclaim (latency spikes on multi-socket hosts). |
 | `vm.dirty_background_bytes`, `vm.dirty_bytes` | auto | **Byte-based** write-back limits replace the RAM-percentage ratios so large-RAM hosts do not accumulate tens of GiB of dirty pages and stall on flush. Setting `*_bytes` disables the `*_ratio` knobs (mutually exclusive). Tune to your storage. |
 | `fs.aio-max-nr` | `1048576` | InnoDB native AIO (`innodb_use_native_aio`, libaio) submits many concurrent requests. Not used by io_uring. |
@@ -33,7 +33,7 @@ This profile is optimized for performance and does **not** include security hard
 
 ## Scope limitation: Transparent Huge Pages
 
-MySQL/MariaDB and especially InnoDB are sensitive to **Transparent Huge Pages (THP)**, which can cause latency spikes; most guidance recommends disabling THP. THP is controlled via `/sys/kernel/mm/transparent_hugepage/` (not a sysctl) and is therefore **out of scope** — manage it separately (tuned, a `systemd` unit, or a kernel boot parameter).
+MySQL/MariaDB and especially InnoDB are sensitive to **Transparent Huge Pages (THP)**, which can cause latency spikes; most guidance recommends disabling THP. THP is controlled via `/sys/kernel/mm/transparent_hugepage/` (not a sysctl) and is therefore **out of scope**; manage it separately (tuned, a `systemd` unit, or a kernel boot parameter).
 
 
 ## References

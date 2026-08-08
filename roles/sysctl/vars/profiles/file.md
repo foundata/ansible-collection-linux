@@ -14,7 +14,7 @@ This profile targets performance; stack others for security hardening (see "Secu
 | `fs.file-max` | `max(RAM_MiB * 100, 100000)` | Scale the system-wide FD limit with memory for many open client files. |
 | `vm.dirty_background_bytes` / `vm.dirty_bytes` | `min(RAM/20, 1 GiB)` / `min(RAM/10, 4 GiB)` | Byte-based, bounded write-back. |
 
-A deliberate change from a naive throughput profile: the per-socket **default** buffers (`net.core.rmem_default`/`wmem_default` and the middle value of `tcp_rmem`/`tcp_wmem`) are **left at the kernel defaults**. Raising the *default* reserves memory on *every* socket, which bloats memory on a server with thousands of SMB/NFS clients; only the autotuning *maximum* is raised, so connections that actually need large windows can grow into them. Note also that the 16 MiB cap is conservative for very high-BDP WAN transfers (e.g. 10 GbE across continents) — raise `*_max` via `sysctl_linux_parameters` there.
+A deliberate change from a naive throughput profile: the per-socket **default** buffers (`net.core.rmem_default`/`wmem_default` and the middle value of `tcp_rmem`/`tcp_wmem`) are **left at the kernel defaults**. Raising the *default* reserves memory on *every* socket, which bloats memory on a server with thousands of SMB/NFS clients; only the autotuning *maximum* is raised, so connections that actually need large windows can grow into them. Note also that the 16 MiB cap is conservative for very high-BDP WAN transfers (e.g. 10 GbE across continents); raise `*_max` via `sysctl_linux_parameters` there.
 
 
 ## TCP throughput
@@ -37,14 +37,14 @@ A deliberate change from a naive throughput profile: the per-socket **default** 
 | `fs.aio-max-nr` | `1048576` | Headroom for outstanding async I/O (libaio). |
 | `fs.inotify.max_user_watches` | `524288` | Large trees watched by sync/backup tools (Syncthing, lsyncd). |
 | `fs.inotify.max_user_instances` | `1024` | Many concurrent inotify instances across users/services. |
-| `vm.vfs_cache_pressure` | `50` | Retain inode/dentry caches longer — fileservers walk huge directory trees (the kernel default `100` is a no-op for this workload). |
+| `vm.vfs_cache_pressure` | `50` | Retain inode/dentry caches longer: fileservers walk huge directory trees (the kernel default `100` is a no-op for this workload). |
 
 
 ## Security hardening
 
-This profile targets performance and does **not** apply security hardening. Stack [`hardening-default`](./hardening-default.md) (shared network/kernel/filesystem safe defaults) before it — e.g. `["hardening-default", "file"]` — and optionally [`hardening-extra`](./hardening-extra.md) for stricter kernel hardening.
+This profile targets performance and does **not** apply security hardening. Stack [`hardening-default`](./hardening-default.md) (shared network/kernel/filesystem safe defaults) before it, e.g. `["hardening-default", "file"]`, and optionally [`hardening-extra`](./hardening-extra.md) for stricter kernel hardening.
 
 
 ## References
 
-- ESnet Fasterdata — Linux Host Tuning: <https://fasterdata.es.net/host-tuning/linux/>
+- ESnet Fasterdata, Linux Host Tuning: <https://fasterdata.es.net/host-tuning/linux/>

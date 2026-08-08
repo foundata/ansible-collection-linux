@@ -31,7 +31,7 @@ This profile is optimized for performance and does **not** include security hard
 
 ## Scope limitations
 
-- **Transparent Huge Pages (THP)**: Redis strongly recommends **disabling** THP, which causes latency and fork-time copy-on-write memory blow-up. THP lives under `/sys/kernel/mm/transparent_hugepage/` (not a sysctl) — **out of scope** here; disable it separately.
+- **Transparent Huge Pages (THP)**: Redis strongly recommends **disabling** THP, which causes latency and fork-time copy-on-write memory blow-up. THP lives under `/sys/kernel/mm/transparent_hugepage/` (not a sysctl), so it is **out of scope** here; disable it separately.
 - **File-descriptor limit**: Redis caps `maxclients` to the process `RLIMIT_NOFILE`; raise the service's systemd `LimitNOFILE` (not a sysctl) if you need many clients.
 
 

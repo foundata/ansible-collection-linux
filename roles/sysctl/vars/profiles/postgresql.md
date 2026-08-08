@@ -19,7 +19,7 @@ This profile targets performance; stack others for security hardening (see "Secu
 | Parameter | Value | Why |
 |-----------|-------|-----|
 | `vm.swappiness` | `10` | Avoid swapping the working set while still allowing swap as a safety valve. |
-| `vm.vfs_cache_pressure` | `50` | Retain inode/dentry caches longer — PostgreSQL touches many relation files. |
+| `vm.vfs_cache_pressure` | `50` | Retain inode/dentry caches longer: PostgreSQL touches many relation files. |
 | `vm.zone_reclaim_mode` | `0` | Disable NUMA zone reclaim, which causes latency spikes on multi-socket hosts. |
 | `vm.dirty_background_bytes`, `vm.dirty_bytes` | auto | Byte-based write-back limits replace the RAM-percentage `dirty_ratio`/`dirty_background_ratio`. On large-RAM hosts a 40%/10% ratio means tens of GiB of dirty pages and multi-second stalls when flushed; a fixed ceiling keeps checkpoints smooth. Setting `*_bytes` automatically disables the `*_ratio` knobs (they are mutually exclusive). Tune to your storage. |
 | `fs.aio-max-nr` | `1048576` | Headroom for libaio (used by prefetch / `effective_io_concurrency`). Helps libaio, not io_uring. |
@@ -34,7 +34,7 @@ This profile is optimized for performance and does **not** include security hard
 ## Scope limitations
 
 - **System V shared memory** (`kernel.shmmax`/`shmall`) is intentionally **not** set: PostgreSQL ≥ 9.3 uses POSIX/mmap shared memory, so the legacy SysV limits no longer constrain `shared_buffers`, and the modern kernel default is effectively unlimited (setting it would only lower it).
-- **HugePages** (`vm.nr_hugepages`) can help large `shared_buffers`, but the right value is deployment-specific and pairs with `huge_pages=try|on` in `postgresql.conf` — out of scope here; manage it explicitly if you use it.
+- **HugePages** (`vm.nr_hugepages`) can help large `shared_buffers`, but the right value is deployment-specific and pairs with `huge_pages=try|on` in `postgresql.conf`, so it is out of scope here; manage it explicitly if you use it.
 
 
 ## References

@@ -9,7 +9,7 @@ sysctl_linux_profile:
   - "hardening-extra"
 ```
 
-This profile adds kernel-information and memory hardening on top of the shared network/kernel/filesystem defaults in [`hardening-default`](./hardening-default.md); the two do not overlap. The workload profiles themselves target performance and carry no hardening, so stack `hardening-default` as well — omitting it means no ASLR, ICMP/source-route hardening or `fs.protected_*`. Stacking composes them (last wins on conflicts, of which there are none here).
+This profile adds kernel-information and memory hardening on top of the shared network/kernel/filesystem defaults in [`hardening-default`](./hardening-default.md); the two do not overlap. The workload profiles themselves target performance and carry no hardening, so stack `hardening-default` as well: omitting it means no ASLR, ICMP/source-route hardening or `fs.protected_*`. Stacking composes them (last wins on conflicts, of which there are none here).
 
 All values can be overridden with `sysctl_linux_parameters`; set a value to `null` to stop managing it.
 
@@ -19,7 +19,7 @@ All values can be overridden with `sysctl_linux_parameters`; set a value to `nul
 | Parameter | Value | Why |
 |-----------|-------|-----|
 | `kernel.kptr_restrict` | `1` | Hide kernel pointers from unprivileged users (`/proc/kallsyms`, etc.), raising the bar for exploit development. |
-| `kernel.dmesg_restrict` | `1` | Restrict the kernel ring buffer (`dmesg`) to privileged users — it can leak addresses and other sensitive info. |
+| `kernel.dmesg_restrict` | `1` | Restrict the kernel ring buffer (`dmesg`) to privileged users; it can leak addresses and other sensitive info. |
 | `vm.mmap_min_addr` | `65536` | Disallow mapping the low address space, mitigating kernel NULL-pointer-dereference exploits. |
 | `net.ipv4.tcp_rfc1337` | `1` | Protect against TCP TIME-WAIT assassination (RFC 1337). |
 
@@ -28,7 +28,7 @@ Several of these already match modern distro defaults; they are asserted so the 
 These values are **enforced exactly** (the role writes them with `sysctl -w` when `sysctl_linux_verify` is true), so on a host already hardened *beyond* them the profile would **lower** the setting. This is most relevant for `vm.mmap_min_addr` (some distributions/architectures default higher than `65536`) and `kernel.kptr_restrict` (a host set to `2` would be reduced to `1`). If your platform already uses a stricter value, override it via `sysctl_linux_parameters` (e.g. `"vm.mmap_min_addr": 1048576`) or set it to `null` to stop managing that key.
 
 
-## Opt-in (NOT set here — enable deliberately, with caveats)
+## Opt-in (NOT set here; enable deliberately, with caveats)
 
 These materially harden the host but **break common workflows, so they are left for you to enable explicitly via `sysctl_linux_parameters`** once you have confirmed they fit your environment:
 
