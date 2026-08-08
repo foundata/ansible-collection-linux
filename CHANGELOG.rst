@@ -4,6 +4,30 @@ foundata.linux Ansible collection Release Notes
 
 .. contents:: Topics
 
+v1.2.0
+======
+
+Release Summary
+---------------
+
+Release Date: 2026-08-08
+
+Feature and bugfix release.
+
+Minor Changes
+-------------
+
+- sysctl: new `container-rootless` profile with the per-UID inotify and kernel keyring quotas for hosts running only rootless containers with user-mode networking (Podman with pasta or slirp4netns). Such hosts never bridge or NAT container traffic, so the forwarding/bridge/conntrack keys and kernel modules of the `container` profile are unnecessary there; the `container` profile documentation now states its rootful/bridged scope.
+- sysctl: new option `sysctl_linux_modules_required` (default `false`) to fail the run instead when a profile kernel module cannot be loaded (detected containers are still tolerated).
+
+Bugfixes
+--------
+
+- ``sysctl`` - the drop-in precedence fix of an earlier release was not effective for default configurations: the documentation said ``zz-managed.conf`` but ``defaults/main.yml`` still carried ``90-managed.conf``, so distribution files like ``99-protect-links.conf`` could still override managed keys (and a ``zz-managed.conf`` from a previous run was even removed as a leftover). The default value now matches the documentation.
+- ``user`` - accounts with more than one managed SSH key got their ``authorized_keys`` entries joined with a literal ``\n`` text instead of real newlines (a Jinja escape-handling pitfall), garbling the keys into a single line.
+- boolean role arguments are now coerced with ``ansible.builtin.bool`` in every conditional. String values, as delivered by ``-e var=false`` command line extra-vars, were evaluated by truthiness before, so ``"false"`` enabled the gated behavior instead of disabling it.
+- sysctl: kernel modules required by a profile are now loaded best effort on every platform, as documented. Previously a load failure was fatal outside of containers, which broke the `container` profile on Enterprise Linux 10 cloud images (their running kernel cannot load `br_netfilter`: the module ships in `kernel-modules-extra`, which GenericCloud images do not install). Parameters gated by an unloadable module are now skipped with a notice on any platform, keeping the rendered configuration valid.
+
 v1.1.0
 ======
 
