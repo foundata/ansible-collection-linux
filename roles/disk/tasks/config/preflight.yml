@@ -5,25 +5,27 @@
 
 ---
 
+# A list on purpose (empty list = no skip): a fully stripped Jinja template
+# that renders no output at all becomes None with native types, which would
+# break later length filters.
 - name: "Config | Preflight | Determine skip conditions"
   ansible.builtin.set_fact:
     __disk_linux_pf_skip: >-
-      {%- set __anc = [] -%}
+      {%- set __ns = namespace(reasons=[]) -%}
       {%- for __s in __disk_linux_skipped_paths -%}
       {%-   if __disk_linux_entry['path'] != __s and __disk_linux_entry['path'].startswith(__s ~ '/') -%}
-      {%-     set _ = __anc.append(__s) -%}
+      {%-     set _ = __ns.reasons.append('parent mountpoint ' ~ __s ~ ' was skipped') -%}
       {%-   endif -%}
       {%- endfor -%}
-      {%- if (__anc | length) > 0 -%}
-      parent mountpoint {{ __anc[0] }} was skipped
-      {%- elif not __disk_linux_device_exists[__disk_linux_entry['device']] -%}
-      device does not exist (on_missing policy is "skip")
+      {%- if not __disk_linux_device_exists[__disk_linux_entry['device']] -%}
+      {%-   set _ = __ns.reasons.append('device does not exist (on_missing policy is "skip")') -%}
       {%- endif -%}
+      {{ __ns.reasons }}
 
 
 - name: "Config | Preflight | Record the skipped entry"
   ansible.builtin.set_fact:
-    __disk_linux_plan: "{{ __disk_linux_plan + [{'entry': __disk_linux_entry, 'action': 'skip', 'reason': __disk_linux_pf_skip}] }}"
+    __disk_linux_plan: "{{ __disk_linux_plan + [{'entry': __disk_linux_entry, 'action': 'skip', 'reason': (__disk_linux_pf_skip | ansible.builtin.first)}] }}"
     __disk_linux_skipped_paths: "{{ __disk_linux_skipped_paths + [__disk_linux_entry['path']] }}"
   when:
     - (__disk_linux_pf_skip | ansible.builtin.length) > 0
@@ -41,7 +43,10 @@
           - "--json"
           - "--bytes"
           - "--output"
-          - "KNAME,TYPE,PTTYPE,FSTYPE,SIZE,MOUNTPOINTS"
+          # NAME must be part of the output: lsblk only nests the "children"
+          # arrays in its JSON when the NAME column is present, otherwise
+          # partitions are emitted as flat siblings of the disk
+          - "NAME,KNAME,TYPE,PTTYPE,FSTYPE,SIZE,MOUNTPOINTS"
           - "{{ __disk_linux_entry['device'] }}"
       changed_when:
         - false
@@ -126,12 +131,13 @@
           ansible.builtin.set_fact:
             __disk_linux_pf_action: >-
               {{ 'mismatch_wipe' if __disk_linux_pf_class is ansible.builtin.match('^mismatch:') else __disk_linux_pf_class }}
-            __disk_linux_pf_mounted_source: >-
+            # a list on purpose (see the skip-conditions comment above)
+            __disk_linux_pf_mounted_sources: >-
               {{
-                (__disk_linux_mounts
-                 | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', __disk_linux_entry['path'])
-                 | ansible.builtin.map(attribute='source')
-                 | ansible.builtin.first) | ansible.builtin.default('', true)
+                __disk_linux_mounts
+                | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', __disk_linux_entry['path'])
+                | ansible.builtin.map(attribute='source')
+                | ansible.builtin.list
               }}
             __disk_linux_pf_mounts_below: >-
               {%- set __ns = namespace(rows=[]) -%}
@@ -188,11 +194,11 @@
               {%- set __child = '/dev/' ~ (__disk_linux_pf_children[0]['kname'] | ansible.builtin.default('', true)) -%}
               {%- set __ownsrc = __disk_linux_pf_children | map(attribute='kname') | map('ansible.builtin.regex_replace', '^', '/dev/') | list -%}
               {#- target path mounted from a source that is not this disk's partition -#}
-              {%- if (__disk_linux_pf_mounted_source | length) > 0 and __disk_linux_pf_mounted_source not in __ownsrc -%}
-              {%-   set _ = __ns.rows.append('the mountpoint already carries a mount from ' ~ __disk_linux_pf_mounted_source) -%}
+              {%- if (__disk_linux_pf_mounted_sources | length) > 0 and __disk_linux_pf_mounted_sources[0] not in __ownsrc -%}
+              {%-   set _ = __ns.rows.append('the mountpoint already carries a mount from ' ~ __disk_linux_pf_mounted_sources[0]) -%}
               {%- endif -%}
               {#- active mounts below an unmounted target would be hidden -#}
-              {%- if (__disk_linux_pf_mounted_source | length) == 0 and (__disk_linux_pf_mounts_below | length) > 0 -%}
+              {%- if (__disk_linux_pf_mounted_sources | length) == 0 and (__disk_linux_pf_mounts_below | length) > 0 -%}
               {%-   set _ = __ns.rows.append('mounting would hide the active mounts below the mountpoint: ' ~ (__disk_linux_pf_mounts_below | join(', '))) -%}
               {%- endif -%}
               {#- the declared filesystem is mounted somewhere else -#}
@@ -239,7 +245,7 @@
             file_type: "any"
             hidden: true
           when:
-            - (__disk_linux_pf_mounted_source | ansible.builtin.length) == 0
+            - (__disk_linux_pf_mounted_sources | ansible.builtin.length) == 0
           register: __disk_linux_pf_find_result
 
 
@@ -251,7 +257,7 @@
               the existing content. Set on_nonempty to "copy" for a one-time
               migration onto the new filesystem, or to "hide" to mount over it.
           when:
-            - (__disk_linux_pf_mounted_source | ansible.builtin.length) == 0
+            - (__disk_linux_pf_mounted_sources | ansible.builtin.length) == 0
             - (__disk_linux_pf_find_result['matched'] | ansible.builtin.default(0)) > 0
             - __disk_linux_entry['mount']['on_nonempty'] == 'fail'
 
@@ -273,7 +279,7 @@
               {%- endfor -%}
               {{ __ns.rows }}
           when:
-            - (__disk_linux_pf_mounted_source | ansible.builtin.length) == 0
+            - (__disk_linux_pf_mounted_sources | ansible.builtin.length) == 0
             - (__disk_linux_pf_find_result['matched'] | ansible.builtin.default(0)) > 0
             - __disk_linux_entry['mount']['on_nonempty'] == 'copy'
           loop: "{{ __disk_linux_pf_descendants }}"
@@ -300,7 +306,7 @@
                 | ansible.builtin.list
               }}
           when:
-            - (__disk_linux_pf_mounted_source | ansible.builtin.length) == 0
+            - (__disk_linux_pf_mounted_sources | ansible.builtin.length) == 0
             - (__disk_linux_pf_find_result['matched'] | ansible.builtin.default(0)) > 0
             - __disk_linux_entry['mount']['on_nonempty'] == 'copy'
             - (__disk_linux_pf_nested_populated | ansible.builtin.length) > 0
@@ -319,7 +325,7 @@
                   'child_knames': (__disk_linux_pf_children | ansible.builtin.map(attribute='kname') | ansible.builtin.list),
                   'mounted_paths': __disk_linux_pf_mounted_paths,
                   'uuid': (__disk_linux_pf_uuid_result['stdout'] | ansible.builtin.default('', true)),
-                  'mounted': ((__disk_linux_pf_mounted_source | ansible.builtin.length) > 0),
+                  'mounted': ((__disk_linux_pf_mounted_sources | ansible.builtin.length) > 0),
                   'nonempty': ((__disk_linux_pf_find_result['matched'] | ansible.builtin.default(0)) > 0)
                 }]
               }}

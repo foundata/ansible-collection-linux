@@ -1,0 +1,86 @@
+# Execute the collection role "disk" against all driver-created instances.
+# The libvirt platforms attach two blank extra disks (see molecule.yml,
+# "extra_disks"), addressable as /dev/disk/by-id/virtio-molecule-data0/1.
+
+
+# Seeded BEFORE the first role run while the mountpoint is still a plain
+# directory on the root filesystem: exercises the on_nonempty "copy"
+# migration. Idempotent, so the (then migrated) content is simply confirmed
+# on later runs.
+- name: "Molecule | Converge | disk | Seed content below the future mountpoint"
+  ansible.builtin.file:
+    path: "/srv/molecule_data0/subdir"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "u=rwx,g=rx,o=rx" # 0755
+
+
+- name: "Molecule | Converge | disk | Seed files below the future mountpoint"
+  ansible.builtin.copy:
+    dest: "{{ item['dest'] }}"
+    content: "{{ item['content'] }}"
+    owner: "root"
+    group: "root"
+    mode: "u=rw,g=r,o=r" # 0644
+  loop:
+    - dest: "/srv/molecule_data0/seeded.txt"
+      content: "seeded before the first mount\n"
+    - dest: "/srv/molecule_data0/.hidden_seed"
+      content: "hidden seed\n"
+    - dest: "/srv/molecule_data0/subdir/nested_seed.txt"
+      content: "nested seed\n"
+  loop_control:
+    label: "{{ item['dest'] }}"
+
+
+- name: "Molecule | Converge | disk | Store disk_linux_* role parameters in __testing_state"
+  ansible.builtin.include_tasks:
+    file: "../tasks/state_update.yml"
+  vars:
+    __testing_state_update:
+      disk_linux_device_defaults:
+        mount:
+          options: "defaults,noatime"
+      disk_linux_devices:
+        # defaults path: GPT, XFS, options inherited from the defaults dict,
+        # one-time content migration of the seeded files
+        - device: "/dev/disk/by-id/virtio-molecule-data0"
+          mount:
+            path: "/srv/molecule_data0"
+            on_nonempty: "copy"
+        # explicit path: ext4 with creation-time options, boot-time fsck,
+        # per-entry mount options override
+        - device: "/dev/disk/by-id/virtio-molecule-data1"
+          filesystem:
+            type: "ext4"
+            mkfs_options: "-m 1"
+          mount:
+            path: "/srv/molecule_data1"
+            options: "defaults,noatime,nodev"
+            passno: 2
+        # optional disk that is not attached to any instance: on_missing skip
+        - device: "/dev/disk/by-id/virtio-molecule-missing0"
+          on_missing: "skip"
+          mount:
+            path: "/srv/molecule_missing"
+
+
+- name: "Molecule | Converge | disk | Set disk_linux_* parameters as facts from __testing_state"
+  ansible.builtin.set_fact:
+    "{{ item['key'] }}": "{{ item['value'] }}"
+  loop: >-
+    {{
+      (__testing_state | ansible.builtin.default({}, true))
+      | ansible.builtin.dict2items
+      | ansible.builtin.selectattr('key', 'ansible.builtin.match', '^disk_linux_')
+      | ansible.builtin.list
+    }}
+
+
+- name: "Molecule | Converge | disk | Include the foundata.linux.disk role"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  # vars: All disk_linux_* variables are set as facts and passed this way to
+  #       the role, so they can be persisted in __testing_state and restored in
+  #       later stages (e.g. verify) without duplicating data across playbooks.

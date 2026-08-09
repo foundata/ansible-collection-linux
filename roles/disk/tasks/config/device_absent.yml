@@ -77,7 +77,9 @@
               - "{{ __disk_linux_lsblk_exec_path }}"
               - "--json"
               - "--output"
-              - "KNAME,MOUNTPOINTS"
+              # NAME must be part of the output: lsblk only nests the
+              # "children" arrays in its JSON when the NAME column is present
+              - "NAME,KNAME,MOUNTPOINTS"
               - "{{ __disk_linux_entry['device'] }}"
           changed_when:
             - false

@@ -1,0 +1,182 @@
+# Check collection role "disk" outcomes.
+
+- name: "Molecule | Verify | disk | Initialize the foundata.linux.disk role (expose internal vars without running it)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+    tasks_from: "init"
+    public: true
+
+
+- name: "Molecule | Verify | disk | Set disk_linux_* and __testing_* parameters as facts from __testing_state"
+  ansible.builtin.set_fact:
+    "{{ item['key'] }}": "{{ item['value'] }}"
+  loop: >-
+    {{
+      (__testing_state | ansible.builtin.default({}, true))
+      | ansible.builtin.dict2items
+      | ansible.builtin.selectattr('key', 'ansible.builtin.match', '^(disk_linux_|__testing_)')
+      | ansible.builtin.list
+    }}
+
+
+- name: "Molecule | Verify | disk | Query the mounted filesystems"
+  ansible.builtin.command:
+    argv:
+      - "findmnt"
+      - "--json"
+      - "--output"
+      - "TARGET,SOURCE,FSTYPE,OPTIONS"
+      - "--mountpoint"
+      - "{{ item }}"
+  changed_when:
+    - false
+  loop:
+    - "/srv/molecule_data0"
+    - "/srv/molecule_data1"
+  register: __testing_disk_findmnt_result
+
+
+- name: "Molecule | Verify | disk | Assert both filesystems are mounted as declared"
+  ansible.builtin.assert:
+    that:
+      - __testing_disk_mounts['/srv/molecule_data0']['fstype'] == 'xfs'
+      - "'noatime' in __testing_disk_mounts['/srv/molecule_data0']['options']"
+      - __testing_disk_mounts['/srv/molecule_data1']['fstype'] == 'ext4'
+      - "'noatime' in __testing_disk_mounts['/srv/molecule_data1']['options']"
+      - "'nodev' in __testing_disk_mounts['/srv/molecule_data1']['options']"
+    fail_msg: "The declared filesystems are not mounted as expected: {{ __testing_disk_mounts }}"
+    success_msg: "Both declared filesystems are mounted with the expected type and options."
+  vars:
+    __testing_disk_mounts: >-
+      {%- set __ns = namespace(map={}) -%}
+      {%- for __r in __testing_disk_findmnt_result['results'] -%}
+      {%-   set __row = (__r['stdout'] | ansible.builtin.from_json)['filesystems'][0] -%}
+      {%-   set _ = __ns.map.update({__r['item']: __row}) -%}
+      {%- endfor -%}
+      {{ __ns.map }}
+
+
+- name: "Molecule | Verify | disk | Query the disk layout"
+  ansible.builtin.command:
+    argv:
+      - "lsblk"
+      - "--json"
+      - "--output"
+      # NAME must be present: lsblk only nests "children" in its JSON when
+      # the NAME column is part of the output
+      - "NAME,KNAME,TYPE,PTTYPE,FSTYPE"
+      - "{{ item }}"
+  changed_when:
+    - false
+  loop:
+    - "/dev/disk/by-id/virtio-molecule-data0"
+    - "/dev/disk/by-id/virtio-molecule-data1"
+  register: __testing_disk_lsblk_result
+
+
+- name: "Molecule | Verify | disk | Assert the on-disk layout matches the declaration"
+  ansible.builtin.assert:
+    that:
+      # GPT (the built-in default) on both disks, exactly one partition each
+      - __testing_disk_layouts[0]['pttype'] == 'gpt'
+      - (__testing_disk_layouts[0]['children'] | ansible.builtin.length) == 1
+      - __testing_disk_layouts[0]['children'][0]['fstype'] == 'xfs'
+      - __testing_disk_layouts[1]['pttype'] == 'gpt'
+      - (__testing_disk_layouts[1]['children'] | ansible.builtin.length) == 1
+      - __testing_disk_layouts[1]['children'][0]['fstype'] == 'ext4'
+    fail_msg: "The on-disk layout does not match the declaration: {{ __testing_disk_layouts }}"
+    success_msg: "Both disks carry a GPT with exactly one partition and the declared filesystem."
+  vars:
+    __testing_disk_layouts: >-
+      {%- set __ns = namespace(rows=[]) -%}
+      {%- for __r in __testing_disk_lsblk_result['results'] -%}
+      {%-   set _ = __ns.rows.append((__r['stdout'] | ansible.builtin.from_json)['blockdevices'][0]) -%}
+      {%- endfor -%}
+      {{ __ns.rows }}
+
+
+- name: "Molecule | Verify | disk | Read /etc/fstab"
+  ansible.builtin.slurp:
+    src: "/etc/fstab"
+  register: __testing_disk_fstab_result
+
+
+- name: "Molecule | Verify | disk | Assert the /etc/fstab entries (UUID source, fields, no leftovers)"
+  ansible.builtin.assert:
+    that:
+      - (__testing_disk_fstab_rows | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', '/srv/molecule_data0') | ansible.builtin.length) == 1
+      - (__testing_disk_fstab_rows | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', '/srv/molecule_data1') | ansible.builtin.length) == 1
+      - __testing_disk_fstab_data0['source'] is ansible.builtin.match('^UUID=')
+      - __testing_disk_fstab_data1['source'] is ansible.builtin.match('^UUID=')
+      - __testing_disk_fstab_data1['passno'] == '2'
+      # the skipped optional disk must not leave any trace
+      - (__testing_disk_fstab_rows | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', '/srv/molecule_missing') | ansible.builtin.length) == 0
+    fail_msg: "The /etc/fstab entries do not match the declaration: {{ __testing_disk_fstab_rows }}"
+    success_msg: "Both filesystems are registered in /etc/fstab by UUID with the declared fields."
+  vars:
+    __testing_disk_fstab_rows: >-
+      {%- set __ns = namespace(rows=[]) -%}
+      {%- for __l in (__testing_disk_fstab_result['content'] | ansible.builtin.b64decode).splitlines() -%}
+      {%-   set __t = __l.strip() -%}
+      {%-   if __t and not __t.startswith('#') -%}
+      {%-     set __f = __t.split() -%}
+      {%-     if (__f | ansible.builtin.length) >= 6 -%}
+      {%-       set _ = __ns.rows.append({'source': __f[0], 'target': __f[1], 'passno': __f[5]}) -%}
+      {%-     endif -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ __ns.rows }}
+    __testing_disk_fstab_data0: >-
+      {{ __testing_disk_fstab_rows | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', '/srv/molecule_data0') | ansible.builtin.first }}
+    __testing_disk_fstab_data1: >-
+      {{ __testing_disk_fstab_rows | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', '/srv/molecule_data1') | ansible.builtin.first }}
+
+
+- name: "Molecule | Verify | disk | Validate /etc/fstab as a whole"
+  ansible.builtin.command:
+    argv:
+      - "findmnt"
+      - "--verify"
+  changed_when:
+    - false
+
+
+- name: "Molecule | Verify | disk | Determine the state of the migrated content and the marker"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "/srv/molecule_data0/seeded.txt"
+    - "/srv/molecule_data0/.hidden_seed"
+    - "/srv/molecule_data0/subdir/nested_seed.txt"
+    - "/srv/molecule_data0/.ansible-disk-migration-in-progress"
+    - "/srv/molecule_missing"
+  register: __testing_disk_stat_result
+
+
+- name: "Molecule | Verify | disk | Assert the migration outcome"
+  ansible.builtin.assert:
+    that:
+      # the seeded content was migrated onto the new filesystem
+      - __testing_disk_stat_result['results'][0]['stat']['exists']
+      - __testing_disk_stat_result['results'][1]['stat']['exists']
+      - __testing_disk_stat_result['results'][2]['stat']['exists']
+      # no in-progress marker was left behind
+      - not __testing_disk_stat_result['results'][3]['stat']['exists']
+    fail_msg: "The on_nonempty copy migration did not produce the expected content."
+    success_msg: "The seeded content was migrated onto the new filesystem, no marker was left behind."
+
+
+- name: "Molecule | Verify | disk | Determine the device of the parent filesystem"
+  ansible.builtin.stat:
+    path: "/srv"
+  register: __testing_disk_root_stat_result
+
+
+- name: "Molecule | Verify | disk | Assert the migrated content is not shadowed on the parent filesystem"
+  ansible.builtin.assert:
+    that:
+      # the device number of the file differs from the parent filesystem's,
+      # so the content lives on the mounted disk, not below the mount
+      - __testing_disk_stat_result['results'][0]['stat']['dev'] != __testing_disk_root_stat_result['stat']['dev']
+    fail_msg: "The migrated content does not reside on the mounted filesystem."
+    success_msg: "The migrated content resides on the mounted filesystem, not on the parent."

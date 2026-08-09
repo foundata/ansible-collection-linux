@@ -130,16 +130,26 @@
         - __disk_linux_item['action'] == 'grow'
 
 
+    # The kernel needs a moment to publish a freshly created partition, so
+    # retry until it shows up instead of racing it.
     - name: "Config | Device | Determine the partition device"
       ansible.builtin.command:
         argv:
           - "{{ __disk_linux_lsblk_exec_path }}"
           - "--json"
           - "--output"
-          - "KNAME"
+          # NAME must be part of the output: lsblk only nests the "children"
+          # arrays in its JSON when the NAME column is present
+          - "NAME,KNAME"
           - "{{ __disk_linux_item['entry']['device'] }}"
       changed_when:
         - false
+      retries: 10
+      delay: 1
+      until:
+        - >-
+          ((__disk_linux_apply_lsblk_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0]['children']
+           | ansible.builtin.default([]) | ansible.builtin.length) > 0
       register: __disk_linux_apply_lsblk_result
 
 
@@ -151,7 +161,7 @@
         __disk_linux_apply_children: >-
           {{
             (__disk_linux_apply_lsblk_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0]['children']
-            | ansible.builtin.default([{'kname': ''}])
+            | ansible.builtin.default([{'kname': ''}], true)
           }}
 
 
