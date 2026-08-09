@@ -1,0 +1,340 @@
+# Role argument validation.
+#
+# For information on the argument_specs.yml, see the official documentation:
+# https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_reuse_roles.html#role-argument-validation
+
+---
+
+argument_specs:
+
+  # foundata.linux/roles/disk/tasks/main.yml entry point
+  main:
+    short_description: "Main entry point for the foundata.linux.disk role"
+    options:
+
+      disk_linux_autoupgrade:
+        description: |
+          If set to `true`, the tooling packages this role installs (partitioning
+          and filesystem utilities such as `parted`, `xfsprogs`, `e2fsprogs` and the
+          full `util-linux`) are upgraded during each Ansible run when the package
+          manager offers a newer version. If `false`, packages are only installed
+          when missing.
+
+          The role installs only the tools the declared devices actually need (for
+          example `xfsprogs` only when at least one entry uses the `xfs`
+          filesystem). These are base-system tools; they are never uninstalled by
+          this role.
+        type: "bool"
+        default: false
+
+      disk_linux_device_defaults:
+        description: |
+          Default values applied to every entry in `disk_linux_devices` that does
+          not set the corresponding key itself. This avoids repeating common
+          settings (filesystem, mount options, ...) on each device.
+
+          The keys mirror the per-device keys of the same name (see
+          `disk_linux_devices`), except `device` and `mount['path']` which are
+          always per-device. Nested keys are deep-merged: an entry that sets only
+          `mount['options']` still inherits `mount['passno']` and the other
+          `mount` defaults. Any value provided here is overridden by an explicit
+          value on the individual device entry.
+
+          Only the keys you want to change need to be supplied; they are
+          deep-merged over the role's built-in defaults (see
+          `__disk_linux_device_defaults_builtin` in `vars/main.yml`). The effective
+          built-in defaults are:
+
+          ```yaml
+          disk_linux_device_defaults:
+            state: "present"
+            wipe: false
+            on_missing: "fail"
+            on_mismatch: "fail"
+            partition_table: "gpt"
+            filesystem:
+              type: "xfs"
+              mkfs_options: ""
+            mount:
+              options: "defaults"
+              dump: 0
+              passno: 0
+              preserve_content: true
+              selinux_relabel: true
+          ```
+        type: "dict"
+        default: {} # see __disk_linux_device_defaults_builtin in vars/main.yml for the defaults
+
+      disk_linux_devices:
+        description: |
+          List of dedicated data disks to manage. Each entry describes one whole
+          block device that is taken from raw disk to mounted filesystem: a single
+          partition spanning the disk, a filesystem on that partition, and a mount
+          (plus `/etc/fstab` entry) by filesystem UUID. `device` and
+          `mount['path']` are mandatory; all other keys are optional and fall back
+          to `disk_linux_device_defaults`.
+
+          Both `device` and `mount['path']` must be unique across the list. When
+          managed mountpoints nest (for example `/srv` and `/srv/data`), list the
+          parent before the child; entries are processed in list order.
+
+          The declared layout (partition table type, single partition, filesystem
+          type) is verified against the disk. Existing data is never touched by
+          default: the role only partitions blank disks and never re-formats; any
+          deviation of a non-blank disk from the declaration is handled according
+          to `on_missing` and `on_mismatch` (both default to failing hard before
+          any change). After every change to `/etc/fstab`, the role validates the
+          result with `findmnt --verify` and fails before a broken table can
+          surface at the next boot.
+
+          Example:
+          ```yaml
+          disk_linux_devices:
+            - device: "/dev/disk/by-id/virtio-home0"
+              mount:
+                path: "/home"
+                options: "defaults,noatime,nodev"
+            - device: "/dev/disk/by-id/virtio-olddata0"
+              mount:
+                path: "/mnt/olddata"
+              state: "absent"
+          ```
+        type: "list"
+        default: []
+        elements: "dict"
+        options:
+
+          device:
+            description: |
+              Absolute path to the whole disk to manage (not a partition). A stable
+              path below `/dev/disk/by-id/` is strongly recommended (for example
+              `/dev/disk/by-id/virtio-data0` for a virtio disk with serial
+              `data0`); kernel names like `/dev/vdb` work but may change between
+              boots.
+
+              The role derives the partition device from this path (partition 1)
+              and always mounts by filesystem UUID, so the path is only used to
+              find the disk and is never written to `/etc/fstab`.
+            type: "str"
+            required: true
+
+          state:
+            description: |
+              Whether the device should be `present` (partitioned, formatted,
+              mounted and in `/etc/fstab`) or `absent`. Setting `absent` unmounts
+              the filesystem and removes its `/etc/fstab` entry, but keeps the
+              mountpoint directory, the partition, the filesystem and all data on
+              it, so the entry can be re-enabled later. To also destroy the on-disk
+              data, additionally set `wipe: true`.
+            type: "str"
+            default: "present"
+            choices:
+              - "present"
+              - "absent"
+
+          wipe:
+            description: |
+              Destructive, only honored when `state` is `absent` (ignored with a
+              notice otherwise): after unmounting and removing the `/etc/fstab`
+              entry, the filesystem signature of the partition and the partition
+              table of the disk are erased (`wipefs`). All data on the disk becomes
+              inaccessible; there is no recovery except from backup. The disk is
+              blank afterwards, so a later run with `state: present` would set it
+              up again from scratch.
+
+              To repurpose a disk with conflicting content in a single run (wipe
+              and set up according to the declaration), use `on_mismatch: "wipe"`
+              instead.
+            type: "bool"
+
+          on_missing:
+            description: |
+              What to do when the configured `device` path does not exist on the
+              host. `fail` aborts the play (a missing dedicated disk usually is a
+              provisioning error that should be noticed). `skip` skips this entry
+              without an error, which is useful for group inventories where only
+              some hosts have the optional disk attached. Falls back to
+              `disk_linux_device_defaults['on_missing']` (built-in default
+              `fail`).
+            type: "str"
+            choices:
+              - "fail"
+              - "skip"
+
+          on_mismatch:
+            description: |
+              What to do when the disk exists, is not blank, and its content
+              contradicts the declared layout. A mismatch is any of: a partition
+              table of a different type than `partition_table`; a filesystem or
+              other signature directly on the whole disk (no partition table); a
+              partition layout other than exactly one partition numbered 1; or a
+              filesystem on the partition that differs from `filesystem['type']`.
+              A blank disk or an existing partition 1 without any filesystem is
+              not a mismatch (setup simply continues there).
+
+              - `fail`: abort with a message describing the difference. A mismatch
+                usually means the `device` path points at the wrong disk or the
+                disk carries foreign data; failing is the only safe reaction
+                (default).
+              - `skip`: leave the disk untouched and skip this entry with a
+                notice. Useful when foreign disks are expected and should stay
+                unmanaged.
+              - `wipe`: destructive. Erase the conflicting structures (`wipefs`;
+                unmounting the old filesystem first if needed) and set the disk up
+                from scratch according to the declaration. All existing data on
+                the disk is lost; there is no recovery except from backup.
+                Intended for deliberately repurposing disks - remove the setting
+                again once the conversion has happened. The role emits a warning
+                whenever this branch actually wipes something.
+
+              Note that the partition table type is part of the declared layout on
+              purpose: for existing disks set up with an `msdos` label by earlier
+              automation, declare `partition_table: "msdos"` so the inventory
+              states what is actually on the disk, instead of the role silently
+              tolerating a layout the inventory does not describe.
+
+              Falls back to `disk_linux_device_defaults['on_mismatch']` (built-in
+              default `fail`).
+            type: "str"
+            choices:
+              - "fail"
+              - "skip"
+              - "wipe"
+
+          partition_table:
+            description: |
+              Partition table type (disk label) of the disk. Part of the declared
+              layout: on blank disks a table of this type is created; a non-blank
+              disk whose existing table type differs is a mismatch and handled
+              according to `on_mismatch`. The role never re-labels a disk outside
+              of the explicit `on_mismatch: "wipe"` path (a re-label destroys the
+              existing partition table).
+
+              Use `msdos` when legacy tooling requires an MBR - and for existing
+              disks that were set up with an `msdos` label by earlier automation,
+              so the declaration matches the disk. Falls back to
+              `disk_linux_device_defaults['partition_table']` (built-in default
+              `gpt`).
+            type: "str"
+            choices:
+              - "gpt"
+              - "msdos"
+
+          filesystem:
+            description: |
+              Filesystem configuration for the disk's single partition. The keys
+              are deep-merged over `disk_linux_device_defaults['filesystem']`, so
+              partially set dictionaries inherit the remaining defaults.
+            type: "dict"
+            options:
+
+              type:
+                description: |
+                  Filesystem to create on the partition and to use for mounting.
+                  Falls back to
+                  `disk_linux_device_defaults['filesystem']['type']` (built-in
+                  default `xfs`).
+
+                  Only used when creating the filesystem: an existing filesystem
+                  of this type is left untouched (including all of its
+                  creation-time parameters). A different existing filesystem is a
+                  mismatch, handled according to `on_mismatch` - so changing the
+                  type of an already set up device requires either
+                  `on_mismatch: "wipe"` (single run) or a wipe-and-recreate cycle
+                  (one run with `state: absent` plus `wipe: true`, then a run
+                  with `state: present`). Both destroy the data on the disk.
+                type: "str"
+                choices:
+                  - "xfs"
+                  - "ext4"
+
+              mkfs_options:
+                description: |
+                  Additional command line options passed to the `mkfs` call when
+                  the filesystem is created (for example `-m 1` to lower the
+                  reserved-blocks percentage of `ext4`). Only applied at creation
+                  time; changing this value later has no effect on an existing
+                  filesystem. Falls back to
+                  `disk_linux_device_defaults['filesystem']['mkfs_options']`
+                  (built-in default: empty string).
+                type: "str"
+
+          mount:
+            description: |
+              Mount configuration: where and how the filesystem is mounted (and
+              written to `/etc/fstab`), plus the behaviors tied to the very first
+              mount. `path` is mandatory; the other keys are deep-merged over
+              `disk_linux_device_defaults['mount']`, so partially set dictionaries
+              inherit the remaining defaults.
+            type: "dict"
+            required: true
+            options:
+
+              path:
+                description: |
+                  Absolute path of the directory the filesystem is mounted on
+                  (also used for the `/etc/fstab` entry). Created if missing. Must
+                  be unique across `disk_linux_devices`.
+                type: "path"
+                required: true
+
+              options:
+                description: |
+                  Mount options for the filesystem as a comma-separated string,
+                  written to the fourth `/etc/fstab` field and used for mounting.
+                  Falls back to `disk_linux_device_defaults['mount']['options']`
+                  (built-in default `defaults`).
+                type: "str"
+
+              dump:
+                description: |
+                  `dump(8)` backup flag, written to the fifth `/etc/fstab` field.
+                  Almost always `0` (dump is not used on modern systems). Falls
+                  back to `disk_linux_device_defaults['mount']['dump']` (built-in
+                  default `0`).
+                type: "int"
+
+              passno:
+                description: |
+                  `fsck` order at boot, written to the sixth `/etc/fstab` field.
+                  `0` disables the boot-time filesystem check. `2` is conventional
+                  for `ext4` data filesystems; keep `0` for `xfs` (its boot-time
+                  `fsck.xfs` is a no-op by design). Falls back to
+                  `disk_linux_device_defaults['mount']['passno']` (built-in
+                  default `0`).
+                type: "int"
+
+              preserve_content:
+                description: |
+                  If `true`, content that already exists below the mountpoint is
+                  preserved on the first mount: before the new filesystem shadows
+                  the directory, it is temporarily mounted at a staging path, the
+                  current content is copied onto it with attributes intact
+                  (`cp --archive`), and only then the real mount happens. This
+                  one-time migration only runs when the mountpoint is not yet
+                  mounted and not empty; later runs are unaffected.
+
+                  Without this, mounting over a populated directory hides its
+                  content. Mounting a fresh filesystem on `/home`, for example,
+                  hides every existing home directory including
+                  `.ssh/authorized_keys` - which breaks SSH public key
+                  authentication for the whole host in the middle of the play.
+                  Falls back to
+                  `disk_linux_device_defaults['mount']['preserve_content']`
+                  (built-in default `true`).
+                type: "bool"
+
+              selinux_relabel:
+                description: |
+                  If `true`, SELinux file contexts below the mountpoint are
+                  restored (`restorecon -r`) once, directly after the initial
+                  mount (covering content copied by `preserve_content`), so files
+                  on the new filesystem get proper labels. This intentionally does
+                  not repeat on later runs: a recurring relabel would be an
+                  idempotence leak and can actively harm workloads that maintain
+                  their own labels below the mountpoint (for example rootless
+                  container storage under `/home`). No-op on systems without
+                  active SELinux. Falls back to
+                  `disk_linux_device_defaults['mount']['selinux_relabel']`
+                  (built-in default `true`).
+                type: "bool"
