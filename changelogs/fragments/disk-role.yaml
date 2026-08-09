@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - >
+    disk role - added the new ``foundata.linux.disk`` role for managing
+    dedicated data disks: a single partition spanning the disk, an XFS or ext4
+    filesystem and a mount plus ``/etc/fstab`` entry by filesystem UUID.
+    Existing data is never reformatted or destroyed by default (declared
+    layout verification, explicit ``on_mismatch``/``on_nonempty``/``wipe``
+    policies), with optional one-time content migration for populated
+    mountpoints and online growth after disk enlargement.
