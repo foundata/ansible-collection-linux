@@ -1,0 +1,274 @@
+# Shared safety preflight for every destructive path of this role: device
+# existence, canonical block device identity, whole-disk and duplicate
+# enforcement and the protection of disks backing the running system.
+# Lives in tasks/shared/ because it is phase-neutral: included by
+# tasks/config/default.yml AND tasks/setup/uninstall/default.yml, so a wipe
+# can never run without these checks.
+
+---
+
+- name: "Safety | Determine device existence"
+  ansible.builtin.stat:
+    path: "{{ item['device'] }}"
+    follow: true
+  loop: "{{ __disk_linux_devices_effective }}"
+  loop_control:
+    label: "{{ item['device'] }}"
+  register: __disk_linux_stat_result
+
+
+- name: "Safety | Build device existence map"
+  ansible.builtin.set_fact:
+    __disk_linux_device_exists: >-
+      {%- set __ns = namespace(map={}) -%}
+      {%- for __r in __disk_linux_stat_result['results'] -%}
+      {%-   set _ = __ns.map.update({__r['item']['device']: (__r['stat']['exists'] | ansible.builtin.bool)}) -%}
+      {%- endfor -%}
+      {{ __ns.map }}
+
+
+- name: "Safety | Fail on missing devices with on_missing policy fail"
+  ansible.builtin.assert:
+    that:
+      - (__disk_linux_missing_fail | ansible.builtin.length) == 0
+    quiet: true
+    fail_msg: >-
+      The following configured devices do not exist on this host (and their
+      on_missing policy is "fail"): {{ __disk_linux_missing_fail | ansible.builtin.join(', ') }}.
+      Attach the disks or set on_missing to "skip" for optional ones.
+  vars:
+    # missing devices matter for present entries and for the destructive
+    # wipe step of absent entries; plain absent cleanup proceeds without
+    # the device (a detached disk is the normal decommissioning case)
+    __disk_linux_existing_devices: >-
+      {{
+        __disk_linux_device_exists
+        | ansible.builtin.dict2items
+        | ansible.builtin.selectattr('value')
+        | ansible.builtin.map(attribute='key')
+        | ansible.builtin.list
+      }}
+    __disk_linux_missing_fail: >-
+      {{
+        __disk_linux_devices_effective
+        | ansible.builtin.rejectattr('device', 'in', __disk_linux_existing_devices)
+        | ansible.builtin.selectattr('on_missing', 'ansible.builtin.equalto', 'fail')
+        | ansible.builtin.rejectattr('state', 'ansible.builtin.equalto', 'absent')
+        | ansible.builtin.map(attribute='device')
+        | ansible.builtin.list
+      }}
+  when:
+    - (__disk_linux_devices_effective | ansible.builtin.length) > 0
+
+
+- name: "Safety | Query block device identity of all existing devices"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_lsblk_exec_path }}"
+      - "--json"
+      - "--nodeps"
+      - "--bytes"
+      - "--output"
+      - "KNAME,TYPE,MAJ:MIN,SIZE"
+      - "{{ item['device'] }}"
+  when:
+    - __disk_linux_device_exists[item['device']]
+  changed_when:
+    - false
+  # The probe is read-only; run it under "--check" too, otherwise it is
+  # skipped and the discovery dereferences its missing result.
+  check_mode: false
+  loop: "{{ __disk_linux_devices_effective }}"
+  loop_control:
+    label: "{{ item['device'] }}"
+  register: __disk_linux_identity_result
+
+
+- name: "Safety | Build canonical block device identity map"
+  ansible.builtin.set_fact:
+    __disk_linux_blockdev: >-
+      {%- set __ns = namespace(map={}) -%}
+      {%- for __r in __disk_linux_identity_result['results'] -%}
+      {%-   if __r is not ansible.builtin.skipped -%}
+      {%-     set __b = (__r['stdout'] | ansible.builtin.from_json)['blockdevices'][0] -%}
+      {%-     set _ = __ns.map.update({__r['item']['device']: {
+                'kname': __b['kname'],
+                'type': __b['type'],
+                'majmin': __b['maj:min'],
+                'size': (__b['size'] | int)
+              }}) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ __ns.map }}
+
+
+- name: "Safety | Enforce whole-disk devices and reject aliased duplicates"
+  ansible.builtin.assert:
+    that:
+      # every existing device must be a whole disk, not a partition or a
+      # device-mapper/LVM child
+      - >-
+        (__disk_linux_blockdev | ansible.builtin.dict2items
+         | ansible.builtin.rejectattr('value.type', 'ansible.builtin.equalto', 'disk')
+         | ansible.builtin.length) == 0
+      # no two entries may address the same physical disk through aliases;
+      # canonical identity is the major:minor pair
+      - >-
+        (__disk_linux_majmins | ansible.builtin.length)
+        == (__disk_linux_majmins | ansible.builtin.unique | ansible.builtin.length)
+    quiet: true
+    fail_msg: >-
+      Device identity violation: every entry must address a whole disk
+      (lsblk TYPE "disk") and no two entries may address the same disk
+      through different aliases. Queried identities:
+      {{ __disk_linux_blockdev }}
+  vars:
+    __disk_linux_majmins: >-
+      {{
+        __disk_linux_blockdev
+        | ansible.builtin.dict2items
+        | ansible.builtin.map(attribute='value.majmin')
+        | ansible.builtin.list
+      }}
+  when:
+    - (__disk_linux_blockdev | ansible.builtin.length) > 0
+
+
+- name: "Safety | Determine the sources backing critical system paths"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_findmnt_exec_path }}"
+      - "--noheadings"
+      - "--output"
+      - "SOURCE"
+      - "--mountpoint"
+      - "{{ item }}"
+  changed_when:
+    - false
+  # a path that is no own mountpoint is normal (rc 1); real resolution
+  # failures are caught below
+  failed_when:
+    - false
+  # The probe is read-only; run it under "--check" too, otherwise it is
+  # skipped and the discovery dereferences its missing result.
+  check_mode: false
+  loop:
+    - "/"
+    - "/boot"
+    - "/boot/efi"
+    - "/efi"
+  register: __disk_linux_sysmount_result
+
+
+- name: "Safety | Determine active swap devices"
+  ansible.builtin.slurp:
+    src: "/proc/swaps"
+  register: __disk_linux_swaps_result
+
+
+# Every critical source is resolved through the WHOLE storage stack to its
+# physical disks with an inverse lsblk (LUKS, LVM, MD RAID and multi-device
+# Btrfs sit between a mount source and its disks; a one-level parent lookup
+# misses them). Btrfs mount sources carry a "[/subvolume]" suffix that lsblk
+# does not accept, so it is stripped first. Swap files need no entry of
+# their own: their backing filesystem is already covered by its mountpoint.
+- name: "Safety | Resolve the critical sources to their physical disks"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_lsblk_exec_path }}"
+      - "--inverse"
+      - "--list"
+      - "--noheadings"
+      - "--output"
+      - "KNAME,TYPE,MAJ:MIN"
+      - "{{ item }}"
+  changed_when:
+    - false
+  # evaluated below: an unresolvable critical source fails CLOSED
+  failed_when:
+    - false
+  # The probe is read-only; run it under "--check" too, otherwise it is
+  # skipped and the discovery dereferences its missing result.
+  check_mode: false
+  vars:
+    __disk_linux_system_sources: >-
+      {{
+        ((__disk_linux_sysmount_result['results']
+          | ansible.builtin.selectattr('rc', 'ansible.builtin.equalto', 0)
+          | ansible.builtin.map(attribute='stdout')
+          | ansible.builtin.list)
+         + ((__disk_linux_swaps_result['content'] | ansible.builtin.b64decode).splitlines()[1:]
+            | ansible.builtin.map('ansible.builtin.split')
+            | ansible.builtin.map('ansible.builtin.first')
+            | ansible.builtin.list))
+        | ansible.builtin.map('ansible.builtin.regex_replace', '\[.*\]$', '')
+        | ansible.builtin.select('ansible.builtin.match', '^/dev/')
+        | ansible.builtin.unique
+      }}
+  loop: "{{ __disk_linux_system_sources }}"
+  register: __disk_linux_sysdisk_result
+
+
+# Fail closed: continuing with an incomplete protected set would let a
+# wipe reach a disk that actually backs the running system. The root
+# filesystem additionally has to resolve to a block device at all (an
+# overlay or network root is outside this role's safety model).
+- name: "Safety | Check every critical source resolved to physical disks"
+  ansible.builtin.assert:
+    that:
+      - >-
+        __disk_linux_sysdisk_result['results'] | ansible.builtin.default([])
+        | ansible.builtin.selectattr('rc', 'ansible.builtin.defined')
+        | ansible.builtin.rejectattr('rc', 'ansible.builtin.equalto', 0)
+        | ansible.builtin.length == 0
+      - >-
+        (__disk_linux_sysmount_result['results'][0]['stdout'] | ansible.builtin.default(''))
+        | ansible.builtin.regex_replace('\[.*\]$', '')
+        is ansible.builtin.match('^/dev/')
+    fail_msg: >-
+      Refusing to continue: a device backing the running system (/, /boot,
+      the EFI system partition or active swap) could not be resolved to its
+      physical disks, so the system-disk protection would be incomplete.
+      Unresolvable:
+      {{
+        __disk_linux_sysdisk_result['results'] | ansible.builtin.default([])
+        | ansible.builtin.selectattr('rc', 'ansible.builtin.defined')
+        | ansible.builtin.rejectattr('rc', 'ansible.builtin.equalto', 0)
+        | ansible.builtin.map(attribute='item') | ansible.builtin.join(', ')
+      }}
+      (root source:
+      {{ __disk_linux_sysmount_result['results'][0]['stdout'] | ansible.builtin.default('unknown') }}).
+    quiet: true
+  when:
+    - (__disk_linux_blockdev | ansible.builtin.length) > 0
+
+
+- name: "Safety | Reject disks backing the running system"
+  ansible.builtin.assert:
+    that:
+      - >-
+        (__disk_linux_blockdev | ansible.builtin.dict2items
+         | ansible.builtin.selectattr('value.majmin', 'in', __disk_linux_protected_majmin)
+         | ansible.builtin.length) == 0
+    quiet: true
+    fail_msg: >-
+      Refusing to manage a disk that backs the running system (/, /boot, the
+      EFI system partition or active swap). Protected disks (MAJ:MIN):
+      {{ __disk_linux_protected_majmin | ansible.builtin.join(', ') }}.
+  vars:
+    # every TYPE=disk ancestor of every critical source, by MAJ:MIN
+    __disk_linux_protected_majmin: >-
+      {{
+        __disk_linux_sysdisk_result['results'] | ansible.builtin.default([])
+        | ansible.builtin.selectattr('rc', 'ansible.builtin.defined')
+        | ansible.builtin.selectattr('rc', 'ansible.builtin.equalto', 0)
+        | ansible.builtin.map(attribute='stdout_lines')
+        | ansible.builtin.flatten
+        | ansible.builtin.map('ansible.builtin.trim')
+        | ansible.builtin.select('ansible.builtin.match', '^\S+\s+disk\s+\S+$')
+        | ansible.builtin.map('ansible.builtin.split')
+        | ansible.builtin.map(attribute='2')
+        | ansible.builtin.unique
+      }}
+  when:
+    - (__disk_linux_blockdev | ansible.builtin.length) > 0

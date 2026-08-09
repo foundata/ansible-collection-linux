@@ -9,6 +9,14 @@
 
 ---
 
+# The shared safety preflight runs here as well: a per-entry wipe reachable
+# through the role-global "absent" must never bypass the whole-disk,
+# duplicate and system-disk checks.
+- name: "Setup | Uninstall | Run the shared disk safety preflight"
+  ansible.builtin.include_tasks:
+    file: "{{ role_path }}/tasks/shared/safety.yml"
+
+
 - name: "Setup | Uninstall | Unmount and de-register the declared devices (children first)"
   ansible.builtin.include_tasks:
     file: "{{ role_path }}/tasks/config/device_absent.yml"
