@@ -1,0 +1,339 @@
+# Read-only classification and conflict preflight for ONE effectively present
+# device entry (loop_var __disk_linux_entry from tasks/config/default.yml).
+# Appends the planned action to __disk_linux_plan; every hard failure fires
+# here, before any disk has been changed.
+
+---
+
+- name: "Config | Preflight | Determine skip conditions"
+  ansible.builtin.set_fact:
+    __disk_linux_pf_skip: >-
+      {%- set __anc = [] -%}
+      {%- for __s in __disk_linux_skipped_paths -%}
+      {%-   if __disk_linux_entry['path'] != __s and __disk_linux_entry['path'].startswith(__s ~ '/') -%}
+      {%-     set _ = __anc.append(__s) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {%- if (__anc | length) > 0 -%}
+      parent mountpoint {{ __anc[0] }} was skipped
+      {%- elif not __disk_linux_device_exists[__disk_linux_entry['device']] -%}
+      device does not exist (on_missing policy is "skip")
+      {%- endif -%}
+
+
+- name: "Config | Preflight | Record the skipped entry"
+  ansible.builtin.set_fact:
+    __disk_linux_plan: "{{ __disk_linux_plan + [{'entry': __disk_linux_entry, 'action': 'skip', 'reason': __disk_linux_pf_skip}] }}"
+    __disk_linux_skipped_paths: "{{ __disk_linux_skipped_paths + [__disk_linux_entry['path']] }}"
+  when:
+    - (__disk_linux_pf_skip | ansible.builtin.length) > 0
+
+
+- name: "Config | Preflight | Classify and check the device"
+  when:
+    - (__disk_linux_pf_skip | ansible.builtin.length) == 0
+  block:
+
+    - name: "Config | Preflight | Query the on-disk layout"
+      ansible.builtin.command:
+        argv:
+          - "{{ __disk_linux_lsblk_exec_path }}"
+          - "--json"
+          - "--bytes"
+          - "--output"
+          - "KNAME,TYPE,PTTYPE,FSTYPE,SIZE,MOUNTPOINTS"
+          - "{{ __disk_linux_entry['device'] }}"
+      changed_when:
+        - false
+      register: __disk_linux_pf_lsblk_result
+
+
+    - name: "Config | Preflight | Parse the on-disk layout"
+      ansible.builtin.set_fact:
+        __disk_linux_pf_disk: >-
+          {{ (__disk_linux_pf_lsblk_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0] }}
+
+
+    - name: "Config | Preflight | Derive layout facts"
+      ansible.builtin.set_fact:
+        __disk_linux_pf_children: "{{ __disk_linux_pf_disk['children'] | ansible.builtin.default([]) }}"
+        __disk_linux_pf_pttype: >-
+          {{
+            __disk_linux_pttype_map[__disk_linux_pf_disk['pttype']]
+            | ansible.builtin.default(__disk_linux_pf_disk['pttype'] | ansible.builtin.default('', true), true)
+          }}
+
+
+    # Classification per the declared layout (see the design document): blank
+    # disks are set up from scratch; an undersized conforming disk is grow
+    # drift; everything else that deviates is a mismatch. The role never
+    # creates a filesystem on a partition it did not create itself, so a
+    # pre-existing signatureless partition is a mismatch too.
+    - name: "Config | Preflight | Classify the disk against the declaration"
+      ansible.builtin.set_fact:
+        __disk_linux_pf_class: >-
+          {%- set __e = __disk_linux_entry -%}
+          {%- set __d = __disk_linux_pf_disk -%}
+          {%- set __c = __disk_linux_pf_children -%}
+          {%- set __ns = namespace(class='adopt') -%}
+          {%- if (__disk_linux_pf_pttype | length) == 0 and (__d['fstype'] is ansible.builtin.none) and (__c | length) == 0 -%}
+          {%-   set __ns.class = 'create' -%}
+          {%- elif (__disk_linux_pf_pttype | length) == 0 and (__d['fstype'] is not ansible.builtin.none) -%}
+          {%-   set __ns.class = 'mismatch:a filesystem or other signature sits directly on the whole disk (no partition table)' -%}
+          {%- elif __disk_linux_pf_pttype != __e['partition_table'] -%}
+          {%-   set __ns.class = 'mismatch:the partition table type is "' ~ __disk_linux_pf_pttype ~ '" while "' ~ __e['partition_table'] ~ '" is declared' -%}
+          {%- elif (__c | length) != 1 or ((__c[0]['kname'] | ansible.builtin.regex_search('[0-9]+$')) != '1') -%}
+          {%-   set __ns.class = 'mismatch:the partition layout is not exactly one partition numbered 1' -%}
+          {%- elif __c[0]['fstype'] is ansible.builtin.none -%}
+          {%-   set __ns.class = 'mismatch:partition 1 exists but carries no recognizable filesystem signature' -%}
+          {%- elif __c[0]['fstype'] != __e['filesystem']['type'] -%}
+          {%-   set __ns.class = 'mismatch:partition 1 carries "' ~ __c[0]['fstype'] ~ '" while "' ~ __e['filesystem']['type'] ~ '" is declared' -%}
+          {%- elif __e['grow'] and ((__d['size'] | int) - (__c[0]['size'] | int)) > __disk_linux_grow_slack_bytes -%}
+          {%-   set __ns.class = 'grow' -%}
+          {%- endif -%}
+          {{ __ns.class }}
+
+
+    - name: "Config | Preflight | Fail on mismatch with on_mismatch policy fail"
+      ansible.builtin.fail:
+        msg: >-
+          Disk {{ __disk_linux_entry['device'] }} (for
+          {{ __disk_linux_entry['path'] }}) contradicts the declared layout:
+          {{ __disk_linux_pf_class.split(':', 1)[1] }}. A mismatch usually
+          means the device path points at the wrong disk or the disk carries
+          foreign data. Set on_mismatch to "skip" to leave such disks alone or
+          to "wipe" to destructively repurpose them.
+      when:
+        - __disk_linux_pf_class is ansible.builtin.match('^mismatch:')
+        - __disk_linux_entry['on_mismatch'] == 'fail'
+
+
+    - name: "Config | Preflight | Record the mismatch-skipped entry"
+      ansible.builtin.set_fact:
+        __disk_linux_plan: "{{ __disk_linux_plan + [{'entry': __disk_linux_entry, 'action': 'skip', 'reason': __disk_linux_pf_class.split(':', 1)[1]}] }}"
+        __disk_linux_skipped_paths: "{{ __disk_linux_skipped_paths + [__disk_linux_entry['path']] }}"
+      when:
+        - __disk_linux_pf_class is ansible.builtin.match('^mismatch:')
+        - __disk_linux_entry['on_mismatch'] == 'skip'
+
+
+    - name: "Config | Preflight | Inspect state and conflicts"
+      when:
+        - not (__disk_linux_pf_class is ansible.builtin.match('^mismatch:') and __disk_linux_entry['on_mismatch'] == 'skip')
+      block:
+
+        - name: "Config | Preflight | Resolve the planned action and mount state"
+          ansible.builtin.set_fact:
+            __disk_linux_pf_action: >-
+              {{ 'mismatch_wipe' if __disk_linux_pf_class is ansible.builtin.match('^mismatch:') else __disk_linux_pf_class }}
+            __disk_linux_pf_mounted_source: >-
+              {{
+                (__disk_linux_mounts
+                 | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', __disk_linux_entry['path'])
+                 | ansible.builtin.map(attribute='source')
+                 | ansible.builtin.first) | ansible.builtin.default('', true)
+              }}
+            __disk_linux_pf_mounts_below: >-
+              {%- set __ns = namespace(rows=[]) -%}
+              {%- for __m in __disk_linux_mounts -%}
+              {%-   if __m['target'] != __disk_linux_entry['path'] and __m['target'].startswith(__disk_linux_entry['path'] ~ '/') -%}
+              {%-     set _ = __ns.rows.append(__m['target']) -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ __ns.rows }}
+
+
+        - name: "Config | Preflight | Determine the filesystem UUID of partition 1"
+          ansible.builtin.command:
+            argv:
+              - "{{ __disk_linux_blkid_exec_path }}"
+              - "--match-tag"
+              - "UUID"
+              - "--output"
+              - "value"
+              - "/dev/{{ __disk_linux_pf_children[0]['kname'] }}"
+          when:
+            - __disk_linux_pf_action in ['adopt', 'grow']
+          changed_when:
+            - false
+          failed_when:
+            - false
+          register: __disk_linux_pf_uuid_result
+
+
+        - name: "Config | Preflight | Determine all devices carrying this filesystem UUID"
+          ansible.builtin.command:
+            argv:
+              - "{{ __disk_linux_blkid_exec_path }}"
+              - "--output"
+              - "device"
+              - "--match-token"
+              - "UUID={{ __disk_linux_pf_uuid_result['stdout'] }}"
+          when:
+            - __disk_linux_pf_action in ['adopt', 'grow']
+            - (__disk_linux_pf_uuid_result['stdout'] | ansible.builtin.default('', true) | ansible.builtin.length) > 0
+          changed_when:
+            - false
+          failed_when:
+            - false
+          register: __disk_linux_pf_uuid_dupe_result
+
+
+        - name: "Config | Preflight | Collect conflicts"
+          ansible.builtin.set_fact:
+            __disk_linux_pf_conflicts: >-
+              {%- set __ns = namespace(rows=[]) -%}
+              {%- set __e = __disk_linux_entry -%}
+              {%- set __uuid = (__disk_linux_pf_uuid_result['stdout'] | ansible.builtin.default('', true)) -%}
+              {%- set __child = '/dev/' ~ (__disk_linux_pf_children[0]['kname'] | ansible.builtin.default('', true)) -%}
+              {%- set __ownsrc = __disk_linux_pf_children | map(attribute='kname') | map('ansible.builtin.regex_replace', '^', '/dev/') | list -%}
+              {#- target path mounted from a source that is not this disk's partition -#}
+              {%- if (__disk_linux_pf_mounted_source | length) > 0 and __disk_linux_pf_mounted_source not in __ownsrc -%}
+              {%-   set _ = __ns.rows.append('the mountpoint already carries a mount from ' ~ __disk_linux_pf_mounted_source) -%}
+              {%- endif -%}
+              {#- active mounts below an unmounted target would be hidden -#}
+              {%- if (__disk_linux_pf_mounted_source | length) == 0 and (__disk_linux_pf_mounts_below | length) > 0 -%}
+              {%-   set _ = __ns.rows.append('mounting would hide the active mounts below the mountpoint: ' ~ (__disk_linux_pf_mounts_below | join(', '))) -%}
+              {%- endif -%}
+              {#- the declared filesystem is mounted somewhere else -#}
+              {%- if __disk_linux_pf_action in ['adopt', 'grow'] -%}
+              {%-   for __m in __disk_linux_mounts -%}
+              {%-     if __m['source'] == __child and __m['target'] != __e['path'] -%}
+              {%-       set _ = __ns.rows.append('the filesystem is already mounted at ' ~ __m['target']) -%}
+              {%-     endif -%}
+              {%-   endfor -%}
+              {%- endif -%}
+              {#- conflicting foreign /etc/fstab lines by target or source -#}
+              {%- set __adoptlike = __disk_linux_pf_action in ['adopt', 'grow'] -%}
+              {%- for __f in __disk_linux_fstab -%}
+              {%-   if __f['target'] == __e['path'] and
+                       (not __adoptlike or __f['source'] != 'UUID=' ~ __uuid) -%}
+              {%-     set _ = __ns.rows.append('/etc/fstab already lists ' ~ __f['source'] ~ ' for the mountpoint') -%}
+              {%-   elif (__uuid | length) > 0 and __f['source'] == 'UUID=' ~ __uuid and __f['target'] != __e['path'] -%}
+              {%-     set _ = __ns.rows.append('/etc/fstab lists this filesystem for a different mountpoint: ' ~ __f['target']) -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {#- duplicate filesystem UUIDs (e.g. cloned disks) -#}
+              {%- set __dupes = __disk_linux_pf_uuid_dupe_result['stdout_lines'] | ansible.builtin.default([]) -%}
+              {%- if (__uuid | length) > 0 and (__dupes | length) > 1 -%}
+              {%-   set _ = __ns.rows.append('duplicate filesystem UUID ' ~ __uuid ~ ' on: ' ~ (__dupes | join(', '))) -%}
+              {%- endif -%}
+              {{ __ns.rows }}
+
+
+        - name: "Config | Preflight | Fail on mount or fstab conflicts"
+          ansible.builtin.fail:
+            msg: >-
+              Conflicting environment for {{ __disk_linux_entry['device'] }}
+              ({{ __disk_linux_entry['path'] }}), refusing to change anything:
+              {{ __disk_linux_pf_conflicts | ansible.builtin.join('; ') }}.
+              These conflicts need a human decision; the role never resolves
+              them by unmounting or replacing anything automatically.
+          when:
+            - (__disk_linux_pf_conflicts | ansible.builtin.length) > 0
+
+
+        - name: "Config | Preflight | Check the mountpoint directory for existing content"
+          ansible.builtin.find:
+            paths: "{{ __disk_linux_entry['path'] }}"
+            file_type: "any"
+            hidden: true
+          when:
+            - (__disk_linux_pf_mounted_source | ansible.builtin.length) == 0
+          register: __disk_linux_pf_find_result
+
+
+        - name: "Config | Preflight | Enforce the on_nonempty policy (fail)"
+          ansible.builtin.fail:
+            msg: >-
+              The mountpoint {{ __disk_linux_entry['path'] }} already contains
+              files and its on_nonempty policy is "fail". Mounting would hide
+              the existing content. Set on_nonempty to "copy" for a one-time
+              migration onto the new filesystem, or to "hide" to mount over it.
+          when:
+            - (__disk_linux_pf_mounted_source | ansible.builtin.length) == 0
+            - (__disk_linux_pf_find_result['matched'] | ansible.builtin.default(0)) > 0
+            - __disk_linux_entry['mount']['on_nonempty'] == 'fail'
+
+
+        - name: "Config | Preflight | Check declared nested mountpoints below a copy migration"
+          ansible.builtin.find:
+            paths: "{{ item }}"
+            file_type: "any"
+            hidden: true
+          vars:
+            __disk_linux_pf_descendants: >-
+              {%- set __ns = namespace(rows=[]) -%}
+              {%- for __p in __disk_linux_devices_effective_present -%}
+              {%-   if __p['path'] != __disk_linux_entry['path'] and __p['path'].startswith(__disk_linux_entry['path'] ~ '/') -%}
+              {%-     if (__disk_linux_mounts | selectattr('target', 'ansible.builtin.equalto', __p['path']) | list | length) == 0 -%}
+              {%-       set _ = __ns.rows.append(__p['path']) -%}
+              {%-     endif -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ __ns.rows }}
+          when:
+            - (__disk_linux_pf_mounted_source | ansible.builtin.length) == 0
+            - (__disk_linux_pf_find_result['matched'] | ansible.builtin.default(0)) > 0
+            - __disk_linux_entry['mount']['on_nonempty'] == 'copy'
+          loop: "{{ __disk_linux_pf_descendants }}"
+          register: __disk_linux_pf_nested_result
+
+
+        - name: "Config | Preflight | Refuse copy migrations over populated unmounted nested mountpoints"
+          ansible.builtin.fail:
+            msg: >-
+              Refusing on_nonempty "copy" for {{ __disk_linux_entry['path'] }}:
+              the declared nested mountpoints
+              {{ __disk_linux_pf_nested_populated | ansible.builtin.join(', ') }}
+              are not mounted yet and contain files. Migrating nested unmounted
+              trees in one pass is not supported. Apply the nested entries
+              first (their own migration mounts them), then run again for this
+              entry.
+          vars:
+            __disk_linux_pf_nested_populated: >-
+              {{
+                __disk_linux_pf_nested_result['results'] | ansible.builtin.default([])
+                | ansible.builtin.selectattr('matched', 'ansible.builtin.defined')
+                | ansible.builtin.selectattr('matched', '>', 0)
+                | ansible.builtin.map(attribute='item')
+                | ansible.builtin.list
+              }}
+          when:
+            - (__disk_linux_pf_mounted_source | ansible.builtin.length) == 0
+            - (__disk_linux_pf_find_result['matched'] | ansible.builtin.default(0)) > 0
+            - __disk_linux_entry['mount']['on_nonempty'] == 'copy'
+            - (__disk_linux_pf_nested_populated | ansible.builtin.length) > 0
+
+
+        - name: "Config | Preflight | Record the planned action"
+          ansible.builtin.set_fact:
+            __disk_linux_plan: >-
+              {{
+                __disk_linux_plan + [{
+                  'entry': __disk_linux_entry,
+                  'action': __disk_linux_pf_action,
+                  'kname': __disk_linux_blockdev[__disk_linux_entry['device']]['kname'],
+                  'pttype_actual': __disk_linux_pf_pttype,
+                  'child_kname': __disk_linux_pf_child_kname,
+                  'child_knames': (__disk_linux_pf_children | ansible.builtin.map(attribute='kname') | ansible.builtin.list),
+                  'mounted_paths': __disk_linux_pf_mounted_paths,
+                  'uuid': (__disk_linux_pf_uuid_result['stdout'] | ansible.builtin.default('', true)),
+                  'mounted': ((__disk_linux_pf_mounted_source | ansible.builtin.length) > 0),
+                  'nonempty': ((__disk_linux_pf_find_result['matched'] | ansible.builtin.default(0)) > 0)
+                }]
+              }}
+          vars:
+            __disk_linux_pf_child_kname: >-
+              {{
+                (__disk_linux_pf_children[0]['kname'] | ansible.builtin.default('', true))
+                if (__disk_linux_pf_children | ansible.builtin.length) > 0 else ''
+              }}
+            __disk_linux_pf_mounted_paths: >-
+              {{
+                __disk_linux_pf_children
+                | ansible.builtin.map(attribute='mountpoints')
+                | ansible.builtin.flatten
+                | ansible.builtin.reject('ansible.builtin.none')
+                | ansible.builtin.list
+              }}

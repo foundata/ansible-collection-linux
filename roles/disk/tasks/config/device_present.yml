@@ -1,0 +1,416 @@
+# Apply the planned action for ONE effectively present device entry
+# (loop_var __disk_linux_item from tasks/config/default.yml; produced by
+# tasks/config/preflight.yml). All read-only checks already happened there.
+
+---
+
+- name: "Config | Device | Notice about skipped entry"
+  ansible.builtin.debug:
+    msg: >-
+      Skipping {{ __disk_linux_item['entry']['device'] }}
+      ({{ __disk_linux_item['entry']['path'] }}): {{ __disk_linux_item['reason'] | ansible.builtin.default('skipped') }}.
+  when:
+    - __disk_linux_item['action'] == 'skip'
+
+
+- name: "Config | Device | Set up the device"
+  when:
+    - __disk_linux_item['action'] != 'skip'
+  block:
+
+    - name: "Config | Device | Repurpose the mismatching disk (on_mismatch policy wipe)"
+      when:
+        - __disk_linux_item['action'] == 'mismatch_wipe'
+      block:
+
+        - name: "Config | Device | WARNING about the following data destruction"
+          ansible.builtin.debug:
+            msg: >-
+              WARNING: on_mismatch "wipe" is about to destroy the existing
+              content of {{ __disk_linux_item['entry']['device'] }} (partition
+              table "{{ __disk_linux_item['pttype_actual'] }}", partitions:
+              {{ __disk_linux_item['child_knames'] | ansible.builtin.join(', ') | ansible.builtin.default('none', true) }}).
+              All data on this disk becomes inaccessible. Remove the
+              on_mismatch setting once the conversion has happened.
+
+
+        - name: "Config | Device | Determine filesystem UUIDs on the disk being repurposed"
+          ansible.builtin.command:
+            argv:
+              - "{{ __disk_linux_blkid_exec_path }}"
+              - "--match-tag"
+              - "UUID"
+              - "--output"
+              - "value"
+              - "/dev/{{ item }}"
+          changed_when:
+            - false
+          failed_when:
+            - false
+          loop: "{{ __disk_linux_item['child_knames'] }}"
+          register: __disk_linux_apply_olduuid_result
+
+
+        - name: "Config | Device | Unmount the old filesystems"
+          ansible.posix.mount:
+            path: "{{ item }}"
+            state: "unmounted"
+          loop: "{{ __disk_linux_item['mounted_paths'] }}"
+
+
+        - name: "Config | Device | Remove /etc/fstab entries of the destroyed filesystems"
+          ansible.posix.mount:
+            path: "{{ item['target'] }}"
+            state: "absent_from_fstab"
+          vars:
+            __disk_linux_apply_old_uuids: >-
+              {{
+                __disk_linux_apply_olduuid_result['results'] | ansible.builtin.default([])
+                | ansible.builtin.selectattr('stdout', 'ansible.builtin.defined')
+                | ansible.builtin.map(attribute='stdout')
+                | ansible.builtin.select('ansible.builtin.truthy')
+                | ansible.builtin.list
+              }}
+          when:
+            - item['source'] is ansible.builtin.match('^UUID=')
+            - (item['source'] | ansible.builtin.regex_replace('^UUID=', '')) in __disk_linux_apply_old_uuids
+          loop: "{{ __disk_linux_fstab }}"
+          loop_control:
+            label: "{{ item['target'] }}"
+
+
+        - name: "Config | Device | Erase the partition signatures"
+          ansible.builtin.command:
+            argv:
+              - "{{ __disk_linux_wipefs_exec_path }}"
+              - "--all"
+              - "/dev/{{ item }}"
+          changed_when:
+            - (__disk_linux_apply_wipefs_part_result['stdout'] | ansible.builtin.default('', true) | ansible.builtin.length) > 0
+          loop: "{{ __disk_linux_item['child_knames'] }}"
+          register: __disk_linux_apply_wipefs_part_result
+
+
+        - name: "Config | Device | Erase the partition table"
+          ansible.builtin.command:
+            argv:
+              - "{{ __disk_linux_wipefs_exec_path }}"
+              - "--all"
+              - "{{ __disk_linux_item['entry']['device'] }}"
+          changed_when:
+            - (__disk_linux_apply_wipefs_disk_result['stdout'] | ansible.builtin.length) > 0
+          register: __disk_linux_apply_wipefs_disk_result
+
+
+    - name: "Config | Device | Create the partition table and partition 1 (blank disk)"
+      community.general.parted:
+        device: "{{ __disk_linux_item['entry']['device'] }}"
+        label: "{{ __disk_linux_item['entry']['partition_table'] }}"
+        number: 1
+        fs_type: "{{ __disk_linux_item['entry']['filesystem']['type'] }}"
+        part_start: "0%"
+        part_end: "100%"
+        state: "present"
+      when:
+        - __disk_linux_item['action'] in ['create', 'mismatch_wipe']
+
+
+    # The label parameter always matches the EXISTING table type on purpose:
+    # community.general.parted destructively re-labels the disk whenever the
+    # current table type differs from the requested label.
+    - name: "Config | Device | Extend partition 1 to span the enlarged disk"
+      community.general.parted:
+        device: "{{ __disk_linux_item['entry']['device'] }}"
+        label: "{{ __disk_linux_item['pttype_actual'] }}"
+        number: 1
+        part_end: "100%"
+        resize: true
+        state: "present"
+      when:
+        - __disk_linux_item['action'] == 'grow'
+
+
+    - name: "Config | Device | Determine the partition device"
+      ansible.builtin.command:
+        argv:
+          - "{{ __disk_linux_lsblk_exec_path }}"
+          - "--json"
+          - "--output"
+          - "KNAME"
+          - "{{ __disk_linux_item['entry']['device'] }}"
+      changed_when:
+        - false
+      register: __disk_linux_apply_lsblk_result
+
+
+    - name: "Config | Device | Set the partition device fact"
+      ansible.builtin.set_fact:
+        __disk_linux_apply_partition: "/dev/{{ __disk_linux_apply_children[0]['kname'] }}"
+        __disk_linux_apply_created: "{{ __disk_linux_item['action'] in ['create', 'mismatch_wipe'] }}"
+      vars:
+        __disk_linux_apply_children: >-
+          {{
+            (__disk_linux_apply_lsblk_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0]['children']
+            | ansible.builtin.default([{'kname': ''}])
+          }}
+
+
+    - name: "Config | Device | Create the filesystem (only on the partition the role created)"
+      community.general.filesystem:
+        dev: "{{ __disk_linux_apply_partition }}"
+        fstype: "{{ __disk_linux_item['entry']['filesystem']['type'] }}"
+        opts: "{{ __disk_linux_apply_mkfs_options if (__disk_linux_apply_mkfs_options | ansible.builtin.length) > 0 else omit }}"
+      vars:
+        __disk_linux_apply_mkfs_options: "{{ __disk_linux_item['entry']['filesystem']['mkfs_options'] }}"
+      when:
+        - __disk_linux_apply_created
+
+
+    - name: "Config | Device | Determine the filesystem UUID"
+      ansible.builtin.command:
+        argv:
+          - "{{ __disk_linux_blkid_exec_path }}"
+          - "--match-tag"
+          - "UUID"
+          - "--output"
+          - "value"
+          - "{{ __disk_linux_apply_partition }}"
+      changed_when:
+        - false
+      register: __disk_linux_apply_uuid_result
+
+
+    - name: "Config | Device | Fail when no filesystem UUID was detected"
+      ansible.builtin.assert:
+        that:
+          - (__disk_linux_apply_uuid_result['stdout'] | ansible.builtin.length) > 0
+        quiet: true
+        fail_msg: "No filesystem UUID found on {{ __disk_linux_apply_partition }}."
+
+
+    # Mounting over a populated directory would hide its content (e.g. /home
+    # with existing accounts, breaking SSH public key authentication). The
+    # one-time migration copies the current content onto the new filesystem
+    # before the real mount. The copy targets the staging mount only, so an
+    # aborted run leaves the system unchanged; the marker makes role-created
+    # remains of such a run recognizable (cleared and re-copied, never merged).
+    - name: "Config | Device | Migrate existing mountpoint content (on_nonempty policy copy)"
+      when:
+        - not __disk_linux_item['mounted']
+        - __disk_linux_item['nonempty']
+        - __disk_linux_item['entry']['mount']['on_nonempty'] == 'copy'
+      block:
+
+        - name: "Config | Device | Create the temporary migration mountpoint"
+          ansible.builtin.file:
+            path: "{{ __disk_linux_migration_mountpoint }}"
+            state: "directory"
+            owner: "root"
+            group: "root"
+            mode: "u=rwx,g=,o=" # 0700
+
+
+        - name: "Config | Device | Mount the new filesystem at the migration mountpoint"
+          ansible.posix.mount:
+            path: "{{ __disk_linux_migration_mountpoint }}"
+            src: "UUID={{ __disk_linux_apply_uuid_result['stdout'] }}"
+            fstype: "{{ __disk_linux_item['entry']['filesystem']['type'] }}"
+            state: "ephemeral" # mount without touching /etc/fstab
+
+
+        - name: "Config | Device | Migrate the content"
+          block:
+
+            - name: "Config | Device | Check the destination filesystem for existing content"
+              ansible.builtin.find:
+                paths: "{{ __disk_linux_migration_mountpoint }}"
+                file_type: "any"
+                hidden: true
+                recurse: false
+              register: __disk_linux_apply_stagefind_result
+
+
+            - name: "Config | Device | Fail when the destination already carries other data (copy never merges)"
+              ansible.builtin.fail:
+                msg: >-
+                  Refusing the on_nonempty "copy" migration onto
+                  {{ __disk_linux_apply_partition }}: the filesystem already
+                  contains data that was not left behind by an earlier
+                  migration attempt of this role. Copying would merge onto
+                  existing data, which is never done.
+              vars:
+                __disk_linux_apply_marker_found: >-
+                  {{
+                    __disk_linux_apply_stagefind_result['files'] | ansible.builtin.default([])
+                    | ansible.builtin.selectattr('path', 'ansible.builtin.equalto', __disk_linux_migration_mountpoint ~ '/' ~ __disk_linux_migration_marker)
+                    | ansible.builtin.length > 0
+                  }}
+              when:
+                - (__disk_linux_apply_stagefind_result['matched'] | ansible.builtin.default(0)) > 0
+                - not (__disk_linux_apply_marker_found | ansible.builtin.bool)
+
+
+            - name: "Config | Device | Clear the remains of an earlier aborted migration"
+              ansible.builtin.file:
+                path: "{{ item['path'] }}"
+                state: "absent"
+              when:
+                - (__disk_linux_apply_stagefind_result['matched'] | ansible.builtin.default(0)) > 0
+              loop: "{{ __disk_linux_apply_stagefind_result['files'] | ansible.builtin.default([]) }}"
+              loop_control:
+                label: "{{ item['path'] }}"
+
+
+            - name: "Config | Device | Determine the size of the content to migrate"
+              ansible.builtin.command:
+                argv:
+                  - "{{ __disk_linux_du_exec_path }}"
+                  - "--summarize"
+                  - "--one-file-system"
+                  - "--block-size=1"
+                  - "{{ __disk_linux_item['entry']['path'] }}"
+              changed_when:
+                - false
+              register: __disk_linux_apply_du_result
+
+
+            - name: "Config | Device | Determine the free space of the destination filesystem"
+              ansible.builtin.command:
+                argv:
+                  - "{{ __disk_linux_findmnt_exec_path }}"
+                  - "--noheadings"
+                  - "--bytes"
+                  - "--output"
+                  - "AVAIL"
+                  - "--mountpoint"
+                  - "{{ __disk_linux_migration_mountpoint }}"
+              changed_when:
+                - false
+              register: __disk_linux_apply_avail_result
+
+
+            - name: "Config | Device | Fail when the destination filesystem is too small"
+              ansible.builtin.assert:
+                that:
+                  - (__disk_linux_apply_du_bytes | int) <= (__disk_linux_apply_avail_bytes | int)
+                quiet: true
+                fail_msg: >-
+                  The content of {{ __disk_linux_item['entry']['path'] }} does
+                  not fit onto the new filesystem
+                  ({{ __disk_linux_apply_du_bytes }} bytes needed,
+                  {{ __disk_linux_apply_avail_bytes }} available).
+              vars:
+                __disk_linux_apply_du_bytes: "{{ __disk_linux_apply_du_result['stdout'].split() | ansible.builtin.first }}"
+                __disk_linux_apply_avail_bytes: "{{ __disk_linux_apply_avail_result['stdout'] | ansible.builtin.trim }}"
+
+
+            - name: "Config | Device | Place the migration in-progress marker"
+              ansible.builtin.file:
+                path: "{{ __disk_linux_migration_mountpoint }}/{{ __disk_linux_migration_marker }}"
+                state: "touch"
+                owner: "root"
+                group: "root"
+                mode: "u=rw,g=,o=" # 0600
+
+
+            - name: "Config | Device | Copy the existing content (preserving attributes)"
+              ansible.builtin.command:
+                argv:
+                  - "{{ __disk_linux_cp_exec_path }}"
+                  - "--archive"
+                  - "--one-file-system"
+                  - "{{ __disk_linux_item['entry']['path'] }}/."
+                  - "{{ __disk_linux_migration_mountpoint }}/"
+              changed_when:
+                - true
+
+
+            - name: "Config | Device | Remove the migration in-progress marker"
+              ansible.builtin.file:
+                path: "{{ __disk_linux_migration_mountpoint }}/{{ __disk_linux_migration_marker }}"
+                state: "absent"
+
+          always:
+
+            - name: "Config | Device | Unmount the temporary migration mountpoint"
+              ansible.posix.mount:
+                path: "{{ __disk_linux_migration_mountpoint }}"
+                state: "unmounted"
+
+
+            - name: "Config | Device | Remove the temporary migration mountpoint"
+              ansible.builtin.file:
+                path: "{{ __disk_linux_migration_mountpoint }}"
+                state: "absent"
+
+
+    - name: "Config | Device | Mount the filesystem by UUID (incl. /etc/fstab)"
+      ansible.posix.mount:
+        path: "{{ __disk_linux_item['entry']['path'] }}"
+        src: "UUID={{ __disk_linux_apply_uuid_result['stdout'] }}"
+        fstype: "{{ __disk_linux_item['entry']['filesystem']['type'] }}"
+        opts: "{{ __disk_linux_item['entry']['mount']['options'] }}"
+        dump: "{{ __disk_linux_item['entry']['mount']['dump'] }}"
+        passno: "{{ __disk_linux_item['entry']['mount']['passno'] }}"
+        state: "mounted"
+      register: __disk_linux_apply_mount_result
+
+
+    - name: "Config | Device | Validate /etc/fstab"
+      ansible.builtin.command:
+        argv:
+          - "{{ __disk_linux_findmnt_exec_path }}"
+          - "--verify"
+      changed_when:
+        - false
+      register: __disk_linux_apply_verify_result
+
+
+    # Only reached when the preflight measured reclaimable space above the
+    # tolerance, so the grow is real; both tools grow online (mounted).
+    - name: "Config | Device | Grow the filesystem to the partition size (xfs)"
+      ansible.builtin.command:
+        argv:
+          - "{{ __disk_linux_xfs_growfs_exec_path }}"
+          - "{{ __disk_linux_item['entry']['path'] }}"
+      when:
+        - __disk_linux_item['action'] == 'grow'
+        - __disk_linux_item['entry']['filesystem']['type'] == 'xfs'
+      changed_when:
+        - true
+
+
+    - name: "Config | Device | Grow the filesystem to the partition size (ext4)"
+      ansible.builtin.command:
+        argv:
+          - "{{ __disk_linux_resize2fs_exec_path }}"
+          - "{{ __disk_linux_apply_partition }}"
+      when:
+        - __disk_linux_item['action'] == 'grow'
+        - __disk_linux_item['entry']['filesystem']['type'] == 'ext4'
+      changed_when:
+        - true
+
+
+    # Only after the initial mount by this role, per the selinux_relabel
+    # policy: a recurring relabel would be an idempotence leak and can harm
+    # workloads that maintain their own labels below the mountpoint. Not a
+    # handler on purpose: the relabel has to happen right here, before later
+    # tasks write to the freshly mounted filesystem. -x keeps it from
+    # crossing filesystem boundaries.
+    - name: "Config | Device | Restore SELinux contexts on the mountpoint"
+      ansible.builtin.command:
+        argv:
+          - "{{ __disk_linux_restorecon_exec_path }}"
+          - "-r"
+          - "-x"
+          - "-v"
+          - "{{ __disk_linux_item['entry']['path'] }}"
+      when:
+        - (ansible_facts['selinux']['status'] | ansible.builtin.default('')) == 'enabled'
+        - not __disk_linux_item['mounted']
+        - __disk_linux_item['entry']['mount']['selinux_relabel'] == 'first_mount' or
+          (__disk_linux_item['entry']['mount']['selinux_relabel'] == 'created' and (__disk_linux_apply_created | ansible.builtin.bool))
+      changed_when:
+        - (__disk_linux_apply_restorecon_result['stdout'] | ansible.builtin.length) > 0
+      register: __disk_linux_apply_restorecon_result

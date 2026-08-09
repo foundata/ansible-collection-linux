@@ -22,42 +22,75 @@ __disk_linux_used_facts:
     - "distribution_major_version"
     - "distribution_version"
     - "os_family"
+  selinux:
+    - "selinux"
 
 
 # List of platforms this role supports and was designed for.
 #
 # A warning will be issued if the list contains values and the role is executed
-# on an unknown (not listed) platform, but execution will continue. Example:
-#
-# - name: "Fedora" # A ansible_facts value ('distribution' or 'os_family')
-#   versions: # A ansible_facts value ('distribution_major_version' or
-#     - "all" # 'distribution_version') or "all"
-# - name: "Ubuntu"
-#   versions:
-#     - "22.04"
-#     - "24.04"
-# - name: "RedHat"
-#   versions:
-#     - "all"
-# - name: "Debian"
-#   versions:
-#     - "all"
-__disk_linux_supported_platforms: []
+# on an unknown (not listed) platform, but execution will continue.
+__disk_linux_supported_platforms:
+  - name: "Debian"
+    versions:
+      - "12"
+      - "13"
+  - name: "Ubuntu"
+    versions:
+      - "22.04"
+      - "24.04"
+      - "26.04"
+  - name: "RedHat"
+    versions:
+      - "9"
+      - "10"
+  - name: "Fedora"
+    versions:
+      - "43"
+      - "44"
+  - name: "openSUSE Leap"
+    versions:
+      - "16.0"
+
+
+# Mapping of supported filesystem types to the package providing their mkfs
+# and grow tooling. Identical package names on all supported platforms
+# (probed 2026-08-09, see tmp/design-linux-disk.md in the repository root).
+__disk_linux_fs_tool_packages:
+  xfs: "xfsprogs"
+  ext4: "e2fsprogs"
 
 
 # List of package names to be installed when disk_linux_state is
 # set to "present".
-__disk_linux_packages_install: []
+#
+# Lazy / late-bound evaluation: Jinja renders this variable on access (in the
+# setup/install phase, after init gathered the facts). The full "util-linux"
+# is explicit because minimal installations of some platforms only ship
+# util-linux-core, which lacks findmnt, lsblk and wipefs. Filesystem tool
+# packages are only installed for filesystem types the declared devices
+# actually use; policycoreutils (restorecon) only where SELinux is active.
+__disk_linux_packages_install: >-
+  {{
+    (['parted', 'util-linux']
+     + (__disk_linux_devices_effective
+        | ansible.builtin.selectattr('state', 'ansible.builtin.equalto', 'present')
+        | ansible.builtin.map(attribute='filesystem')
+        | ansible.builtin.map(attribute='type')
+        | ansible.builtin.map('ansible.builtin.extract', __disk_linux_fs_tool_packages)
+        | ansible.builtin.list)
+     + (['policycoreutils']
+        if ((ansible_facts['selinux']['status'] | ansible.builtin.default('')) == 'enabled')
+        else []))
+    | ansible.builtin.unique
+  }}
 
 
 # List of package names to be uninstalled when disk_linux_state is
-# set to "absent". This variable is useful when __disk_linux_packages_install
-# contains packages that are required for the managed software to function but
-# should not be removed during uninstallation, as doing so could break other
-# software. This is usually the case if there are common dependencies like
-# "curl" or "openssl" which typically should remain installed even after
-# uninstalling the software managed by this role.
-__disk_linux_packages_uninstall: "{{ __disk_linux_packages_install }}"
+# set to "absent". Intentionally empty: parted, util-linux and the filesystem
+# tools are base-system components whose removal could break unrelated
+# software, so the role never uninstalls them.
+__disk_linux_packages_uninstall: []
 
 
 # List of package names to be removed unconditionally before installation
@@ -79,6 +112,162 @@ __disk_linux_paths_removal: []
 # configuration, while modified files are preserved. For example, RPM with
 # %config(noreplace) restores missing files but preserves modified ones.
 __disk_linux_paths_neutralize: {}
+
+
+# Built-in defaults for the per-device keys of disk_linux_devices. The public
+# disk_linux_device_defaults dictionary is deep-merged over this, individual
+# device entries win over both. Documented as the effective built-in defaults
+# in meta/argument_specs.yml; keep both places in sync.
+__disk_linux_device_defaults_builtin:
+  state: "present"
+  wipe: false
+  on_missing: "fail"
+  on_mismatch: "fail"
+  partition_table: "gpt"
+  grow: true
+  filesystem:
+    type: "xfs"
+    mkfs_options: ""
+  mount:
+    options: "defaults"
+    dump: 0
+    passno: 0
+    on_nonempty: "fail"
+    selinux_relabel: "created"
+
+
+# Lazy / late-bound evaluation: Jinja renders this variable on access.
+__disk_linux_device_defaults_effective: >-
+  {{
+    __disk_linux_device_defaults_builtin
+    | ansible.builtin.combine(disk_linux_device_defaults, recursive=true)
+  }}
+
+
+# Effective per-device entries: each disk_linux_devices item deep-merged over
+# the effective defaults, plus derived helper fields:
+#
+# - "path":  the normalized mountpoint (no trailing slash)
+# - "depth": path depth, used for dependency ordering (parents before
+#            children on present, children before parents on absent)
+# - "wipe":  normalized to the destructive-only-when-absent rule; the raw
+#            value is only honored when the entry's own effective state is
+#            "absent" (the role-global disk_linux_state never enables it)
+#
+# Keep emitted values plain scalars/dicts so they round-trip literal_eval.
+# Lazy / late-bound evaluation: Jinja renders this variable on access.
+__disk_linux_devices_effective: >-
+  {%- set __ns = namespace(items=[]) -%}
+  {%- for __d in disk_linux_devices -%}
+  {%-   set __m = __disk_linux_device_defaults_effective | ansible.builtin.combine(__d, recursive=true) -%}
+  {%-   set __path = __m['mount']['path'] if __m['mount']['path'] == '/' else (__m['mount']['path'] | ansible.builtin.regex_replace('/+$', '')) -%}
+  {%-   set _ = __ns.items.append({
+          'device': __m['device'],
+          'state': __m['state'],
+          'wipe': ((__m['wipe'] | ansible.builtin.bool) and (__m['state'] == 'absent')),
+          'wipe_raw': (__m['wipe'] | ansible.builtin.bool),
+          'on_missing': __m['on_missing'],
+          'on_mismatch': __m['on_mismatch'],
+          'partition_table': __m['partition_table'],
+          'grow': (__m['grow'] | ansible.builtin.bool),
+          'filesystem': __m['filesystem'],
+          'mount': __m['mount'],
+          'path': __path,
+          'depth': (__path.split('/') | ansible.builtin.length)
+        }) -%}
+  {%- endfor -%}
+  {{ __ns.items }}
+
+
+# Processing order (see design doc: computed from the mount dependency graph,
+# never from list order): present entries parent-first, absent entries
+# child-first. Lazy / late-bound evaluation.
+__disk_linux_devices_effective_present: >-
+  {{
+    __disk_linux_devices_effective
+    | ansible.builtin.selectattr('state', 'ansible.builtin.equalto', 'present')
+    | ansible.builtin.sort(attribute='depth')
+    | ansible.builtin.list
+  }}
+__disk_linux_devices_effective_absent: >-
+  {{
+    __disk_linux_devices_effective
+    | ansible.builtin.selectattr('state', 'ansible.builtin.equalto', 'absent')
+    | ansible.builtin.sort(attribute='depth', reverse=true)
+    | ansible.builtin.list
+  }}
+# All entries in cleanup order (children before parents), used when the
+# role-global disk_linux_state is "absent" and every entry is unmounted.
+__disk_linux_devices_effective_cleanup_order: >-
+  {{
+    __disk_linux_devices_effective
+    | ansible.builtin.sort(attribute='depth', reverse=true)
+    | ansible.builtin.list
+  }}
+
+
+# Structurally contradictory declarations: an effectively absent parent with
+# an effectively present child below it (mounting the child would land on the
+# wrong filesystem). Asserted empty in tasks/init.yml.
+# Lazy / late-bound evaluation.
+__disk_linux_state_conflicts: >-
+  {%- set __ns = namespace(items=[]) -%}
+  {%- for __a in __disk_linux_devices_effective if __a['state'] == 'absent' -%}
+  {%-   for __p in __disk_linux_devices_effective if __p['state'] == 'present' -%}
+  {%-     if __p['path'] != __a['path'] and __p['path'].startswith(__a['path'] ~ '/') -%}
+  {%-       set _ = __ns.items.append(__p['path'] ~ ' (present) is below ' ~ __a['path'] ~ ' (absent)') -%}
+  {%-     endif -%}
+  {%-   endfor -%}
+  {%- endfor -%}
+  {{ __ns.items }}
+
+
+# Entries whose "wipe: true" is ignored because their own effective state is
+# "present" (documented behavior, reported via a notice in tasks/init.yml).
+# Lazy / late-bound evaluation.
+__disk_linux_wipe_ignored: >-
+  {{
+    __disk_linux_devices_effective
+    | ansible.builtin.selectattr('state', 'ansible.builtin.equalto', 'present')
+    | ansible.builtin.selectattr('wipe_raw', 'ansible.builtin.equalto', true)
+    | ansible.builtin.map(attribute='path')
+    | ansible.builtin.list
+  }}
+
+
+# Normalization of lsblk's PTTYPE values to the partition table names used by
+# the public API (and by parted).
+__disk_linux_pttype_map:
+  gpt: "gpt"
+  dos: "msdos"
+
+
+# Reclaimable-space tolerance for the grow reconciliation, in bytes. Space
+# differences below this (partition alignment gaps, the GPT backup header
+# area) never trigger a resize, so idempotence cannot flap. Real disk
+# enlargements are orders of magnitude larger.
+__disk_linux_grow_slack_bytes: 33554432 # 32 MiB
+
+
+# One-time content migration (mount['on_nonempty'] == 'copy'): staging
+# mountpoint and the in-progress marker that gates retries (a staged
+# filesystem containing only role-created remains of an aborted migration is
+# recognized by the marker, cleared and re-copied; anything else fails).
+__disk_linux_migration_mountpoint: "/mnt/.disk-migration"
+__disk_linux_migration_marker: ".ansible-disk-migration-in-progress"
+
+
+# Executable paths of external tools invoked via command tasks. Never
+# hard-code these inline; override per platform vars file if a path differs.
+__disk_linux_findmnt_exec_path: "/usr/bin/findmnt"
+__disk_linux_lsblk_exec_path: "/usr/bin/lsblk"
+__disk_linux_blkid_exec_path: "/usr/sbin/blkid"
+__disk_linux_wipefs_exec_path: "/usr/sbin/wipefs"
+__disk_linux_restorecon_exec_path: "/usr/sbin/restorecon"
+__disk_linux_cp_exec_path: "/usr/bin/cp"
+__disk_linux_du_exec_path: "/usr/bin/du"
+__disk_linux_xfs_growfs_exec_path: "/usr/sbin/xfs_growfs"
+__disk_linux_resize2fs_exec_path: "/usr/sbin/resize2fs"
 
 
 ### Override defaults of dependencies used by this role (if any).

@@ -1,14 +1,307 @@
-# Configuration: Manage settings, like adapting or creating config files.
+# Configuration: take the declared disks from raw device to mounted
+# filesystem (or per-item absent state). Order of operations:
+#
+#   1. Determine device existence, enforce the on_missing policy.
+#   2. Identity preflight over ALL existing devices (canonical identity,
+#      whole-disk requirement, system-disk protection) before any change.
+#   3. Read-only classification and conflict preflight per present entry
+#      (building __disk_linux_plan); every hard failure fires before the
+#      first mutation.
+#   4. Apply the plan per present entry (parent-first), then per-item
+#      absent cleanup (child-first).
 
 ---
 
-# these steps should configure the remote host/software
-# Eg. configuration files for services which change often
+- name: "Config | Default | Determine device existence"
+  ansible.builtin.stat:
+    path: "{{ item['device'] }}"
+    follow: true
+  loop: "{{ __disk_linux_devices_effective }}"
+  loop_control:
+    label: "{{ item['device'] }}"
+  register: __disk_linux_stat_result
 
-# - name: "Config | Default | Copy NGINX configuration"
-#   ansible.builtin.template:
-#     src: "nginx.conf.j2"
-#     dest: "/etc/nginx/nginx.conf"
-#     owner: "root"
-#     group: "root"
-#   notify: "restart_nginx"
+
+- name: "Config | Default | Build device existence map"
+  ansible.builtin.set_fact:
+    __disk_linux_device_exists: >-
+      {%- set __ns = namespace(map={}) -%}
+      {%- for __r in __disk_linux_stat_result['results'] -%}
+      {%-   set _ = __ns.map.update({__r['item']['device']: (__r['stat']['exists'] | ansible.builtin.bool)}) -%}
+      {%- endfor -%}
+      {{ __ns.map }}
+
+
+- name: "Config | Default | Fail on missing devices with on_missing policy fail"
+  ansible.builtin.assert:
+    that:
+      - (__disk_linux_missing_fail | ansible.builtin.length) == 0
+    quiet: true
+    fail_msg: >-
+      The following configured devices do not exist on this host (and their
+      on_missing policy is "fail"): {{ __disk_linux_missing_fail | ansible.builtin.join(', ') }}.
+      Attach the disks or set on_missing to "skip" for optional ones.
+  vars:
+    # missing devices matter for present entries and for the destructive
+    # wipe step of absent entries; plain absent cleanup proceeds without
+    # the device (a detached disk is the normal decommissioning case)
+    __disk_linux_existing_devices: >-
+      {{
+        __disk_linux_device_exists
+        | ansible.builtin.dict2items
+        | ansible.builtin.selectattr('value')
+        | ansible.builtin.map(attribute='key')
+        | ansible.builtin.list
+      }}
+    __disk_linux_missing_fail: >-
+      {{
+        __disk_linux_devices_effective
+        | ansible.builtin.rejectattr('device', 'in', __disk_linux_existing_devices)
+        | ansible.builtin.selectattr('on_missing', 'ansible.builtin.equalto', 'fail')
+        | ansible.builtin.rejectattr('state', 'ansible.builtin.equalto', 'absent')
+        | ansible.builtin.map(attribute='device')
+        | ansible.builtin.list
+      }}
+  when:
+    - (__disk_linux_devices_effective | ansible.builtin.length) > 0
+
+
+- name: "Config | Default | Query block device identity of all existing devices"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_lsblk_exec_path }}"
+      - "--json"
+      - "--nodeps"
+      - "--bytes"
+      - "--output"
+      - "KNAME,TYPE,MAJ:MIN,SIZE"
+      - "{{ item['device'] }}"
+  when:
+    - __disk_linux_device_exists[item['device']]
+  changed_when:
+    - false
+  loop: "{{ __disk_linux_devices_effective }}"
+  loop_control:
+    label: "{{ item['device'] }}"
+  register: __disk_linux_identity_result
+
+
+- name: "Config | Default | Build canonical block device identity map"
+  ansible.builtin.set_fact:
+    __disk_linux_blockdev: >-
+      {%- set __ns = namespace(map={}) -%}
+      {%- for __r in __disk_linux_identity_result['results'] -%}
+      {%-   if __r is not ansible.builtin.skipped -%}
+      {%-     set __b = (__r['stdout'] | ansible.builtin.from_json)['blockdevices'][0] -%}
+      {%-     set _ = __ns.map.update({__r['item']['device']: {
+                'kname': __b['kname'],
+                'type': __b['type'],
+                'majmin': __b['maj:min'],
+                'size': (__b['size'] | int)
+              }}) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ __ns.map }}
+
+
+- name: "Config | Default | Enforce whole-disk devices and reject aliased duplicates"
+  ansible.builtin.assert:
+    that:
+      # every existing device must be a whole disk, not a partition or a
+      # device-mapper/LVM child
+      - >-
+        (__disk_linux_blockdev | ansible.builtin.dict2items
+         | ansible.builtin.rejectattr('value.type', 'ansible.builtin.equalto', 'disk')
+         | ansible.builtin.length) == 0
+      # no two entries may address the same physical disk through aliases;
+      # canonical identity is the major:minor pair
+      - >-
+        (__disk_linux_majmins | ansible.builtin.length)
+        == (__disk_linux_majmins | ansible.builtin.unique | ansible.builtin.length)
+    quiet: true
+    fail_msg: >-
+      Device identity violation: every entry must address a whole disk
+      (lsblk TYPE "disk") and no two entries may address the same disk
+      through different aliases. Queried identities:
+      {{ __disk_linux_blockdev }}
+  vars:
+    __disk_linux_majmins: >-
+      {{
+        __disk_linux_blockdev
+        | ansible.builtin.dict2items
+        | ansible.builtin.map(attribute='value.majmin')
+        | ansible.builtin.list
+      }}
+  when:
+    - (__disk_linux_blockdev | ansible.builtin.length) > 0
+
+
+- name: "Config | Default | Determine devices backing critical system paths"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_findmnt_exec_path }}"
+      - "--noheadings"
+      - "--output"
+      - "SOURCE"
+      - "--mountpoint"
+      - "{{ item }}"
+  changed_when:
+    - false
+  failed_when:
+    - false
+  loop:
+    - "/"
+    - "/boot"
+    - "/boot/efi"
+    - "/efi"
+  register: __disk_linux_sysmount_result
+
+
+- name: "Config | Default | Determine active swap devices"
+  ansible.builtin.slurp:
+    src: "/proc/swaps"
+  register: __disk_linux_swaps_result
+
+
+- name: "Config | Default | Resolve parent disks of the critical system devices"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_lsblk_exec_path }}"
+      - "--noheadings"
+      - "--output"
+      - "PKNAME,KNAME"
+      - "{{ item }}"
+  vars:
+    __disk_linux_system_sources: >-
+      {{
+        ((__disk_linux_sysmount_result['results']
+          | ansible.builtin.selectattr('rc', 'ansible.builtin.equalto', 0)
+          | ansible.builtin.map(attribute='stdout')
+          | ansible.builtin.list)
+         + ((__disk_linux_swaps_result['content'] | ansible.builtin.b64decode).splitlines()[1:]
+            | ansible.builtin.map('ansible.builtin.split')
+            | ansible.builtin.map('ansible.builtin.first')
+            | ansible.builtin.select('ansible.builtin.match', '^/dev/')
+            | ansible.builtin.list))
+        | ansible.builtin.select('ansible.builtin.match', '^/')
+        | ansible.builtin.unique
+      }}
+  changed_when:
+    - false
+  failed_when:
+    - false
+  loop: "{{ __disk_linux_system_sources }}"
+  register: __disk_linux_sysdisk_result
+
+
+- name: "Config | Default | Reject disks backing the running system"
+  ansible.builtin.assert:
+    that:
+      - >-
+        (__disk_linux_blockdev | ansible.builtin.dict2items
+         | ansible.builtin.selectattr('value.kname', 'in', __disk_linux_protected_knames)
+         | ansible.builtin.length) == 0
+    quiet: true
+    fail_msg: >-
+      Refusing to manage a disk that backs the running system (/, /boot, the
+      EFI system partition or active swap). Protected disks:
+      {{ __disk_linux_protected_knames | ansible.builtin.join(', ') }}.
+  vars:
+    __disk_linux_protected_knames: >-
+      {{
+        __disk_linux_sysdisk_result['results']
+        | ansible.builtin.selectattr('rc', 'ansible.builtin.defined')
+        | ansible.builtin.selectattr('rc', 'ansible.builtin.equalto', 0)
+        | ansible.builtin.map(attribute='stdout_lines')
+        | ansible.builtin.flatten
+        | ansible.builtin.map('ansible.builtin.split')
+        | ansible.builtin.flatten
+        | ansible.builtin.select('ansible.builtin.truthy')
+        | ansible.builtin.unique
+      }}
+  when:
+    - (__disk_linux_blockdev | ansible.builtin.length) > 0
+
+
+- name: "Config | Default | Read the current mount table"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_findmnt_exec_path }}"
+      - "--list"
+      - "--real"
+      - "--noheadings"
+      - "--output"
+      - "TARGET,SOURCE"
+  changed_when:
+    - false
+  register: __disk_linux_mounts_result
+
+
+- name: "Config | Default | Determine whether /etc/fstab exists"
+  ansible.builtin.stat:
+    path: "/etc/fstab"
+  register: __disk_linux_fstab_stat_result
+
+
+- name: "Config | Default | Read /etc/fstab"
+  ansible.builtin.slurp:
+    src: "/etc/fstab"
+  when:
+    - __disk_linux_fstab_stat_result['stat']['exists']
+  register: __disk_linux_fstab_result
+
+
+- name: "Config | Default | Initialize the per-device plan"
+  ansible.builtin.set_fact:
+    __disk_linux_plan: []
+    __disk_linux_skipped_paths: []
+    # active mounts as a list of {target, source} rows
+    __disk_linux_mounts: >-
+      {%- set __ns = namespace(rows=[]) -%}
+      {%- for __l in __disk_linux_mounts_result['stdout_lines'] -%}
+      {%-   set __f = __l.split() -%}
+      {%-   if (__f | ansible.builtin.length) >= 2 -%}
+      {%-     set _ = __ns.rows.append({'target': __f[0], 'source': __f[1]}) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ __ns.rows }}
+    # fstab entries as a list of {source, target} rows (comments stripped)
+    __disk_linux_fstab: >-
+      {%- set __ns = namespace(rows=[]) -%}
+      {%- for __l in ((__disk_linux_fstab_result['content'] | ansible.builtin.default('')) | ansible.builtin.b64decode).splitlines() -%}
+      {%-   set __t = __l.strip() -%}
+      {%-   if __t and not __t.startswith('#') -%}
+      {%-     set __f = __t.split() -%}
+      {%-     if (__f | ansible.builtin.length) >= 2 -%}
+      {%-       set _ = __ns.rows.append({'source': __f[0], 'target': __f[1]}) -%}
+      {%-     endif -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ __ns.rows }}
+
+
+- name: "Config | Default | Classify disks and preflight conflicts (read-only, parent-first)"
+  ansible.builtin.include_tasks:
+    file: "{{ role_path }}/tasks/config/preflight.yml"
+  loop: "{{ __disk_linux_devices_effective_present }}"
+  loop_control:
+    label: "{{ __disk_linux_entry['path'] }}"
+    loop_var: "__disk_linux_entry"
+
+
+- name: "Config | Default | Apply the plan (parent-first)"
+  ansible.builtin.include_tasks:
+    file: "{{ role_path }}/tasks/config/device_present.yml"
+  loop: "{{ __disk_linux_plan }}"
+  loop_control:
+    label: "{{ __disk_linux_item['entry']['path'] }} ({{ __disk_linux_item['action'] }})"
+    loop_var: "__disk_linux_item"
+
+
+- name: "Config | Default | Per-item absent cleanup (child-first)"
+  ansible.builtin.include_tasks:
+    file: "{{ role_path }}/tasks/config/device_absent.yml"
+  loop: "{{ __disk_linux_devices_effective_absent }}"
+  loop_control:
+    label: "{{ __disk_linux_entry['path'] }}"
+    loop_var: "__disk_linux_entry"

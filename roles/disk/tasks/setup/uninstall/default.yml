@@ -1,6 +1,22 @@
 # Uninstall: Manage basic resource removal, such as packages or service users.
+#
+# For this role (disk_linux_state "absent"): every entry in
+# disk_linux_devices is treated as state "absent" - unmount plus /etc/fstab
+# cleanup, children before parents. Data is kept; a per-entry wipe is only
+# honored when the entry's own effective state is "absent" (the global
+# "absent" never enables wiping). Tool packages are never uninstalled
+# (__disk_linux_packages_uninstall is empty), they are base-system components.
 
 ---
+
+- name: "Setup | Uninstall | Unmount and de-register the declared devices (children first)"
+  ansible.builtin.include_tasks:
+    file: "{{ role_path }}/tasks/config/device_absent.yml"
+  loop: "{{ __disk_linux_devices_effective_cleanup_order }}"
+  loop_control:
+    label: "{{ __disk_linux_entry['path'] }}"
+    loop_var: "__disk_linux_entry"
+
 
 - name: "Setup | Uninstall | Remove packages"
   ansible.builtin.package:

@@ -126,3 +126,62 @@
   when:
     - __disk_linux_vars_file is ansible.builtin.file
   loop: "{{ __disk_linux_platform_filenames_most_specific_last }}"
+
+
+### foundata.linux.disk specific
+
+- name: "Init | Assert cross-item invariants of disk_linux_devices"
+  ansible.builtin.assert:
+    that:
+      # unique devices (by configured path; canonical identity is verified
+      # against the live system in the config phase preflight)
+      - >-
+        (__disk_linux_devices_effective | ansible.builtin.map(attribute='device') | ansible.builtin.length)
+        == (__disk_linux_devices_effective | ansible.builtin.map(attribute='device') | ansible.builtin.unique | ansible.builtin.length)
+      # unique mountpoints (after normalization)
+      - >-
+        (__disk_linux_devices_effective | ansible.builtin.map(attribute='path') | ansible.builtin.length)
+        == (__disk_linux_devices_effective | ansible.builtin.map(attribute='path') | ansible.builtin.unique | ansible.builtin.length)
+    quiet: true
+    fail_msg: >-
+      disk_linux_devices contains duplicate device paths or duplicate
+      mountpoints. Every entry must address its own disk and mountpoint.
+  when:
+    - (__disk_linux_devices_effective | ansible.builtin.length) > 0
+
+
+- name: "Init | Assert per-item invariants of disk_linux_devices"
+  ansible.builtin.assert:
+    that:
+      - item['device'] is ansible.builtin.match('^/')
+      - item['path'] is ansible.builtin.match('^/')
+      - item['path'] != '/'
+    quiet: true
+    fail_msg: >-
+      Entry for device "{{ item['device'] }}": device and mount['path'] must be
+      absolute paths, and "/" cannot be a managed mountpoint.
+  loop: "{{ __disk_linux_devices_effective }}"
+  loop_control:
+    label: "{{ item['path'] }}"
+
+
+- name: "Init | Fail on structurally contradictory parent/child states"
+  ansible.builtin.assert:
+    that:
+      - (__disk_linux_state_conflicts | ansible.builtin.length) == 0
+    quiet: true
+    fail_msg: >-
+      Contradictory declarations in disk_linux_devices, a present mountpoint
+      lies below an absent one: {{ __disk_linux_state_conflicts | ansible.builtin.join('; ') }}.
+      Mounting the child would land on the wrong filesystem.
+
+
+- name: "Init | Notice about ignored wipe settings (only honored on effectively absent entries)"
+  ansible.builtin.debug:
+    msg: >-
+      Notice: "wipe: true" is ignored for the following entries because their
+      effective state is "present" (wipe is only honored together with
+      state "absent"; see on_mismatch "wipe" for single-run repurposing):
+      {{ __disk_linux_wipe_ignored | ansible.builtin.join(', ') }}
+  when:
+    - (__disk_linux_wipe_ignored | ansible.builtin.length) > 0
