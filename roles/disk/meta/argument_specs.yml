@@ -92,7 +92,7 @@ argument_specs:
               dump: 0
               passno: 0
               on_nonempty: "fail"
-              selinux_relabel: "new"
+              selinux_relabel: "created"
           ```
         type: "dict"
         default: {} # see __disk_linux_device_defaults_builtin in vars/main.yml for the defaults
@@ -217,8 +217,8 @@ argument_specs:
                 type: "str"
                 choices:
                   - "never"
-                  - "new"
-                  - "always"
+                  - "created"
+                  - "first_mount"
 
       disk_linux_devices:
         description: |
@@ -251,12 +251,16 @@ argument_specs:
           and fails before a broken table can surface at the next boot.
 
           Safety invariants, guaranteed before any change to any disk (not
-          configurable): every `device` path is resolved to its canonical block
-          device identity, and the role rejects two entries addressing the same
-          disk through different aliases, paths that are not a whole disk (a
-          partition or a device-mapper child), and disks backing the running
-          system (`/`, `/boot`, the EFI system partition, active swap). All
-          entries are preflighted before the first one is changed.
+          configurable): every existing `device` path is resolved to its
+          canonical block device identity, and the role rejects two entries
+          addressing the same disk through different aliases, paths that are
+          not a whole disk (a partition or a device-mapper child), and disks
+          backing the running system (`/`, `/boot`, the EFI system partition,
+          active swap). All entries are preflighted before the first one is
+          changed. Entries whose device is missing are exempt from the
+          block-device identity checks - they are handled by `on_missing` and
+          the absent-state cleanup, and still participate in the mount-path
+          and `/etc/fstab` validation.
 
           Conflicting environments make the role fail before any change, without
           a bypass option: the mountpoint already carrying a mount from a
@@ -321,10 +325,15 @@ argument_specs:
               `absent` (ignored with a notice otherwise): after unmounting and
               removing the `/etc/fstab` entry, the filesystem signature of the
               partition and the partition table of the disk are erased
-              (`wipefs`). All data on the disk becomes inaccessible; there is no
-              recovery except from backup. The disk is blank afterwards, so a
+              (`wipefs`). This is logical destruction, not secure erasure: only
+              the recognizable signatures are removed, the data blocks are not
+              overwritten. The disk is blank to the system afterwards (no
+              recovery of the destroyed structures except from backup, and a
               later run with `state: present` would set it up again from
-              scratch.
+              scratch), but considerable data may remain forensically
+              recoverable. Before disposing of or handing over media, use
+              dedicated secure-erase tooling (for example `blkdiscard`,
+              `shred`, or a cryptographic erase).
 
               The effective `state` is computed from the built-in defaults,
               `disk_linux_device_defaults` and the entry itself. Inherited values
@@ -392,7 +401,10 @@ argument_specs:
               - `wipe`: destructive. Erase the conflicting structures (`wipefs`;
                 unmounting the old filesystem first if needed) and set the disk up
                 from scratch according to the declaration. All existing data on
-                the disk is lost; there is no recovery except from backup.
+                the disk becomes inaccessible (logical destruction as with
+                `wipe`: signatures are removed, data blocks are not overwritten
+                and may remain forensically recoverable); there is no recovery
+                except from backup.
                 Intended for deliberately repurposing disks - remove the setting
                 again once the conversion has happened. The role emits a warning
                 whenever this branch actually wipes something.
@@ -577,6 +589,17 @@ argument_specs:
                     other data is an error - existing data is never overlaid.
                     An aborted copy leaves the system unchanged: the real mount
                     only happens after a completed copy.
+
+                    Limit: `copy` is refused when another managed mountpoint
+                    below this entry's path is not mounted yet and its
+                    directory is populated. Migrating nested unmounted trees
+                    in one pass would either duplicate the nested data onto
+                    the parent filesystem or hide it before the nested
+                    migration can read it; supporting this is deliberately out
+                    of scope for a provisioning role. Escape: apply the nested
+                    entry first (its own migration mounts it), then run again
+                    for the parent - a mounted nested mountpoint is recreated
+                    empty and never descended into.
                   - `hide`: mount anyway. The existing content stays on the
                     parent filesystem, hidden below the new mount, and keeps
                     occupying its space there.
@@ -593,8 +616,10 @@ argument_specs:
               selinux_relabel:
                 description: |
                   Controls the one-time SELinux relabel (`restorecon`) of the
-                  mountpoint directly after the initial mount by this role. It
-                  never repeats on later runs regardless of the value: a
+                  mountpoint directly after the initial mount by this role.
+                  Every value names an inherently one-time event - a
+                  filesystem is created once, a first mount happens once - so
+                  no setting ever repeats the relabel on later runs: a
                   recurring relabel would be an idempotence leak and can
                   actively harm workloads that maintain their own labels below
                   the mountpoint (for example rootless container storage under
@@ -603,21 +628,21 @@ argument_specs:
                   active SELinux.
 
                   - `never`: no relabeling.
-                  - `new` (default): relabel only when the role created the
-                    filesystem during this run, covering content migrated by
+                  - `created` (default): relabel only filesystems the role
+                    created during this run, covering content migrated by
                     `on_nonempty: "copy"`. Adopted, already existing
                     filesystems are not relabeled - their data, including the
                     security-context attributes, stays untouched.
-                  - `always`: additionally relabel an adopted, existing
+                  - `first_mount`: additionally relabel an adopted, existing
                     filesystem once, right after the first time this role
                     mounts it. Use when adopting disks whose labels are known
                     to be wrong for the new mountpoint.
 
                   Falls back to
                   `disk_linux_device_defaults['mount']['selinux_relabel']`
-                  (built-in default `new`).
+                  (built-in default `created`).
                 type: "str"
                 choices:
                   - "never"
-                  - "new"
-                  - "always"
+                  - "created"
+                  - "first_mount"
