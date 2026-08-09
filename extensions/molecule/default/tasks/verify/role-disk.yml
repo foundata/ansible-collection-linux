@@ -220,6 +220,58 @@
     success_msg: "The copy migration onto the fresh ext4 filesystem succeeded."
 
 
+## Busy-tree protection of on_mismatch "wipe"
+
+# The mounted, role-managed data0 disk deliberately gets a CONTRADICTING
+# declaration (ext4 instead of its actual XFS) with on_mismatch "wipe": the
+# preflight must classify the mismatch and then refuse the wipe because the
+# disk's tree is mounted - before anything was changed.
+- name: "Molecule | Verify | disk | Busy wipe: attempt a mismatch wipe of a mounted disk"
+  block:
+
+    - name: "Molecule | Verify | disk | Busy wipe: include the role with a contradicting declaration"
+      ansible.builtin.include_role:
+        name: "foundata.linux.disk"
+      vars:
+        disk_linux_devices:
+          - device: "/dev/disk/by-id/virtio-molecule-data0"
+            filesystem:
+              type: "ext4"
+            mount:
+              path: "/srv/molecule_data0"
+            on_mismatch: "wipe"
+
+    - name: "Molecule | Verify | disk | Busy wipe: record that the wipe was accepted"
+      ansible.builtin.set_fact:
+        __testing_disk_busywipe_rejected: false
+
+  rescue:
+
+    - name: "Molecule | Verify | disk | Busy wipe: record that the wipe was rejected"
+      ansible.builtin.set_fact:
+        __testing_disk_busywipe_rejected: true
+
+
+- name: "Molecule | Verify | disk | Busy wipe: check the filesystem survived"
+  ansible.builtin.command:
+    argv: ["findmnt", "--noheadings", "--output", "FSTYPE", "/srv/molecule_data0"]
+  changed_when:
+    - false
+  register: __testing_disk_busywipe_fstype
+
+
+- name: "Molecule | Verify | disk | Busy wipe: assert the mounted tree was protected"
+  ansible.builtin.assert:
+    that:
+      - __testing_disk_busywipe_rejected | ansible.builtin.bool
+      - "'xfs' in __testing_disk_busywipe_fstype['stdout']"
+    fail_msg: >-
+      on_mismatch "wipe" was not refused on a mounted device tree (rejected:
+      {{ __testing_disk_busywipe_rejected }}, filesystem now:
+      {{ __testing_disk_busywipe_fstype['stdout'] }}).
+    success_msg: "A mismatch wipe on a mounted device tree is refused before mutation."
+
+
 ## Check mode on the deployed state
 #
 # A --check run must succeed as a dry run (regression: the read-only

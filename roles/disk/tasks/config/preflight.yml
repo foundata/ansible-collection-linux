@@ -321,6 +321,78 @@
             - (__disk_linux_pf_nested_populated | ansible.builtin.length) > 0
 
 
+        # on_mismatch "wipe" repurposes INACTIVE disks; it does not tear
+        # down mounted LUKS, LVM, MD RAID or other foreign storage stacks.
+        # The immediate-children view above cannot see mounts below such
+        # stacks, so the WHOLE device tree is enumerated flat: any mounted
+        # descendant or an /etc/fstab reference to any UUID in the tree
+        # aborts before mutation.
+        - name: "Config | Preflight | Enumerate the full device tree of the mismatched disk"
+          ansible.builtin.command:
+            argv:
+              - "{{ __disk_linux_lsblk_exec_path }}"
+              # --pairs is a flat output format on its own (--list would
+              # conflict with it) and covers the whole descendant tree
+              - "--noheadings"
+              - "--pairs"
+              - "--output"
+              - "KNAME,MOUNTPOINTS,UUID"
+              - "{{ __disk_linux_entry['device'] }}"
+          changed_when:
+            - false
+          # The probe is read-only; run it under "--check" too, otherwise it
+          # is skipped and the preflight dereferences its missing result.
+          check_mode: false
+          register: __disk_linux_pf_tree_result
+          when:
+            - __disk_linux_pf_action == 'mismatch_wipe'
+
+
+        - name: "Config | Preflight | Check the mismatched disk's tree is inactive"
+          ansible.builtin.assert:
+            that:
+              - (__disk_linux_pf_tree_mounted | ansible.builtin.length) == 0
+              - (__disk_linux_pf_tree_fstab_uuids | ansible.builtin.length) == 0
+            fail_msg: >-
+              Refusing on_mismatch "wipe" for
+              {{ __disk_linux_entry['device'] }}: the disk's device tree is
+              still active (mounted descendants:
+              [{{ __disk_linux_pf_tree_mounted | ansible.builtin.join(', ') }}],
+              /etc/fstab references:
+              [{{ __disk_linux_pf_tree_fstab_uuids | ansible.builtin.join(', ') }}]).
+              on_mismatch "wipe" repurposes inactive disks only; unmount the
+              tree and remove its foreign persistence first.
+            quiet: true
+          vars:
+            # full --pairs lines with a non-empty MOUNTPOINTS field; the
+            # whole line lands in the message, no extraction needed
+            __disk_linux_pf_tree_mounted: >-
+              {{
+                __disk_linux_pf_tree_result['stdout_lines'] | ansible.builtin.default([])
+                | ansible.builtin.select('ansible.builtin.search', 'MOUNTPOINTS="[^"]')
+                | ansible.builtin.list
+              }}
+            # UUIDs of the whole tree that /etc/fstab still references.
+            # Extracted without regex backreferences on purpose (map-form
+            # backreferences stay literal and a '\1' argument is an octal
+            # escape in this Jinja context): the full match is split instead.
+            __disk_linux_pf_tree_fstab_uuids: >-
+              {%- set __ns = namespace(uuids=[]) -%}
+              {%- set __fstab = (__disk_linux_fstab_result['content'] | ansible.builtin.default('') | ansible.builtin.b64decode) -%}
+              {%- for __l in (__disk_linux_pf_tree_result['stdout_lines'] | ansible.builtin.default([])) -%}
+              {%-   set __m = __l | ansible.builtin.regex_search('UUID="[^"]+"') -%}
+              {%-   if __m -%}
+              {%-     set __u = (__m.split('"'))[1] -%}
+              {%-     if ('UUID=' ~ __u) in __fstab -%}
+              {%-       set _ = __ns.uuids.append(__u) -%}
+              {%-     endif -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ __ns.uuids }}
+          when:
+            - __disk_linux_pf_action == 'mismatch_wipe'
+
+
         - name: "Config | Preflight | Record the planned action"
           ansible.builtin.set_fact:
             __disk_linux_plan: >-

@@ -644,6 +644,13 @@ reconciled or tolerated according to `grow`.
   again once the conversion has happened. The role emits a warning
   whenever this branch actually wipes something.
 
+  `wipe` repurposes INACTIVE disks only: it does not tear down
+  mounted LUKS, LVM, MD RAID or other foreign storage stacks.
+  The whole device tree is checked before mutation; any mounted
+  descendant or an `/etc/fstab` reference to a UUID anywhere in
+  the tree aborts the run. Unmount the tree and remove its
+  foreign persistence first.
+
 Note that the partition table type is part of the declared layout on
 purpose: for existing disks set up with an `msdos` label by earlier
 automation, declare `partition_table: "msdos"` so the inventory
