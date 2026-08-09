@@ -287,32 +287,51 @@
               register: __disk_linux_apply_stagefind_result
 
 
+            # mkfs.ext4 creates lost+found on every fresh filesystem; an
+            # EMPTY one is filesystem metadata, not foreign data. A non-empty
+            # lost+found carries recovered orphans and stays fatal.
+            - name: "Config | Device | Check whether a lost+found directory carries content"
+              ansible.builtin.find:
+                paths: "{{ __disk_linux_migration_mountpoint }}/lost+found"
+                file_type: "any"
+                hidden: true
+                recurse: false
+              register: __disk_linux_apply_lostfound_result
+
+
             - name: "Config | Device | Fail when the destination already carries other data (copy never merges)"
               ansible.builtin.fail:
                 msg: >-
                   Refusing the on_nonempty "copy" migration onto
                   {{ __disk_linux_apply_partition }}: the filesystem already
                   contains data that was not left behind by an earlier
-                  migration attempt of this role. Copying would merge onto
-                  existing data, which is never done.
+                  migration attempt of this role or created by mkfs. Copying
+                  would merge onto existing data, which is never done.
               vars:
-                __disk_linux_apply_marker_found: >-
+                __disk_linux_apply_other_entries: >-
                   {{
                     __disk_linux_apply_stagefind_result['files'] | ansible.builtin.default([])
-                    | ansible.builtin.selectattr('path', 'ansible.builtin.equalto', __disk_linux_migration_mountpoint ~ '/' ~ __disk_linux_migration_marker)
-                    | ansible.builtin.length > 0
+                    | ansible.builtin.map(attribute='path')
+                    | ansible.builtin.reject('ansible.builtin.equalto', __disk_linux_migration_mountpoint ~ '/' ~ __disk_linux_migration_marker)
+                    | ansible.builtin.reject('ansible.builtin.equalto',
+                        (__disk_linux_migration_mountpoint ~ '/lost+found')
+                        if ((__disk_linux_apply_lostfound_result['matched'] | ansible.builtin.default(1)) == 0)
+                        else __disk_linux_migration_mountpoint)
+                    | ansible.builtin.list
                   }}
               when:
-                - (__disk_linux_apply_stagefind_result['matched'] | ansible.builtin.default(0)) > 0
-                - not (__disk_linux_apply_marker_found | ansible.builtin.bool)
+                - (__disk_linux_apply_other_entries | ansible.builtin.length) > 0
 
 
+            # lost+found is kept: e2fsck expects it and it was just proven
+            # empty (or the fail task above already aborted the migration)
             - name: "Config | Device | Clear the remains of an earlier aborted migration"
               ansible.builtin.file:
                 path: "{{ item['path'] }}"
                 state: "absent"
               when:
                 - (__disk_linux_apply_stagefind_result['matched'] | ansible.builtin.default(0)) > 0
+                - item['path'] != (__disk_linux_migration_mountpoint ~ '/lost+found')
               loop: "{{ __disk_linux_apply_stagefind_result['files'] | ansible.builtin.default([]) }}"
               loop_control:
                 label: "{{ item['path'] }}"

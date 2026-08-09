@@ -7,13 +7,18 @@
 # directory on the root filesystem: exercises the on_nonempty "copy"
 # migration. Idempotent, so the (then migrated) content is simply confirmed
 # on later runs.
-- name: "Molecule | Converge | disk | Seed content below the future mountpoint"
+- name: "Molecule | Converge | disk | Seed content below the future mountpoints"
   ansible.builtin.file:
-    path: "/srv/molecule_data0/subdir"
+    path: "{{ item }}"
     state: "directory"
     owner: "root"
     group: "root"
     mode: "u=rwx,g=rx,o=rx" # 0755
+  loop:
+    - "/srv/molecule_data0/subdir"
+    # the ext4 destination: covers the copy migration onto a fresh ext4
+    # filesystem (mkfs-created lost+found must not abort it)
+    - "/srv/molecule_data1"
 
 
 - name: "Molecule | Converge | disk | Seed files below the future mountpoint"
@@ -30,6 +35,10 @@
       content: "hidden seed\n"
     - dest: "/srv/molecule_data0/subdir/nested_seed.txt"
       content: "nested seed\n"
+    # the ext4 destination: covers the copy migration onto a fresh ext4
+    # filesystem (mkfs-created lost+found must not abort it)
+    - dest: "/srv/molecule_data1/seeded-ext4.txt"
+      content: "molecule ext4 migration content\n"
   loop_control:
     label: "{{ item['dest'] }}"
 
@@ -128,7 +137,10 @@
             path: "/srv/molecule_data0"
             on_nonempty: "copy"
         # explicit path: ext4 with creation-time options, boot-time fsck,
-        # per-entry mount options override
+        # per-entry mount options override; on_nonempty "copy" onto a FRESH
+        # ext4 filesystem on purpose (regression: the emptiness check
+        # classified the mkfs-created lost+found as foreign data and aborted
+        # the migration; the XFS entry above cannot cover this)
         - device: "/dev/disk/by-id/virtio-molecule-data1"
           filesystem:
             type: "ext4"
@@ -137,6 +149,7 @@
             path: "/srv/molecule_data1"
             options: "defaults,noatime,nodev"
             passno: 2
+            on_nonempty: "copy"
         # repurposing path: the foreign signature seeded above is wiped and
         # the disk set up per declaration (single-run on_mismatch "wipe");
         # on later runs the disk conforms and the setting is a no-op

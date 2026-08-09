@@ -192,6 +192,34 @@
     success_msg: "The migrated content resides on the mounted filesystem, not on the parent."
 
 
+## Copy migration onto the fresh ext4 filesystem
+
+- name: "Molecule | Verify | disk | Read the migrated ext4 content"
+  ansible.builtin.slurp:
+    src: "/srv/molecule_data1/seeded-ext4.txt"
+  register: __testing_disk_ext4_migrated
+
+
+- name: "Molecule | Verify | disk | Query the ext4 mount"
+  ansible.builtin.command:
+    argv: ["findmnt", "--noheadings", "--output", "FSTYPE", "/srv/molecule_data1"]
+  changed_when:
+    - false
+  register: __testing_disk_ext4_mount
+
+
+- name: "Molecule | Verify | disk | Assert the ext4 migration succeeded despite lost+found"
+  ansible.builtin.assert:
+    that:
+      - (__testing_disk_ext4_migrated['content'] | ansible.builtin.b64decode) is ansible.builtin.search('molecule ext4 migration content')
+      - "'ext4' in __testing_disk_ext4_mount['stdout']"
+    fail_msg: >-
+      The copy migration onto the fresh ext4 filesystem failed or the content
+      did not arrive (regression: the mkfs-created lost+found used to abort
+      it as foreign data).
+    success_msg: "The copy migration onto the fresh ext4 filesystem succeeded."
+
+
 ## Check mode on the deployed state
 #
 # A --check run must succeed as a dry run (regression: the read-only
