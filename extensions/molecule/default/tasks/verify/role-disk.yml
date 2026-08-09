@@ -190,3 +190,37 @@
       - __testing_disk_stat_result['results'][0]['stat']['dev'] != __testing_disk_root_stat_result['stat']['dev']
     fail_msg: "The migrated content does not reside on the mounted filesystem."
     success_msg: "The migrated content resides on the mounted filesystem, not on the parent."
+
+
+## Check mode on the deployed state
+#
+# A --check run must succeed as a dry run (regression: the read-only
+# discovery probes were skipped in check mode and their missing results
+# dereferenced) and must not change anything on disk; /etc/fstab is the
+# witness (its state must be identical before and after).
+
+- name: "Molecule | Verify | disk | Check mode: get information about /etc/fstab (before)"
+  ansible.builtin.stat:
+    path: "/etc/fstab"
+  register: __testing_disk_checkmode_fstab_before
+
+
+- name: "Molecule | Verify | disk | Run the role in check mode on the deployed state"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+    apply:
+      check_mode: true
+
+
+- name: "Molecule | Verify | disk | Check mode: get information about /etc/fstab (after)"
+  ansible.builtin.stat:
+    path: "/etc/fstab"
+  register: __testing_disk_checkmode_fstab_after
+
+
+- name: "Molecule | Verify | disk | Check mode: assert nothing was changed"
+  ansible.builtin.assert:
+    that:
+      - __testing_disk_checkmode_fstab_after['stat']['checksum'] == __testing_disk_checkmode_fstab_before['stat']['checksum']
+    fail_msg: "The check-mode run changed /etc/fstab on disk."
+    success_msg: "The check-mode run succeeded as a dry run without changing the deployed state."

@@ -12,6 +12,23 @@
 
 ---
 
+# ansible_check_mode is unreliable for roles included with
+# "apply: check_mode: true" (the tasks run in check mode but the variable
+# stays false), so check mode is detected empirically: a plain command task
+# is skipped exactly when this run is a check-mode run.
+- name: "Config | Default | Detect check mode (canary)"
+  ansible.builtin.command:
+    argv: ["true"]
+  register: __disk_linux_checkmode_canary
+  changed_when:
+    - false
+
+
+- name: "Config | Default | Set the check mode fact"
+  ansible.builtin.set_fact:
+    __disk_linux_check_mode: "{{ __disk_linux_checkmode_canary is ansible.builtin.skipped }}"
+
+
 - name: "Config | Default | Determine device existence"
   ansible.builtin.stat:
     path: "{{ item['device'] }}"
@@ -80,6 +97,9 @@
     - __disk_linux_device_exists[item['device']]
   changed_when:
     - false
+  # The probe is read-only; run it under "--check" too, otherwise it is
+  # skipped and the discovery dereferences its missing result.
+  check_mode: false
   loop: "{{ __disk_linux_devices_effective }}"
   loop_control:
     label: "{{ item['device'] }}"
@@ -147,6 +167,9 @@
       - "{{ item }}"
   changed_when:
     - false
+  # The probe is read-only; run it under "--check" too, otherwise it is
+  # skipped and the discovery dereferences its missing result.
+  check_mode: false
   failed_when:
     - false
   loop:
@@ -188,6 +211,9 @@
       }}
   changed_when:
     - false
+  # The probe is read-only; run it under "--check" too, otherwise it is
+  # skipped and the discovery dereferences its missing result.
+  check_mode: false
   failed_when:
     - false
   loop: "{{ __disk_linux_system_sources }}"
@@ -234,6 +260,9 @@
       - "TARGET,SOURCE"
   changed_when:
     - false
+  # The probe is read-only; run it under "--check" too, otherwise it is
+  # skipped and the discovery dereferences its missing result.
+  check_mode: false
   register: __disk_linux_mounts_result
 
 
@@ -289,9 +318,35 @@
     loop_var: "__disk_linux_entry"
 
 
+# In check mode the discovery, preflight and plan above ARE the dry run: the
+# apply steps below depend on the results of preceding disk changes
+# (partition devices, filesystem UUIDs) and cannot be simulated meaningfully,
+# so they are skipped with the plan reported instead.
+- name: "Config | Default | Report the planned actions (check mode)"
+  ansible.builtin.debug:
+    msg: >-
+      Check mode: the apply phase is skipped. Planned actions:
+      {{
+        (__disk_linux_plan
+         | ansible.builtin.map(attribute='entry') | ansible.builtin.map(attribute='path')
+         | ansible.builtin.zip(__disk_linux_plan | ansible.builtin.map(attribute='action'))
+         | ansible.builtin.map('ansible.builtin.join', ': ')
+         | ansible.builtin.list
+         + (__disk_linux_devices_effective_absent
+            | ansible.builtin.map(attribute='path')
+            | ansible.builtin.map('ansible.builtin.regex_replace', '$', ': absent')
+            | ansible.builtin.list))
+        | ansible.builtin.join(', ')
+      }}
+  when:
+    - __disk_linux_check_mode | ansible.builtin.bool
+
+
 - name: "Config | Default | Apply the plan (parent-first)"
   ansible.builtin.include_tasks:
     file: "{{ role_path }}/tasks/config/device_present.yml"
+  when:
+    - not (__disk_linux_check_mode | ansible.builtin.bool)
   loop: "{{ __disk_linux_plan }}"
   loop_control:
     label: "{{ __disk_linux_item['entry']['path'] }} ({{ __disk_linux_item['action'] }})"
@@ -301,6 +356,8 @@
 - name: "Config | Default | Per-item absent cleanup (child-first)"
   ansible.builtin.include_tasks:
     file: "{{ role_path }}/tasks/config/device_absent.yml"
+  when:
+    - not (__disk_linux_check_mode | ansible.builtin.bool)
   loop: "{{ __disk_linux_devices_effective_absent }}"
   loop_control:
     label: "{{ __disk_linux_entry['path'] }}"

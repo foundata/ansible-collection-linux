@@ -50,6 +50,9 @@
           - "{{ __disk_linux_entry['device'] }}"
       changed_when:
         - false
+      # The probe is read-only; run it under "--check" too, otherwise it is
+      # skipped and the preflight dereferences its missing result.
+      check_mode: false
       register: __disk_linux_pf_lsblk_result
 
 
@@ -162,6 +165,9 @@
             - __disk_linux_pf_action in ['adopt', 'grow']
           changed_when:
             - false
+          # The probe is read-only; run it under "--check" too, otherwise it is
+          # skipped and the preflight dereferences its missing result.
+          check_mode: false
           failed_when:
             - false
           register: __disk_linux_pf_uuid_result
@@ -180,6 +186,9 @@
             - (__disk_linux_pf_uuid_result['stdout'] | ansible.builtin.default('', true) | ansible.builtin.length) > 0
           changed_when:
             - false
+          # The probe is read-only; run it under "--check" too, otherwise it is
+          # skipped and the preflight dereferences its missing result.
+          check_mode: false
           failed_when:
             - false
           register: __disk_linux_pf_uuid_dupe_result
