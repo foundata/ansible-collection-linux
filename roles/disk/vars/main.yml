@@ -261,6 +261,8 @@ __disk_linux_migration_marker: ".ansible-disk-migration-in-progress"
 # hard-code these inline; override per platform vars file if a path differs.
 __disk_linux_findmnt_exec_path: "/usr/bin/findmnt"
 __disk_linux_lsblk_exec_path: "/usr/bin/lsblk"
+__disk_linux_sfdisk_exec_path: "/usr/sbin/sfdisk"
+__disk_linux_partprobe_exec_path: "/usr/sbin/partprobe"
 __disk_linux_blkid_exec_path: "/usr/sbin/blkid"
 __disk_linux_wipefs_exec_path: "/usr/sbin/wipefs"
 __disk_linux_restorecon_exec_path: "/usr/sbin/restorecon"

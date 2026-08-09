@@ -1,0 +1,84 @@
+# Exercise the "grow" reconciliation of the collection role "disk": enlarge
+# the first extra disk on the hypervisor side (virtio-blk propagates the new
+# capacity to the running guest), re-run the role and assert partition and
+# filesystem were grown online. Runs once, between idempotence and verify.
+
+
+- name: "Molecule | Side effect | disk | Grow the first extra disk image on the hypervisor"
+  delegate_to: "localhost"
+  ansible.builtin.command:
+    argv:
+      - "virsh"
+      - "--connect"
+      - "qemu:///session"
+      - "blockresize"
+      - "{{ inventory_hostname }}"
+      - "{{ molecule_ephemeral_directory }}/vm/{{ inventory_hostname }}/extra-molecule-data0.qcow2"
+      - "3G"
+  changed_when:
+    - true
+
+
+- name: "Molecule | Side effect | disk | Wait until the guest sees the grown disk"
+  ansible.builtin.command:
+    argv:
+      - "lsblk"
+      - "--json"
+      - "--bytes"
+      - "--nodeps"
+      - "--output"
+      - "SIZE"
+      - "/dev/disk/by-id/virtio-molecule-data0"
+  changed_when:
+    - false
+  retries: 30
+  delay: 2
+  until:
+    - >-
+      ((__testing_disk_growsize_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0]['size'] | int)
+      > 2147483648
+  register: __testing_disk_growsize_result
+
+
+- name: "Molecule | Side effect | disk | Set disk_linux_* parameters as facts from __testing_state"
+  ansible.builtin.set_fact:
+    "{{ item['key'] }}": "{{ item['value'] }}"
+  loop: >-
+    {{
+      (__testing_state | ansible.builtin.default({}, true))
+      | ansible.builtin.dict2items
+      | ansible.builtin.selectattr('key', 'ansible.builtin.match', '^disk_linux_')
+      | ansible.builtin.list
+    }}
+
+
+- name: "Molecule | Side effect | disk | Re-run the foundata.linux.disk role (grow reconciliation)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+
+
+- name: "Molecule | Side effect | disk | Query the size of the grown filesystem"
+  ansible.builtin.command:
+    argv:
+      - "findmnt"
+      - "--bytes"
+      - "--noheadings"
+      - "--output"
+      - "SIZE"
+      - "--mountpoint"
+      - "/srv/molecule_data0"
+  changed_when:
+    - false
+  register: __testing_disk_grownfs_result
+
+
+- name: "Molecule | Side effect | disk | Assert the filesystem was grown online"
+  ansible.builtin.assert:
+    that:
+      # well above the previous 2G disk size, so partition AND filesystem
+      # must have been extended (xfs size on a 3G disk minus overhead)
+      - (__testing_disk_grownfs_result['stdout'] | ansible.builtin.trim | int) > 2500000000
+    fail_msg: >-
+      The filesystem on /srv/molecule_data0 was not grown
+      ({{ __testing_disk_grownfs_result['stdout'] | ansible.builtin.trim }} bytes).
+    success_msg: "The partition and filesystem were grown online to span the enlarged disk."

@@ -1,0 +1,82 @@
+# Exercise the teardown path of the collection role "disk" at the end of the
+# test run: per-item state "absent" plus wipe returns the extra disks to
+# blank. The cleanup stage also runs before create and after failures; the
+# play-level ignore_unreachable only covers connection errors, not the
+# follow-up local failures of running a whole role against a dead instance,
+# so everything below is gated on an explicit reachability probe.
+
+
+- name: "Molecule | Cleanup | disk | Probe instance reachability"
+  ansible.builtin.ping:
+  ignore_unreachable: true
+  register: __testing_disk_cleanup_ping_result
+
+
+- name: "Molecule | Cleanup | disk | Tear down the managed disks on the reachable instance"
+  when:
+    - not (__testing_disk_cleanup_ping_result['unreachable'] | ansible.builtin.default(false))
+  block:
+
+    - name: "Molecule | Cleanup | disk | Set the teardown parameters as facts"
+      ansible.builtin.set_fact:
+        disk_linux_device_defaults: {}
+        disk_linux_devices:
+          - device: "/dev/disk/by-id/virtio-molecule-data0"
+            state: "absent"
+            wipe: true
+            on_missing: "skip" # tolerate a stale instance without the disk
+            mount:
+              path: "/srv/molecule_data0"
+          - device: "/dev/disk/by-id/virtio-molecule-data1"
+            state: "absent"
+            wipe: true
+            on_missing: "skip" # tolerate a stale instance without the disk
+            mount:
+              path: "/srv/molecule_data1"
+          - device: "/dev/disk/by-id/virtio-molecule-data2"
+            state: "absent"
+            wipe: true
+            on_missing: "skip" # tolerate a stale instance without the disk
+            mount:
+              path: "/srv/molecule_data2"
+
+
+    - name: "Molecule | Cleanup | disk | Include the foundata.linux.disk role (absent plus wipe)"
+      ansible.builtin.include_role:
+        name: "foundata.linux.disk"
+
+
+    - name: "Molecule | Cleanup | disk | Query the disks for remaining signatures"
+      ansible.builtin.command:
+        argv:
+          - "wipefs"
+          - "--noheadings"
+          - "/dev/disk/by-id/virtio-molecule-data{{ item }}"
+      changed_when:
+        - false
+      loop:
+        - 0
+        - 1
+        - 2
+      register: __testing_disk_wiped_result
+
+
+    - name: "Molecule | Cleanup | disk | Read /etc/fstab after the teardown"
+      ansible.builtin.slurp:
+        src: "/etc/fstab"
+      register: __testing_disk_cleanup_fstab_result
+
+
+    - name: "Molecule | Cleanup | disk | Assert the disks are blank and de-registered"
+      ansible.builtin.assert:
+        that:
+          # no signatures left on any of the disks
+          - >-
+            (__testing_disk_wiped_result['results']
+             | ansible.builtin.map(attribute='stdout')
+             | ansible.builtin.select('ansible.builtin.truthy')
+             | ansible.builtin.length) == 0
+          # no /etc/fstab entries left for the managed mountpoints
+          - "'/srv/molecule_data' not in (__testing_disk_cleanup_fstab_result['content'] | ansible.builtin.b64decode)"
+        fail_msg: "The teardown left signatures or /etc/fstab entries behind."
+        success_msg: "All extra disks are blank again and their /etc/fstab entries are gone."

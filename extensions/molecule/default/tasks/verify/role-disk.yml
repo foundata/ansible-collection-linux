@@ -33,10 +33,11 @@
   loop:
     - "/srv/molecule_data0"
     - "/srv/molecule_data1"
+    - "/srv/molecule_data2"
   register: __testing_disk_findmnt_result
 
 
-- name: "Molecule | Verify | disk | Assert both filesystems are mounted as declared"
+- name: "Molecule | Verify | disk | Assert the filesystems are mounted as declared"
   ansible.builtin.assert:
     that:
       - __testing_disk_mounts['/srv/molecule_data0']['fstype'] == 'xfs'
@@ -44,8 +45,11 @@
       - __testing_disk_mounts['/srv/molecule_data1']['fstype'] == 'ext4'
       - "'noatime' in __testing_disk_mounts['/srv/molecule_data1']['options']"
       - "'nodev' in __testing_disk_mounts['/srv/molecule_data1']['options']"
+      # the repurposed disk (foreign signature wiped via on_mismatch)
+      - __testing_disk_mounts['/srv/molecule_data2']['fstype'] == 'xfs'
+      - "'noatime' in __testing_disk_mounts['/srv/molecule_data2']['options']"
     fail_msg: "The declared filesystems are not mounted as expected: {{ __testing_disk_mounts }}"
-    success_msg: "Both declared filesystems are mounted with the expected type and options."
+    success_msg: "All declared filesystems are mounted with the expected type and options."
   vars:
     __testing_disk_mounts: >-
       {%- set __ns = namespace(map={}) -%}
@@ -71,21 +75,26 @@
   loop:
     - "/dev/disk/by-id/virtio-molecule-data0"
     - "/dev/disk/by-id/virtio-molecule-data1"
+    - "/dev/disk/by-id/virtio-molecule-data2"
   register: __testing_disk_lsblk_result
 
 
 - name: "Molecule | Verify | disk | Assert the on-disk layout matches the declaration"
   ansible.builtin.assert:
     that:
-      # GPT (the built-in default) on both disks, exactly one partition each
+      # GPT (the built-in default) on every disk, exactly one partition each
       - __testing_disk_layouts[0]['pttype'] == 'gpt'
       - (__testing_disk_layouts[0]['children'] | ansible.builtin.length) == 1
       - __testing_disk_layouts[0]['children'][0]['fstype'] == 'xfs'
       - __testing_disk_layouts[1]['pttype'] == 'gpt'
       - (__testing_disk_layouts[1]['children'] | ansible.builtin.length) == 1
       - __testing_disk_layouts[1]['children'][0]['fstype'] == 'ext4'
+      # the repurposed disk: foreign swap signature gone, declared layout in place
+      - __testing_disk_layouts[2]['pttype'] == 'gpt'
+      - (__testing_disk_layouts[2]['children'] | ansible.builtin.length) == 1
+      - __testing_disk_layouts[2]['children'][0]['fstype'] == 'xfs'
     fail_msg: "The on-disk layout does not match the declaration: {{ __testing_disk_layouts }}"
-    success_msg: "Both disks carry a GPT with exactly one partition and the declared filesystem."
+    success_msg: "All disks carry a GPT with exactly one partition and the declared filesystem."
   vars:
     __testing_disk_layouts: >-
       {%- set __ns = namespace(rows=[]) -%}
@@ -106,6 +115,7 @@
     that:
       - (__testing_disk_fstab_rows | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', '/srv/molecule_data0') | ansible.builtin.length) == 1
       - (__testing_disk_fstab_rows | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', '/srv/molecule_data1') | ansible.builtin.length) == 1
+      - (__testing_disk_fstab_rows | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', '/srv/molecule_data2') | ansible.builtin.length) == 1
       - __testing_disk_fstab_data0['source'] is ansible.builtin.match('^UUID=')
       - __testing_disk_fstab_data1['source'] is ansible.builtin.match('^UUID=')
       - __testing_disk_fstab_data1['passno'] == '2'

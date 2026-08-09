@@ -34,6 +34,84 @@
     label: "{{ item['dest'] }}"
 
 
+# --- Mismatch fixture -------------------------------------------------------
+# A foreign signature directly on the whole disk (no partition table) is the
+# simplest mismatch class, and mkswap is available everywhere (util-linux
+# core). Seeded only while the disk is blank: on the idempotence run the disk
+# already carries the role-created layout (converted via on_mismatch "wipe"
+# below), so seeding and the negative check are skipped and stay out of the
+# idempotence accounting.
+- name: "Molecule | Converge | disk | Query the third extra disk"
+  ansible.builtin.command:
+    argv:
+      - "lsblk"
+      - "--json"
+      - "--output"
+      - "NAME,PTTYPE,FSTYPE"
+      - "/dev/disk/by-id/virtio-molecule-data2"
+  changed_when:
+    - false
+  register: __testing_disk_data2_lsblk_result
+
+
+- name: "Molecule | Converge | disk | Derive the third disk's state"
+  ansible.builtin.set_fact:
+    __testing_disk_data2_blank: >-
+      {{
+        (__testing_disk_data2_dev['pttype'] is ansible.builtin.none)
+        and (__testing_disk_data2_dev['fstype'] is ansible.builtin.none)
+        and ((__testing_disk_data2_dev['children'] | ansible.builtin.default([]) | ansible.builtin.length) == 0)
+      }}
+    __testing_disk_data2_swap: "{{ __testing_disk_data2_dev['fstype'] == 'swap' }}"
+  vars:
+    __testing_disk_data2_dev: >-
+      {{ (__testing_disk_data2_lsblk_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0] }}
+
+
+- name: "Molecule | Converge | disk | Seed a foreign signature on the third disk"
+  ansible.builtin.command:
+    argv:
+      - "mkswap"
+      - "/dev/disk/by-id/virtio-molecule-data2"
+  when:
+    - __testing_disk_data2_blank | ansible.builtin.bool
+  changed_when:
+    - true
+
+
+# Runs BEFORE the disk_linux_* facts are set below: include_role vars (task
+# vars) would lose against already-set facts otherwise.
+- name: "Molecule | Converge | disk | Negative check: on_mismatch fail must refuse the foreign disk"
+  when:
+    - (__testing_disk_data2_blank | ansible.builtin.bool) or (__testing_disk_data2_swap | ansible.builtin.bool)
+  block:
+
+    - name: "Molecule | Converge | disk | Run the role against the foreign disk (must fail)"
+      ansible.builtin.include_role:
+        name: "foundata.linux.disk"
+      vars:
+        disk_linux_devices:
+          - device: "/dev/disk/by-id/virtio-molecule-data2"
+            mount:
+              path: "/srv/molecule_data2"
+
+
+    - name: "Molecule | Converge | disk | Fail because the role accepted the foreign disk"
+      ansible.builtin.fail:
+        msg: "The role accepted a disk with a foreign signature although on_mismatch is fail."
+
+  rescue:
+
+    - name: "Molecule | Converge | disk | Assert the failure is the expected mismatch refusal"
+      ansible.builtin.assert:
+        that:
+          - "'contradicts the declared layout' in (ansible_failed_result['msg'] | ansible.builtin.default(''))"
+        fail_msg: >-
+          The role failed for an unexpected reason:
+          {{ ansible_failed_result['msg'] | ansible.builtin.default('(no message)') }}
+        success_msg: "The role refused the foreign disk with the expected mismatch message."
+
+
 - name: "Molecule | Converge | disk | Store disk_linux_* role parameters in __testing_state"
   ansible.builtin.include_tasks:
     file: "../tasks/state_update.yml"
@@ -59,6 +137,13 @@
             path: "/srv/molecule_data1"
             options: "defaults,noatime,nodev"
             passno: 2
+        # repurposing path: the foreign signature seeded above is wiped and
+        # the disk set up per declaration (single-run on_mismatch "wipe");
+        # on later runs the disk conforms and the setting is a no-op
+        - device: "/dev/disk/by-id/virtio-molecule-data2"
+          on_mismatch: "wipe"
+          mount:
+            path: "/srv/molecule_data2"
         # optional disk that is not attached to any instance: on_missing skip
         - device: "/dev/disk/by-id/virtio-molecule-missing0"
           on_missing: "skip"

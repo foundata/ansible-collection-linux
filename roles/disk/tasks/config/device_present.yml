@@ -115,19 +115,66 @@
         - __disk_linux_item['action'] in ['create', 'mismatch_wipe']
 
 
-    # The label parameter always matches the EXISTING table type on purpose:
-    # community.general.parted destructively re-labels the disk whenever the
-    # current table type differs from the requested label.
+    # sfdisk instead of parted on purpose: parted's resizepart prompts
+    # interactively ("Partition is being used") for mounted partitions even
+    # in script mode. sfdisk grows partition 1 in place (", +" = same start,
+    # maximum size), accepts in-use partitions with --force and rewrites the
+    # GPT with a properly relocated backup header; partx then hands the new
+    # size to the kernel while the filesystem stays mounted. Only reached
+    # when the preflight measured reclaimable space above the tolerance.
     - name: "Config | Device | Extend partition 1 to span the enlarged disk"
-      community.general.parted:
-        device: "{{ __disk_linux_item['entry']['device'] }}"
-        label: "{{ __disk_linux_item['pttype_actual'] }}"
-        number: 1
-        part_end: "100%"
-        resize: true
-        state: "present"
+      ansible.builtin.command:
+        argv:
+          - "{{ __disk_linux_sfdisk_exec_path }}"
+          - "--force"
+          - "-N"
+          - "1"
+          - "{{ __disk_linux_item['entry']['device'] }}"
+        stdin: ", +"
       when:
         - __disk_linux_item['action'] == 'grow'
+      changed_when:
+        - true
+
+
+    # partx cannot resize an in-use partition (it works via BLKPG add and
+    # delete) and util-linux's resizepart is not packaged on every platform
+    # (Debian omits it). partprobe from the already installed parted package
+    # issues the dedicated BLKPG_RESIZE_PARTITION ioctl for existing busy
+    # partitions, which works while the filesystem stays mounted.
+    - name: "Config | Device | Hand the grown partition size to the kernel"
+      ansible.builtin.command:
+        argv:
+          - "{{ __disk_linux_partprobe_exec_path }}"
+          - "{{ __disk_linux_item['entry']['device'] }}"
+      when:
+        - __disk_linux_item['action'] == 'grow'
+      changed_when:
+        - false
+
+
+    - name: "Config | Device | Wait until the kernel reports the grown partition"
+      ansible.builtin.command:
+        argv:
+          - "{{ __disk_linux_lsblk_exec_path }}"
+          - "--json"
+          - "--bytes"
+          - "--output"
+          - "NAME,SIZE"
+          - "{{ __disk_linux_item['entry']['device'] }}"
+      when:
+        - __disk_linux_item['action'] == 'grow'
+      changed_when:
+        - false
+      retries: 10
+      delay: 1
+      until:
+        - >-
+          ((__disk_linux_apply_growcheck_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0]['size'] | int)
+          - (((__disk_linux_apply_growcheck_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0]['children']
+              | ansible.builtin.default([{'size': 0}]))[0]['size'] | int)
+          <= __disk_linux_grow_slack_bytes
+      register: __disk_linux_apply_growcheck_result
 
 
     # The kernel needs a moment to publish a freshly created partition, so
