@@ -12,16 +12,46 @@ argument_specs:
     short_description: "Main entry point for the foundata.linux.disk role"
     options:
 
+      disk_linux_state:
+        description: |
+          Determines whether the managed resources should be `present` or `absent`.
+
+          `present` ensures that required components, such as software packages, are
+          installed and configured.
+
+          `absent` reverts changes as much as possible, such as removing packages,
+          deleting created users, stopping services, restoring modified settings, …
+
+          Note: For this role, the required component and package set is minimal.
+          There are no users or services to manage, and the partitioning and
+          filesystem tools it installs (`parted`, `xfsprogs`, `e2fsprogs`,
+          `util-linux`) are base-system components that cannot be safely removed
+          due to dependencies, so the role does not uninstall them.
+
+          On `absent`, every entry in `disk_linux_devices` is treated as
+          `state: "absent"`: the filesystems are unmounted and their `/etc/fstab`
+          entries are removed, while partitions, filesystems, data and the
+          mountpoint directories are kept. This global `absent` is a
+          non-destructive override: a per-device `wipe: true` is only honored
+          when the entry's own effective `state` — computed from the built-in
+          defaults, `disk_linux_device_defaults` and the entry itself, without
+          this variable — is `absent`. Entries whose effective state is
+          `present` are never wiped through this switch, so a leftover `wipe`
+          setting cannot destroy data when decommissioning a host.
+        type: "str"
+        default: "present"
+        choices:
+          - "present"
+          - "absent"
+
       disk_linux_autoupgrade:
         description: |
-          If set to `true`, the tooling packages this role installs (partitioning
-          and filesystem utilities such as `parted`, `xfsprogs`, `e2fsprogs` and the
-          full `util-linux`) are upgraded during each Ansible run when the package
-          manager offers a newer version. If `false`, packages are only installed
-          when missing.
+          If set to `true`, all managed packages will be upgraded during each Ansible
+          run (e.g., when the package provider detects a newer version than the
+          currently installed one).
 
-          The role installs only the tools the declared devices actually need (for
-          example `xfsprogs` only when at least one entry uses the `xfs`
+          Note: The role installs only the tools the declared devices actually need
+          (for example `xfsprogs` only when at least one entry uses the `xfs`
           filesystem). These are base-system tools; they are never uninstalled by
           this role.
         type: "bool"
@@ -62,7 +92,7 @@ argument_specs:
               dump: 0
               passno: 0
               on_nonempty: "fail"
-              selinux_relabel: true
+              selinux_relabel: "new"
           ```
         type: "dict"
         default: {} # see __disk_linux_device_defaults_builtin in vars/main.yml for the defaults
@@ -184,7 +214,11 @@ argument_specs:
                 description: |
                   Default for the per-device key of the same name; see
                   `disk_linux_devices['mount']['selinux_relabel']`.
-                type: "bool"
+                type: "str"
+                choices:
+                  - "never"
+                  - "new"
+                  - "always"
 
       disk_linux_devices:
         description: |
@@ -196,22 +230,38 @@ argument_specs:
           all other keys are optional and fall back to
           `disk_linux_device_defaults`.
 
-          Both `device` and `mount['path']` must be unique across the list. When
-          managed mountpoints nest (for example `/srv` and `/srv/data`), list the
-          parent before the child; entries are processed in list order.
+          Both `device` and `mount['path']` must be unique across the list.
+          Entries may nest (for example `/srv` and `/srv/data`); the role orders
+          the work by mount dependency automatically: `present` entries are
+          processed parent-first, `absent` entries child-first, independent of
+          the list order. A parent that is effectively `absent` while a child
+          below it is `present` fails validation; when a parent entry is skipped
+          (`on_missing`/`on_mismatch`: `skip`), all entries below its path are
+          skipped too, with a notice — mounting them would land on the wrong
+          filesystem.
 
           The declared layout (partition table type, single partition, filesystem
-          type) is verified against the disk. Existing data is never touched by
-          default: the role only partitions blank disks and never re-formats; any
-          deviation of a non-blank disk from the declaration is handled according
-          to `on_missing` and `on_mismatch` (both default to failing hard before
-          any change). After every change to `/etc/fstab`, the role validates the
-          result with `findmnt --verify` and fails before a broken table can
-          surface at the next boot.
+          type) is verified against the disk. Existing data is never reformatted
+          or destroyed by default: the role only partitions blank disks and
+          creates filesystems only on partitions it created itself during the
+          same run; any other deviation of a non-blank disk from the declaration
+          is handled according to `on_missing` and `on_mismatch` (both default
+          to failing hard before any change). After every change to
+          `/etc/fstab`, the role validates the result with `findmnt --verify`
+          and fails before a broken table can surface at the next boot.
+
+          Safety invariants, guaranteed before any change to any disk (not
+          configurable): every `device` path is resolved to its canonical block
+          device identity, and the role rejects two entries addressing the same
+          disk through different aliases, paths that are not a whole disk (a
+          partition or a device-mapper child), and disks backing the running
+          system (`/`, `/boot`, the EFI system partition, active swap). All
+          entries are preflighted before the first one is changed.
 
           Conflicting environments make the role fail before any change, without
           a bypass option: the mountpoint already carrying a mount from a
-          different source, the declared filesystem being mounted somewhere else,
+          different source, an active mount below the entry's path that mounting
+          it would hide, the declared filesystem being mounted somewhere else,
           `/etc/fstab` lines not managed by the role conflicting by source or
           target, and duplicate filesystem UUIDs (for example from cloned disks)
           are all treated as errors that need a human decision - the role never
@@ -267,13 +317,21 @@ argument_specs:
 
           wipe:
             description: |
-              Destructive, only honored when `state` is `absent` (ignored with a
-              notice otherwise): after unmounting and removing the `/etc/fstab`
-              entry, the filesystem signature of the partition and the partition
-              table of the disk are erased (`wipefs`). All data on the disk becomes
-              inaccessible; there is no recovery except from backup. The disk is
-              blank afterwards, so a later run with `state: present` would set it
-              up again from scratch.
+              Destructive, only honored when the entry's effective `state` is
+              `absent` (ignored with a notice otherwise): after unmounting and
+              removing the `/etc/fstab` entry, the filesystem signature of the
+              partition and the partition table of the disk are erased
+              (`wipefs`). All data on the disk becomes inaccessible; there is no
+              recovery except from backup. The disk is blank afterwards, so a
+              later run with `state: present` would set it up again from
+              scratch.
+
+              The effective `state` is computed from the built-in defaults,
+              `disk_linux_device_defaults` and the entry itself. Inherited values
+              count: declaring `state: "absent"` together with `wipe: true` in
+              `disk_linux_device_defaults` wipes every listed device. The
+              role-global `disk_linux_state: "absent"` however never enables
+              wiping (see its description).
 
               To repurpose a disk with conflicting content in a single run (wipe
               and set up according to the declaration), use `on_mismatch: "wipe"`
@@ -314,12 +372,15 @@ argument_specs:
               other signature directly on the whole disk (no partition table); a
               partition layout other than exactly one partition numbered 1; a
               filesystem on the partition that differs from `filesystem['type']`;
-              or a layout that would require shrinking a partition or filesystem
-              (shrinking is never performed). A blank disk or an existing
-              partition 1 without any filesystem is not a mismatch (setup simply
-              continues there), and neither is an undersized partition after the
-              disk was enlarged - that is reconciled or tolerated according to
-              `grow`.
+              a pre-existing partition without any recognizable filesystem
+              signature (an existing partition is evidence the disk was in use,
+              and a missing signature does not prove the absence of data - the
+              role only creates filesystems on partitions it created itself
+              during the same run); or a layout that would require shrinking a
+              partition or filesystem (shrinking is never performed). A blank
+              disk is not a mismatch (normal setup), and neither is an
+              undersized partition after the disk was enlarged - that is
+              reconciled or tolerated according to `grow`.
 
               - `fail`: abort with a message describing the difference. A mismatch
                 usually means the `device` path points at the wrong disk or the
@@ -402,9 +463,12 @@ argument_specs:
 
                   Only used when creating the filesystem: an existing filesystem
                   of this type is left untouched (including all of its
-                  creation-time parameters). A different existing filesystem is a
-                  mismatch, handled according to `on_mismatch` - so changing the
-                  type of an already set up device requires either
+                  creation-time parameters), and the role only ever creates
+                  filesystems on partitions it created itself during the same
+                  run. A different existing filesystem is a mismatch, as is a
+                  pre-existing partition without any recognizable signature (see
+                  `on_mismatch`) - so changing the type of an already set up
+                  device requires either
                   `on_mismatch: "wipe"` (single run) or a wipe-and-recreate cycle
                   (one run with `state: absent` plus `wipe: true`, then a run
                   with `state: present`). Both destroy the data on the disk.
@@ -500,10 +564,19 @@ argument_specs:
                     directories, never descended into. Free space on the new
                     filesystem is checked before copying. The role does not stop
                     any services; quiescing writers below the path (databases,
-                    applications) is the caller's responsibility. An aborted or
-                    partial copy is harmless: the real mount only happens after a
-                    completed copy, so the system stays unchanged on failure and
-                    the next run restarts the migration.
+                    applications) is the caller's responsibility.
+
+                    The copy never merges: it only targets a filesystem that is
+                    empty, or that contains nothing but the remains of an
+                    earlier migration attempt by this role (recognized by an
+                    in-progress marker the role places before copying and
+                    removes after completion; such remains are cleared and the
+                    copy restarts from scratch, so the result is always an
+                    exact snapshot of the source). A populated mountpoint
+                    combined with an adopted filesystem that already carries
+                    other data is an error - existing data is never overlaid.
+                    An aborted copy leaves the system unchanged: the real mount
+                    only happens after a completed copy.
                   - `hide`: mount anyway. The existing content stays on the
                     parent filesystem, hidden below the new mount, and keeps
                     occupying its space there.
@@ -519,15 +592,32 @@ argument_specs:
 
               selinux_relabel:
                 description: |
-                  If `true`, SELinux file contexts below the mountpoint are
-                  restored (`restorecon -r`) once, directly after the initial
-                  mount (covering content migrated by `on_nonempty: "copy"`), so
-                  files on the new filesystem get proper labels. This
-                  intentionally does not repeat on later runs: a recurring relabel
-                  would be an idempotence leak and can actively harm workloads
-                  that maintain their own labels below the mountpoint (for
-                  example rootless container storage under `/home`). No-op on
-                  systems without active SELinux. Falls back to
+                  Controls the one-time SELinux relabel (`restorecon`) of the
+                  mountpoint directly after the initial mount by this role. It
+                  never repeats on later runs regardless of the value: a
+                  recurring relabel would be an idempotence leak and can
+                  actively harm workloads that maintain their own labels below
+                  the mountpoint (for example rootless container storage under
+                  `/home`). The relabel does not cross filesystem boundaries
+                  (nested mounts stay untouched). No-op on systems without
+                  active SELinux.
+
+                  - `never`: no relabeling.
+                  - `new` (default): relabel only when the role created the
+                    filesystem during this run, covering content migrated by
+                    `on_nonempty: "copy"`. Adopted, already existing
+                    filesystems are not relabeled - their data, including the
+                    security-context attributes, stays untouched.
+                  - `always`: additionally relabel an adopted, existing
+                    filesystem once, right after the first time this role
+                    mounts it. Use when adopting disks whose labels are known
+                    to be wrong for the new mountpoint.
+
+                  Falls back to
                   `disk_linux_device_defaults['mount']['selinux_relabel']`
-                  (built-in default `true`).
-                type: "bool"
+                  (built-in default `new`).
+                type: "str"
+                choices:
+                  - "never"
+                  - "new"
+                  - "always"
