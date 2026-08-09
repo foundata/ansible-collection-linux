@@ -1,0 +1,86 @@
+# Internal role variables and values that must NOT be overridden by the user.
+#
+# Variables defined here usually override earlier definitions due to the high
+# precedence of this file. Each variable should have a concise comment above
+# it, describing its purpose and how it fits into the role's functionality.
+
+---
+
+# Facts used by the role (gathered on a best-effort basis if needed), as a
+# mapping of "gather_subset" name to the ansible_facts keys it provides.
+#
+# To identify which subset a fact belongs to during development, you can use
+# the following snippet:
+#
+# - ansible.builtin.setup:
+#     gather_subset:
+#       - '!min'
+#       - '<subset_name, see parameter doc for details>'
+__disk_linux_used_facts:
+  distribution:
+    - "distribution"
+    - "distribution_major_version"
+    - "distribution_version"
+    - "os_family"
+
+
+# List of platforms this role supports and was designed for.
+#
+# A warning will be issued if the list contains values and the role is executed
+# on an unknown (not listed) platform, but execution will continue. Example:
+#
+# - name: "Fedora" # A ansible_facts value ('distribution' or 'os_family')
+#   versions: # A ansible_facts value ('distribution_major_version' or
+#     - "all" # 'distribution_version') or "all"
+# - name: "Ubuntu"
+#   versions:
+#     - "22.04"
+#     - "24.04"
+# - name: "RedHat"
+#   versions:
+#     - "all"
+# - name: "Debian"
+#   versions:
+#     - "all"
+__disk_linux_supported_platforms: []
+
+
+# List of package names to be installed when disk_linux_state is
+# set to "present".
+__disk_linux_packages_install: []
+
+
+# List of package names to be uninstalled when disk_linux_state is
+# set to "absent". This variable is useful when __disk_linux_packages_install
+# contains packages that are required for the managed software to function but
+# should not be removed during uninstallation, as doing so could break other
+# software. This is usually the case if there are common dependencies like
+# "curl" or "openssl" which typically should remain installed even after
+# uninstalling the software managed by this role.
+__disk_linux_packages_uninstall: "{{ __disk_linux_packages_install }}"
+
+
+# List of package names to be removed unconditionally before installation
+# (e.g., to prevent conflicts or resolve incompatibilities).
+__disk_linux_packages_removal: []
+
+
+# List of paths of files and directories to be removed unconditionally after
+# installation. This is useful for removing default configuration resources
+# that would otherwise create confusion or conflict with custom configurations
+# managed by this role.
+__disk_linux_paths_removal: []
+
+
+# Dictionary of files to be overwritten with a managed comment instead of being
+# deleted. Keys are file paths; values are the single-line comment characters to
+# use. This is needed on platforms where the package manager reinstalls deleted
+# files on package update. Restored files would conflict with the managed
+# configuration, while modified files are preserved. For example, RPM with
+# %config(noreplace) restores missing files but preserves modified ones.
+__disk_linux_paths_neutralize: {}
+
+
+### Override defaults of dependencies used by this role (if any).
+
+# nothing right now

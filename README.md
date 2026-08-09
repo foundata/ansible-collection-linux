@@ -22,6 +22,7 @@ It provides roles for managing common Linux host concerns: automatic updates, co
 
 - [Included content](#content)
   - [Role: `foundata.linux.auto_update`](#content-role-auto_update)
+  - [Role: `foundata.linux.disk`](#content-role-disk)
   - [Role: `foundata.linux.reboot`](#content-role-reboot)
   - [Role: `foundata.linux.sudo`](#content-role-sudo)
   - [Role: `foundata.linux.sysctl`](#content-role-sysctl)
@@ -64,6 +65,59 @@ Configures each supported distribution's native unattended-update service throug
   - [Compatibility](roles/auto_update/README.md#compatibility)
   - [External requirements](roles/auto_update/README.md#requirements)
 <!-- ANSIBLE DOCSMITH TOC-FULL auto_update END -->
+
+
+
+### Role: `foundata.linux.disk`<a id="content-role-disk"></a>
+
+Manages dedicated data disks: single partition spanning the disk, filesystem (XFS or ext4), mount plus `/etc/fstab` entry by filesystem UUID — with safe handling of existing data, mountpoint content preservation on first mount, and one-time SELinux relabeling. [Its `README.md`](./roles/disk/README.md) covers configuration, usage examples, and more:
+
+<!-- ANSIBLE DOCSMITH TOC-FULL disk START -->
+- [Ansible role: `foundata.linux.disk`](roles/disk/README.md#ansible-role-foundatalinuxdisk)
+  - [Table of contents](roles/disk/README.md#toc)
+  - [Example playbooks, using this role](roles/disk/README.md#examples)
+  - [Supported tags](roles/disk/README.md#tags)
+  - [Role variables](roles/disk/README.md#variables)
+    - [`disk_linux_state`](roles/disk/README.md#variable-disk_linux_state)
+    - [`disk_linux_autoupgrade`](roles/disk/README.md#variable-disk_linux_autoupgrade)
+    - [`disk_linux_device_defaults`](roles/disk/README.md#variable-disk_linux_device_defaults)
+      - [`disk_linux_device_defaults['state']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-state)
+      - [`disk_linux_device_defaults['wipe']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-wipe)
+      - [`disk_linux_device_defaults['on_missing']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-on_missing)
+      - [`disk_linux_device_defaults['on_mismatch']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-on_mismatch)
+      - [`disk_linux_device_defaults['partition_table']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-partition_table)
+      - [`disk_linux_device_defaults['grow']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-grow)
+      - [`disk_linux_device_defaults['filesystem']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-filesystem)
+        - [`disk_linux_device_defaults['filesystem']['type']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-filesystem-sub-type)
+        - [`disk_linux_device_defaults['filesystem']['mkfs_options']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-filesystem-sub-mkfs_options)
+      - [`disk_linux_device_defaults['mount']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-mount)
+        - [`disk_linux_device_defaults['mount']['options']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-mount-sub-options)
+        - [`disk_linux_device_defaults['mount']['dump']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-mount-sub-dump)
+        - [`disk_linux_device_defaults['mount']['passno']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-mount-sub-passno)
+        - [`disk_linux_device_defaults['mount']['on_nonempty']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-mount-sub-on_nonempty)
+        - [`disk_linux_device_defaults['mount']['selinux_relabel']`](roles/disk/README.md#variable-disk_linux_device_defaults-sub-mount-sub-selinux_relabel)
+    - [`disk_linux_devices`](roles/disk/README.md#variable-disk_linux_devices)
+      - [`disk_linux_devices['device']`](roles/disk/README.md#variable-disk_linux_devices-sub-device)
+      - [`disk_linux_devices['state']`](roles/disk/README.md#variable-disk_linux_devices-sub-state)
+      - [`disk_linux_devices['wipe']`](roles/disk/README.md#variable-disk_linux_devices-sub-wipe)
+      - [`disk_linux_devices['on_missing']`](roles/disk/README.md#variable-disk_linux_devices-sub-on_missing)
+      - [`disk_linux_devices['on_mismatch']`](roles/disk/README.md#variable-disk_linux_devices-sub-on_mismatch)
+      - [`disk_linux_devices['partition_table']`](roles/disk/README.md#variable-disk_linux_devices-sub-partition_table)
+      - [`disk_linux_devices['grow']`](roles/disk/README.md#variable-disk_linux_devices-sub-grow)
+      - [`disk_linux_devices['filesystem']`](roles/disk/README.md#variable-disk_linux_devices-sub-filesystem)
+        - [`disk_linux_devices['filesystem']['type']`](roles/disk/README.md#variable-disk_linux_devices-sub-filesystem-sub-type)
+        - [`disk_linux_devices['filesystem']['mkfs_options']`](roles/disk/README.md#variable-disk_linux_devices-sub-filesystem-sub-mkfs_options)
+      - [`disk_linux_devices['mount']`](roles/disk/README.md#variable-disk_linux_devices-sub-mount)
+        - [`disk_linux_devices['mount']['path']`](roles/disk/README.md#variable-disk_linux_devices-sub-mount-sub-path)
+        - [`disk_linux_devices['mount']['options']`](roles/disk/README.md#variable-disk_linux_devices-sub-mount-sub-options)
+        - [`disk_linux_devices['mount']['dump']`](roles/disk/README.md#variable-disk_linux_devices-sub-mount-sub-dump)
+        - [`disk_linux_devices['mount']['passno']`](roles/disk/README.md#variable-disk_linux_devices-sub-mount-sub-passno)
+        - [`disk_linux_devices['mount']['on_nonempty']`](roles/disk/README.md#variable-disk_linux_devices-sub-mount-sub-on_nonempty)
+        - [`disk_linux_devices['mount']['selinux_relabel']`](roles/disk/README.md#variable-disk_linux_devices-sub-mount-sub-selinux_relabel)
+  - [Dependencies](roles/disk/README.md#dependencies)
+  - [Compatibility](roles/disk/README.md#compatibility)
+  - [External requirements](roles/disk/README.md#requirements)
+<!-- ANSIBLE DOCSMITH TOC-FULL disk END -->
 
 
 

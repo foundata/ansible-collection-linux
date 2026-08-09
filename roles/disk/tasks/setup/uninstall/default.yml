@@ -1,0 +1,11 @@
+# Uninstall: Manage basic resource removal, such as packages or service users.
+
+---
+
+- name: "Setup | Uninstall | Remove packages"
+  ansible.builtin.package:
+    name: "{{ __disk_linux_packages_uninstall }}"
+    state: "absent"
+  when:
+    - __disk_linux_packages_uninstall is ansible.builtin.defined
+    - (__disk_linux_packages_uninstall | ansible.builtin.length) > 0

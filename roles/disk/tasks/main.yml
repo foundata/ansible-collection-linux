@@ -1,0 +1,151 @@
+# Main entry point for the role.
+
+---
+
+- name: "Main | Include role initialization tasks"
+  ansible.builtin.include_tasks:
+    file: "{{ role_path }}/tasks/init.yml"
+    apply:
+      tags:
+        - "always"
+        - "disk_linux_always"
+  tags:
+    - "always"
+    - "disk_linux_always"
+
+
+# Separate includes for platform-specific files and default.yml on purpose. When
+# looping over "platform files + ['default.yml']" for multiple platforms in one
+# play, Ansible batches them across all hosts. Insertion order depends on when
+# results arrive (non-deterministic behavior) and default.yml may run before the
+# platform-specific files. Separate tasks enforce the required barrier.
+
+- name: "Main | Include setup tasks (install): best platform matches (if any)"
+  ansible.builtin.include_tasks:
+    file: "{{ __disk_linux_task_file }}"
+    apply:
+      tags:
+        - "disk_linux_setup"
+  vars:
+    __disk_linux_task_file: "{{ role_path }}/tasks/setup/install/{{ __disk_linux_loop_item }}"
+  when:
+    - disk_linux_state == 'present'
+    - __disk_linux_task_file is ansible.builtin.file
+  loop: "{{ __disk_linux_platform_filenames_most_specific_first }}"
+  loop_control:
+    loop_var: "__disk_linux_loop_item"
+  tags:
+    - "disk_linux_setup"
+
+
+- name: "Main | Include setup tasks (install): default"
+  ansible.builtin.include_tasks:
+    file: "{{ __disk_linux_task_file }}"
+    apply:
+      tags:
+        - "disk_linux_setup"
+  vars:
+    __disk_linux_task_file: "{{ role_path }}/tasks/setup/install/default.yml"
+  when:
+    - disk_linux_state == 'present'
+    - __disk_linux_task_file is ansible.builtin.file
+  tags:
+    - "disk_linux_setup"
+
+
+- name: "Main | Include configuration tasks: best platform matches (if any)"
+  ansible.builtin.include_tasks:
+    file: "{{ __disk_linux_task_file }}"
+    apply:
+      tags:
+        - "disk_linux_config"
+  vars:
+    __disk_linux_task_file: "{{ role_path }}/tasks/config/{{ __disk_linux_loop_item }}"
+  when:
+    - disk_linux_state == 'present'
+    - __disk_linux_task_file is ansible.builtin.file
+  loop: "{{ __disk_linux_platform_filenames_most_specific_first }}"
+  loop_control:
+    loop_var: "__disk_linux_loop_item"
+  tags:
+    - "disk_linux_config"
+
+
+- name: "Main | Include configuration tasks: default"
+  ansible.builtin.include_tasks:
+    file: "{{ __disk_linux_task_file }}"
+    apply:
+      tags:
+        - "disk_linux_config"
+  vars:
+    __disk_linux_task_file: "{{ role_path }}/tasks/config/default.yml"
+  when:
+    - disk_linux_state == 'present'
+    - __disk_linux_task_file is ansible.builtin.file
+  tags:
+    - "disk_linux_config"
+
+
+- name: "Main | Include service or daemon management tasks: best platform matches (if any)"
+  ansible.builtin.include_tasks:
+    file: "{{ __disk_linux_task_file }}"
+    apply:
+      tags:
+        - "disk_linux_service"
+  vars:
+    __disk_linux_task_file: "{{ role_path }}/tasks/service/{{ __disk_linux_loop_item }}"
+  when:
+    - disk_linux_state == 'present'
+    - __disk_linux_task_file is ansible.builtin.file
+  loop: "{{ __disk_linux_platform_filenames_most_specific_first }}"
+  loop_control:
+    loop_var: "__disk_linux_loop_item"
+  tags:
+    - "disk_linux_service"
+
+
+- name: "Main | Include service or daemon management tasks: default"
+  ansible.builtin.include_tasks:
+    file: "{{ __disk_linux_task_file }}"
+    apply:
+      tags:
+        - "disk_linux_service"
+  vars:
+    __disk_linux_task_file: "{{ role_path }}/tasks/service/default.yml"
+  when:
+    - disk_linux_state == 'present'
+    - __disk_linux_task_file is ansible.builtin.file
+  tags:
+    - "disk_linux_service"
+
+
+- name: "Main | Include setup tasks (uninstall): best platform matches (if any)"
+  ansible.builtin.include_tasks:
+    file: "{{ __disk_linux_task_file }}"
+    apply:
+      tags:
+        - "disk_linux_setup"
+  vars:
+    __disk_linux_task_file: "{{ role_path }}/tasks/setup/uninstall/{{ __disk_linux_loop_item }}"
+  when:
+    - disk_linux_state == 'absent'
+    - __disk_linux_task_file is ansible.builtin.file
+  loop: "{{ __disk_linux_platform_filenames_most_specific_first }}"
+  loop_control:
+    loop_var: "__disk_linux_loop_item"
+  tags:
+    - "disk_linux_setup"
+
+- name: "Main | Include setup tasks (uninstall): default"
+  ansible.builtin.include_tasks:
+    file: "{{ __disk_linux_task_file }}"
+    apply:
+      tags:
+        - "disk_linux_setup"
+  vars:
+    __disk_linux_task_file: "{{ role_path }}/tasks/setup/uninstall/default.yml"
+  when:
+    - disk_linux_state == 'absent'
+    - __disk_linux_task_file is ansible.builtin.file
+  tags:
+    - "disk_linux_setup"
