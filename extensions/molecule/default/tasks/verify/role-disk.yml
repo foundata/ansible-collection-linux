@@ -274,6 +274,11 @@
 
 ## Multi-device Btrfs system-disk protection (loop devices)
 
+# Not every platform can create a Btrfs filesystem (Enterprise Linux 10
+# dropped Btrfs entirely, so btrfs-progs is not installable there). The
+# member protection is a property of the role, not of the platform, so the
+# fixture reports its absence and the checks below are skipped instead of
+# failing the whole run.
 - name: "Molecule | Verify | disk | Btrfs: install tooling and create two loop devices"
   ansible.builtin.shell:
     cmd: |
@@ -282,7 +287,8 @@
         (command -v apt-get >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get -qq install -y btrfs-progs) \
         || (command -v dnf >/dev/null && dnf -q -y install btrfs-progs) \
         || zypper -q -n install btrfsprogs
-      } >/dev/null 2>&1
+      } >/dev/null 2>&1 || true
+      command -v mkfs.btrfs >/dev/null 2>&1 || { echo "BTRFS-UNAVAILABLE"; exit 0; }
       mkdir -p /var/tmp/molecule-loops /mnt/molecule-btrfs
       truncate -s 200M /var/tmp/molecule-loops/btrfs0.img /var/tmp/molecule-loops/btrfs1.img
       L0=$(losetup --find --show /var/tmp/molecule-loops/btrfs0.img)
@@ -297,9 +303,26 @@
     - true
 
 
+- name: "Molecule | Verify | disk | Btrfs: determine whether the fixture could be created"
+  ansible.builtin.set_fact:
+    __testing_disk_btrfs_available: >-
+      {{ 'BTRFS-UNAVAILABLE' not in (__testing_disk_btrfs_setup['stdout'] | ansible.builtin.default('')) }}
+
+
+- name: "Molecule | Verify | disk | Btrfs: report a skipped check"
+  ansible.builtin.debug:
+    msg: >-
+      This platform cannot create a Btrfs filesystem, so the multi-device
+      member protection cannot be exercised here.
+  when:
+    - not (__testing_disk_btrfs_available | ansible.builtin.bool)
+
+
 - name: "Molecule | Verify | disk | Btrfs: set the loop device facts"
   ansible.builtin.set_fact:
     __testing_disk_btrfs_loops: "{{ __testing_disk_btrfs_setup['stdout_lines'][-1].split() }}"
+  when:
+    - __testing_disk_btrfs_available | ansible.builtin.bool
 
 
 # Declaring EITHER member has to be rejected: the second member is a peer of
@@ -308,6 +331,8 @@
 - name: "Molecule | Verify | disk | Btrfs: reset the attempt results"
   ansible.builtin.set_fact:
     __testing_attempt_results: []
+  when:
+    - __testing_disk_btrfs_available | ansible.builtin.bool
 
 
 - name: "Molecule | Verify | disk | Btrfs: attempt to manage each member of the critical filesystem"
@@ -323,6 +348,8 @@
   loop: "{{ __testing_disk_btrfs_loops }}"
   loop_control:
     loop_var: "__testing_disk_btrfs_member"
+  when:
+    - __testing_disk_btrfs_available | ansible.builtin.bool
 
 
 - name: "Molecule | Verify | disk | Btrfs: assert both members are protected"
@@ -333,6 +360,8 @@
       A member of the critical multi-device Btrfs filesystem passed the
       system-disk safeguard (rejections: {{ __testing_attempt_results }}).
     success_msg: "Both Btrfs members are protected, peers included."
+  when:
+    - __testing_disk_btrfs_available | ansible.builtin.bool
 
 
 - name: "Molecule | Verify | disk | Btrfs: tear the loop filesystem down again"
@@ -346,6 +375,8 @@
     executable: "/bin/bash"
   changed_when:
     - true
+  when:
+    - __testing_disk_btrfs_available | ansible.builtin.bool
 
 
 ## Atomic wipe refusal on an active unmounted stack (loop device + LUKS)
