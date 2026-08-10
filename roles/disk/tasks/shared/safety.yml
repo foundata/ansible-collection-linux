@@ -139,8 +139,9 @@
     argv:
       - "{{ __disk_linux_findmnt_exec_path }}"
       - "--noheadings"
+      - "--pairs"
       - "--output"
-      - "SOURCE"
+      - "SOURCE,FSTYPE,UUID"
       - "--mountpoint"
       - "{{ item }}"
   changed_when:
@@ -152,11 +153,7 @@
   # The probe is read-only; run it under "--check" too, otherwise it is
   # skipped and the discovery dereferences its missing result.
   check_mode: false
-  loop:
-    - "/"
-    - "/boot"
-    - "/boot/efi"
-    - "/efi"
+  loop: "{{ __disk_linux_critical_mountpoints }}"
   register: __disk_linux_sysmount_result
 
 
@@ -166,12 +163,62 @@
   register: __disk_linux_swaps_result
 
 
+# Multi-device Btrfs filesystems report only ONE member as the mount source;
+# the other members are peers, not ancestors, so the inverse traversal below
+# would miss them. The members of a MOUNTED Btrfs filesystem are enumerated
+# from sysfs (/sys/fs/btrfs/<UUID>/devices/), which needs no btrfs-progs and
+# cannot be confused by an unrelated clone carrying the same UUID.
+- name: "Safety | Enumerate the members of critical Btrfs filesystems"
+  ansible.builtin.find:
+    paths: "/sys/fs/btrfs/{{ __disk_linux_btrfs_uuid }}/devices"
+    file_type: "any"
+  register: __disk_linux_btrfs_members_result
+  vars:
+    __disk_linux_btrfs_uuids: >-
+      {%- set __ns = namespace(uuids=[]) -%}
+      {%- for __r in (__disk_linux_sysmount_result['results'] | ansible.builtin.default([])) -%}
+      {%-   if (__r['rc'] | ansible.builtin.default(1)) == 0
+              and ('FSTYPE="btrfs"' in (__r['stdout'] | ansible.builtin.default(''))) -%}
+      {%-     set __m = (__r['stdout'] | ansible.builtin.regex_search('UUID="[^"]+"')) -%}
+      {%-     if __m -%}
+      {%-       set _ = __ns.uuids.append((__m.split('"'))[1]) -%}
+      {%-     endif -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ __ns.uuids | ansible.builtin.unique }}
+  loop: "{{ __disk_linux_btrfs_uuids }}"
+  loop_control:
+    loop_var: "__disk_linux_btrfs_uuid"
+
+
+# Fail closed: a critical Btrfs filesystem whose member enumeration yields
+# nothing would leave peer disks unprotected.
+- name: "Safety | Check every critical Btrfs filesystem enumerated its members"
+  ansible.builtin.assert:
+    that:
+      - >-
+        __disk_linux_btrfs_members_result['results'] | ansible.builtin.default([])
+        | ansible.builtin.selectattr('matched', 'ansible.builtin.defined')
+        | ansible.builtin.rejectattr('matched', '>', 0)
+        | ansible.builtin.length == 0
+    fail_msg: >-
+      Refusing to continue: a Btrfs filesystem backing a critical system
+      path did not enumerate its member devices via
+      /sys/fs/btrfs/<UUID>/devices, so the system-disk protection would be
+      incomplete.
+    quiet: true
+  when:
+    - (__disk_linux_blockdev | ansible.builtin.length) > 0
+    - (__disk_linux_btrfs_members_result['results'] | ansible.builtin.default([]) | ansible.builtin.length) > 0
+
+
 # Every critical source is resolved through the WHOLE storage stack to its
-# physical disks with an inverse lsblk (LUKS, LVM, MD RAID and multi-device
-# Btrfs sit between a mount source and its disks; a one-level parent lookup
-# misses them). Btrfs mount sources carry a "[/subvolume]" suffix that lsblk
-# does not accept, so it is stripped first. Swap files need no entry of
-# their own: their backing filesystem is already covered by its mountpoint.
+# physical disks with an inverse lsblk (LUKS, LVM and MD RAID sit between a
+# mount source and its disks; a one-level parent lookup misses them). The
+# Btrfs "[/subvolume]" suffix is stripped (lsblk does not accept it) and the
+# sysfs-enumerated Btrfs members are added as additional sources. Swap files
+# need no entry of their own: their backing filesystem is already covered by
+# its mountpoint.
 - name: "Safety | Resolve the critical sources to their physical disks"
   ansible.builtin.command:
     argv:
@@ -192,15 +239,25 @@
   check_mode: false
   vars:
     __disk_linux_system_sources: >-
+      {%- set __ns = namespace(sources=[]) -%}
+      {%- for __r in (__disk_linux_sysmount_result['results'] | ansible.builtin.default([])) -%}
+      {%-   if (__r['rc'] | ansible.builtin.default(1)) == 0 -%}
+      {%-     set __m = (__r['stdout'] | ansible.builtin.default('') | ansible.builtin.regex_search('SOURCE="[^"]+"')) -%}
+      {%-     if __m -%}
+      {%-       set _ = __ns.sources.append((__m.split('"'))[1]) -%}
+      {%-     endif -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {%- for __sw in (__disk_linux_swaps_result['content'] | ansible.builtin.b64decode).splitlines()[1:] -%}
+      {%-   set _ = __ns.sources.append(__sw.split() | ansible.builtin.first) -%}
+      {%- endfor -%}
+      {%- for __r in (__disk_linux_btrfs_members_result['results'] | ansible.builtin.default([])) -%}
+      {%-   for __f in (__r['files'] | ansible.builtin.default([])) -%}
+      {%-     set _ = __ns.sources.append('/dev/' ~ (__f['path'] | ansible.builtin.basename)) -%}
+      {%-   endfor -%}
+      {%- endfor -%}
       {{
-        ((__disk_linux_sysmount_result['results']
-          | ansible.builtin.selectattr('rc', 'ansible.builtin.equalto', 0)
-          | ansible.builtin.map(attribute='stdout')
-          | ansible.builtin.list)
-         + ((__disk_linux_swaps_result['content'] | ansible.builtin.b64decode).splitlines()[1:]
-            | ansible.builtin.map('ansible.builtin.split')
-            | ansible.builtin.map('ansible.builtin.first')
-            | ansible.builtin.list))
+        __ns.sources
         | ansible.builtin.map('ansible.builtin.regex_replace', '\[.*\]$', '')
         | ansible.builtin.select('ansible.builtin.match', '^/dev/')
         | ansible.builtin.unique
@@ -222,9 +279,9 @@
         | ansible.builtin.rejectattr('rc', 'ansible.builtin.equalto', 0)
         | ansible.builtin.length == 0
       - >-
-        (__disk_linux_sysmount_result['results'][0]['stdout'] | ansible.builtin.default(''))
-        | ansible.builtin.regex_replace('\[.*\]$', '')
-        is ansible.builtin.match('^/dev/')
+        ((__disk_linux_sysmount_result['results'][0]['stdout'] | ansible.builtin.default(''))
+         | ansible.builtin.regex_search('SOURCE="[^"]+"') | ansible.builtin.default('SOURCE=""', true))
+        is ansible.builtin.search('SOURCE="/dev/')
     fail_msg: >-
       Refusing to continue: a device backing the running system (/, /boot,
       the EFI system partition or active swap) could not be resolved to its

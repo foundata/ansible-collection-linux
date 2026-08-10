@@ -272,6 +272,16 @@ __disk_linux_xfs_growfs_exec_path: "/usr/sbin/xfs_growfs"
 __disk_linux_resize2fs_exec_path: "/usr/sbin/resize2fs"
 
 
+# Mountpoints whose backing disks are protected from any destructive
+# operation. Internal, parameterizable so tests can point the resolver at a
+# constructed filesystem instead of replacing / or /boot.
+__disk_linux_critical_mountpoints:
+  - "/"
+  - "/boot"
+  - "/boot/efi"
+  - "/efi"
+
+
 ### Override defaults of dependencies used by this role (if any).
 
 # nothing right now
