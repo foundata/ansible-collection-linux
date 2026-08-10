@@ -95,7 +95,7 @@
                 'kname': __b['kname'],
                 'type': __b['type'],
                 'majmin': __b['maj:min'],
-                'size': (__b['size'] | int)
+                'size': (__b['size'] | ansible.builtin.int)
               }}) -%}
       {%-   endif -%}
       {%- endfor -%}

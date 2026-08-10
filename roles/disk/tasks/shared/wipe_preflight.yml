@@ -71,7 +71,7 @@
       {%- set __allowed = __disk_linux_wp_allowed_mountpoint | ansible.builtin.default('') -%}
       {%- set __fstab = (__disk_linux_wp_fstab_result['content'] | ansible.builtin.default('') | ansible.builtin.b64decode) -%}
       {%- set __swaps = (__disk_linux_swaps_result['content'] | ansible.builtin.default('') | ansible.builtin.b64decode).splitlines()[1:]
-                        | map('ansible.builtin.split') | map('ansible.builtin.first') | list -%}
+                        | ansible.builtin.map('ansible.builtin.split') | ansible.builtin.map('ansible.builtin.first') | ansible.builtin.list -%}
       {%- for __l in (__disk_linux_wp_tree_result['stdout_lines'] | ansible.builtin.default([])) -%}
       {%-   set __km = __l | ansible.builtin.regex_search('KNAME="[^"]+"') -%}
       {%-   set __kname = (__km.split('"'))[1] if __km else '' -%}
@@ -92,7 +92,7 @@
       {%-     set __uuid = (__um.split('"'))[1] -%}
       {%-     for __fl in __fstab.splitlines() -%}
       {%-       set __ff = __fl.split() -%}
-      {%-       if (__ff | length) >= 2 and ('UUID=' ~ __uuid) == (__ff[0]) and (__ff[1]) != __allowed -%}
+      {%-       if (__ff | ansible.builtin.length) >= 2 and ('UUID=' ~ __uuid) == (__ff[0]) and (__ff[1]) != __allowed -%}
       {%-         set _ = __ns.reasons.append(__kname ~ ' referenced by /etc/fstab (' ~ __ff[1] ~ ')') -%}
       {%-       endif -%}
       {%-     endfor -%}
@@ -100,8 +100,8 @@
       {%- endfor -%}
       {%- for __r in (__disk_linux_wp_holders_result['results'] | ansible.builtin.default([])) -%}
       {%-   if (__r['matched'] | ansible.builtin.default(0)) > 0 -%}
-      {%-     set __holders = __r['files'] | map(attribute='path')
-                          | map('ansible.builtin.basename') | join(', ') -%}
+      {%-     set __holders = __r['files'] | ansible.builtin.map(attribute='path')
+                          | ansible.builtin.map('ansible.builtin.basename') | ansible.builtin.join(', ') -%}
       {%-     set _ = __ns.reasons.append(__r['__disk_linux_wp_kname'] ~ ' held by ' ~ __holders) -%}
       {%-   endif -%}
       {%- endfor -%}

@@ -197,9 +197,9 @@
       delay: 1
       until:
         - >-
-          ((__disk_linux_apply_growcheck_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0]['size'] | int)
+          ((__disk_linux_apply_growcheck_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0]['size'] | ansible.builtin.int)
           - (((__disk_linux_apply_growcheck_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0]['children']
-              | ansible.builtin.default([{'size': 0}]))[0]['size'] | int)
+              | ansible.builtin.default([{'size': 0}]))[0]['size'] | ansible.builtin.int)
           <= __disk_linux_grow_slack_bytes
       register: __disk_linux_apply_growcheck_result
 
@@ -435,7 +435,7 @@
             - name: "Config | Device | Fail when the destination filesystem is too small"
               ansible.builtin.assert:
                 that:
-                  - (__disk_linux_apply_du_bytes | int) <= (__disk_linux_apply_avail_bytes | int)
+                  - (__disk_linux_apply_du_bytes | ansible.builtin.int) <= (__disk_linux_apply_avail_bytes | ansible.builtin.int)
                 quiet: true
                 fail_msg: >-
                   The content of {{ __disk_linux_item['entry']['path'] }} does

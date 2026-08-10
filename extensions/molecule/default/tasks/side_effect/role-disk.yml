@@ -35,7 +35,7 @@
   delay: 2
   until:
     - >-
-      ((__testing_disk_growsize_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0]['size'] | int)
+      ((__testing_disk_growsize_result['stdout'] | ansible.builtin.from_json)['blockdevices'][0]['size'] | ansible.builtin.int)
       > 2147483648
   register: __testing_disk_growsize_result
 
@@ -77,7 +77,7 @@
     that:
       # well above the previous 2G disk size, so partition AND filesystem
       # must have been extended (xfs size on a 3G disk minus overhead)
-      - (__testing_disk_grownfs_result['stdout'] | ansible.builtin.trim | int) > 2500000000
+      - (__testing_disk_grownfs_result['stdout'] | ansible.builtin.trim | ansible.builtin.int) > 2500000000
     fail_msg: >-
       The filesystem on /srv/molecule_data0 was not grown
       ({{ __testing_disk_grownfs_result['stdout'] | ansible.builtin.trim }} bytes).

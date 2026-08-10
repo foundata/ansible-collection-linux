@@ -84,19 +84,19 @@
           {%- set __d = __disk_linux_pf_disk -%}
           {%- set __c = __disk_linux_pf_children -%}
           {%- set __ns = namespace(class='adopt') -%}
-          {%- if (__disk_linux_pf_pttype | length) == 0 and (__d['fstype'] is ansible.builtin.none) and (__c | length) == 0 -%}
+          {%- if (__disk_linux_pf_pttype | ansible.builtin.length) == 0 and (__d['fstype'] is ansible.builtin.none) and (__c | ansible.builtin.length) == 0 -%}
           {%-   set __ns.class = 'create' -%}
-          {%- elif (__disk_linux_pf_pttype | length) == 0 and (__d['fstype'] is not ansible.builtin.none) -%}
+          {%- elif (__disk_linux_pf_pttype | ansible.builtin.length) == 0 and (__d['fstype'] is not ansible.builtin.none) -%}
           {%-   set __ns.class = 'mismatch:a filesystem or other signature sits directly on the whole disk (no partition table)' -%}
           {%- elif __disk_linux_pf_pttype != __e['partition_table'] -%}
           {%-   set __ns.class = 'mismatch:the partition table type is "' ~ __disk_linux_pf_pttype ~ '" while "' ~ __e['partition_table'] ~ '" is declared' -%}
-          {%- elif (__c | length) != 1 or ((__c[0]['kname'] | ansible.builtin.regex_search('[0-9]+$')) != '1') -%}
+          {%- elif (__c | ansible.builtin.length) != 1 or ((__c[0]['kname'] | ansible.builtin.regex_search('[0-9]+$')) != '1') -%}
           {%-   set __ns.class = 'mismatch:the partition layout is not exactly one partition numbered 1' -%}
           {%- elif __c[0]['fstype'] is ansible.builtin.none -%}
           {%-   set __ns.class = 'mismatch:partition 1 exists but carries no recognizable filesystem signature' -%}
           {%- elif __c[0]['fstype'] != __e['filesystem']['type'] -%}
           {%-   set __ns.class = 'mismatch:partition 1 carries "' ~ __c[0]['fstype'] ~ '" while "' ~ __e['filesystem']['type'] ~ '" is declared' -%}
-          {%- elif __e['grow'] and ((__d['size'] | int) - (__c[0]['size'] | int)) > __disk_linux_grow_slack_bytes -%}
+          {%- elif __e['grow'] and ((__d['size'] | ansible.builtin.int) - (__c[0]['size'] | ansible.builtin.int)) > __disk_linux_grow_slack_bytes -%}
           {%-   set __ns.class = 'grow' -%}
           {%- endif -%}
           {{ __ns.class }}
@@ -201,14 +201,17 @@
               {%- set __e = __disk_linux_entry -%}
               {%- set __uuid = (__disk_linux_pf_uuid_result['stdout'] | ansible.builtin.default('', true)) -%}
               {%- set __child = '/dev/' ~ (__disk_linux_pf_children[0]['kname'] | ansible.builtin.default('', true)) -%}
-              {%- set __ownsrc = __disk_linux_pf_children | map(attribute='kname') | map('ansible.builtin.regex_replace', '^', '/dev/') | list -%}
+              {%- set __ownsrc = __disk_linux_pf_children | ansible.builtin.map(attribute='kname')
+                  | ansible.builtin.map('ansible.builtin.regex_replace', '^', '/dev/')
+                  | ansible.builtin.list -%}
               {#- target path mounted from a source that is not this disk's partition -#}
-              {%- if (__disk_linux_pf_mounted_sources | length) > 0 and __disk_linux_pf_mounted_sources[0] not in __ownsrc -%}
+              {%- if (__disk_linux_pf_mounted_sources | ansible.builtin.length) > 0 and __disk_linux_pf_mounted_sources[0] not in __ownsrc -%}
               {%-   set _ = __ns.rows.append('the mountpoint already carries a mount from ' ~ __disk_linux_pf_mounted_sources[0]) -%}
               {%- endif -%}
               {#- active mounts below an unmounted target would be hidden -#}
-              {%- if (__disk_linux_pf_mounted_sources | length) == 0 and (__disk_linux_pf_mounts_below | length) > 0 -%}
-              {%-   set _ = __ns.rows.append('mounting would hide the active mounts below the mountpoint: ' ~ (__disk_linux_pf_mounts_below | join(', '))) -%}
+              {%- if (__disk_linux_pf_mounted_sources | ansible.builtin.length) == 0 and (__disk_linux_pf_mounts_below | ansible.builtin.length) > 0 -%}
+              {%-   set _ = __ns.rows.append('mounting would hide the active mounts below the mountpoint: '
+                    ~ (__disk_linux_pf_mounts_below | ansible.builtin.join(', '))) -%}
               {%- endif -%}
               {#- the declared filesystem is mounted somewhere else -#}
               {%- if __disk_linux_pf_action in ['adopt', 'grow'] -%}
@@ -224,14 +227,14 @@
               {%-   if __f['target'] == __e['path'] and
                        (not __adoptlike or __f['source'] != 'UUID=' ~ __uuid) -%}
               {%-     set _ = __ns.rows.append('/etc/fstab already lists ' ~ __f['source'] ~ ' for the mountpoint') -%}
-              {%-   elif (__uuid | length) > 0 and __f['source'] == 'UUID=' ~ __uuid and __f['target'] != __e['path'] -%}
+              {%-   elif (__uuid | ansible.builtin.length) > 0 and __f['source'] == 'UUID=' ~ __uuid and __f['target'] != __e['path'] -%}
               {%-     set _ = __ns.rows.append('/etc/fstab lists this filesystem for a different mountpoint: ' ~ __f['target']) -%}
               {%-   endif -%}
               {%- endfor -%}
               {#- duplicate filesystem UUIDs (e.g. cloned disks) -#}
               {%- set __dupes = __disk_linux_pf_uuid_dupe_result['stdout_lines'] | ansible.builtin.default([]) -%}
-              {%- if (__uuid | length) > 0 and (__dupes | length) > 1 -%}
-              {%-   set _ = __ns.rows.append('duplicate filesystem UUID ' ~ __uuid ~ ' on: ' ~ (__dupes | join(', '))) -%}
+              {%- if (__uuid | ansible.builtin.length) > 0 and (__dupes | ansible.builtin.length) > 1 -%}
+              {%-   set _ = __ns.rows.append('duplicate filesystem UUID ' ~ __uuid ~ ' on: ' ~ (__dupes | ansible.builtin.join(', '))) -%}
               {%- endif -%}
               {{ __ns.rows }}
 
@@ -281,7 +284,9 @@
               {%- set __ns = namespace(rows=[]) -%}
               {%- for __p in __disk_linux_devices_effective_present -%}
               {%-   if __p['path'] != __disk_linux_entry['path'] and __p['path'].startswith(__disk_linux_entry['path'] ~ '/') -%}
-              {%-     if (__disk_linux_mounts | selectattr('target', 'ansible.builtin.equalto', __p['path']) | list | length) == 0 -%}
+              {%-     if (__disk_linux_mounts
+                      | ansible.builtin.selectattr('target', 'ansible.builtin.equalto', __p['path'])
+                      | ansible.builtin.list | ansible.builtin.length) == 0 -%}
               {%-       set _ = __ns.rows.append(__p['path']) -%}
               {%-     endif -%}
               {%-   endif -%}
