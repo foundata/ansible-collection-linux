@@ -1,0 +1,26 @@
+# Attempt ONE disk-role invocation that is expected to fail, recording the
+# outcome instead of aborting the play: ignore_errors on include_role does
+# NOT cover the included tasks, only block/rescue catches their failures.
+# Callers pass __testing_attempt_devices (the disk_linux_devices list) and
+# optionally __testing_attempt_critical (critical-mountpoint override).
+
+- name: "Molecule | Verify | disk | Attempt an expected-failure role invocation"
+  block:
+
+    - name: "Molecule | Verify | disk | Include the role for the attempt"
+      ansible.builtin.include_role:
+        name: "foundata.linux.disk"
+      vars:
+        disk_linux_devices: "{{ __testing_attempt_devices }}"
+        __disk_linux_critical_mountpoints: >-
+          {{ __testing_attempt_critical | ansible.builtin.default(['/', '/boot', '/boot/efi', '/efi']) }}
+
+    - name: "Molecule | Verify | disk | Record the accepted attempt"
+      ansible.builtin.set_fact:
+        __testing_attempt_results: "{{ (__testing_attempt_results | ansible.builtin.default([])) + [false] }}"
+
+  rescue:
+
+    - name: "Molecule | Verify | disk | Record the rejected attempt"
+      ansible.builtin.set_fact:
+        __testing_attempt_results: "{{ (__testing_attempt_results | ansible.builtin.default([])) + [true] }}"

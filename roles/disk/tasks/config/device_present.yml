@@ -79,6 +79,33 @@
             label: "{{ item['target'] }}"
 
 
+        # Immediate recheck right before the wipe (the planning-phase
+        # preflight already validated every candidate; this narrows the
+        # race between discovery and destruction).
+        - name: "Config | Device | Reset the wipe violation aggregate (immediate recheck)"
+          ansible.builtin.set_fact:
+            __disk_linux_wipe_violations: []
+
+
+        - name: "Config | Device | Run the wipe activity preflight (immediate recheck)"
+          ansible.builtin.include_tasks:
+            file: "{{ role_path }}/tasks/shared/wipe_preflight.yml"
+          vars:
+            __disk_linux_wp_device: "{{ __disk_linux_item['entry']['device'] }}"
+            __disk_linux_wp_allowed_mountpoint: ""
+
+
+        - name: "Config | Device | Check the device tree is inactive (immediate recheck)"
+          ansible.builtin.assert:
+            that:
+              - (__disk_linux_wipe_violations | ansible.builtin.length) == 0
+            fail_msg: >-
+              Refusing to wipe {{ __disk_linux_item['entry']['device'] }}:
+              its device tree became active again
+              ({{ __disk_linux_wipe_violations | ansible.builtin.join('; ') }}).
+            quiet: true
+
+
         - name: "Config | Device | Erase the partition signatures"
           ansible.builtin.command:
             argv:

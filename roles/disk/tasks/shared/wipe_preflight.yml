@@ -1,0 +1,111 @@
+# Activity preflight for ONE destructive candidate (a disk about to be
+# wiped): enumerates the complete descendant tree and records every reason
+# the tree is still active. Mounted descendants, sysfs holders (an open LUKS
+# mapping, an active LV, an assembled MD array or any other block-device
+# consumer, without maintaining a type list), active swap and /etc/fstab
+# references all count. Callers pass:
+#   __disk_linux_wp_device             the whole-disk device path
+#   __disk_linux_wp_allowed_mountpoint mountpoint the role itself manages
+#                                      ('' = no mount is acceptable)
+# Violations are appended to __disk_linux_wipe_violations; the caller
+# asserts on the aggregate BEFORE the first wipefs call, so one busy disk
+# cannot be discovered after another one was already destroyed.
+
+---
+
+- name: "Safety | Wipe preflight | Enumerate the device tree"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_lsblk_exec_path }}"
+      - "--noheadings"
+      - "--pairs"
+      - "--output"
+      - "KNAME,MOUNTPOINTS,UUID"
+      - "{{ __disk_linux_wp_device }}"
+  changed_when:
+    - false
+  # The probe is read-only; run it under "--check" too, otherwise it is
+  # skipped and the preflight dereferences its missing result.
+  check_mode: false
+  register: __disk_linux_wp_tree_result
+
+
+- name: "Safety | Wipe preflight | Inspect the sysfs holders of every tree member"
+  ansible.builtin.find:
+    paths: "/sys/class/block/{{ __disk_linux_wp_kname }}/holders"
+    file_type: "any"
+  register: __disk_linux_wp_holders_result
+  vars:
+    __disk_linux_wp_knames: >-
+      {%- set __ns = namespace(knames=[]) -%}
+      {%- for __l in (__disk_linux_wp_tree_result['stdout_lines'] | ansible.builtin.default([])) -%}
+      {%-   set __m = __l | ansible.builtin.regex_search('KNAME="[^"]+"') -%}
+      {%-   if __m -%}
+      {%-     set _ = __ns.knames.append((__m.split('"'))[1]) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ __ns.knames }}
+  loop: "{{ __disk_linux_wp_knames }}"
+  loop_control:
+    loop_var: "__disk_linux_wp_kname"
+
+
+# /etc/fstab is re-read here on purpose: the run may legitimately have
+# removed entries since the safety preflight (the absent flow removes its
+# own entry right before the wipe), and a stale copy would produce false
+# violations.
+- name: "Safety | Wipe preflight | Read the current /etc/fstab"
+  ansible.builtin.slurp:
+    src: "/etc/fstab"
+  register: __disk_linux_wp_fstab_result
+  failed_when:
+    # tolerate a missing fstab (treated as empty below)
+    - __disk_linux_wp_fstab_result['msg'] is ansible.builtin.defined
+    - "'file not found' not in (__disk_linux_wp_fstab_result['msg'] | ansible.builtin.lower)"
+
+
+- name: "Safety | Wipe preflight | Record the activity violations of the candidate"
+  ansible.builtin.set_fact:
+    __disk_linux_wipe_violations: >-
+      {%- set __ns = namespace(reasons=[]) -%}
+      {%- set __allowed = __disk_linux_wp_allowed_mountpoint | ansible.builtin.default('') -%}
+      {%- set __fstab = (__disk_linux_wp_fstab_result['content'] | ansible.builtin.default('') | ansible.builtin.b64decode) -%}
+      {%- set __swaps = (__disk_linux_swaps_result['content'] | ansible.builtin.default('') | ansible.builtin.b64decode).splitlines()[1:]
+                        | map('ansible.builtin.split') | map('ansible.builtin.first') | list -%}
+      {%- for __l in (__disk_linux_wp_tree_result['stdout_lines'] | ansible.builtin.default([])) -%}
+      {%-   set __km = __l | ansible.builtin.regex_search('KNAME="[^"]+"') -%}
+      {%-   set __kname = (__km.split('"'))[1] if __km else '' -%}
+      {%-   set __mm = __l | ansible.builtin.regex_search('MOUNTPOINTS="[^"]+"') -%}
+      {%-   if __mm -%}
+      {%-     set __mp = (__mm.split('"'))[1] -%}
+      {%-     if __mp != __allowed and __mp != '[SWAP]' -%}
+      {%-       set _ = __ns.reasons.append(__kname ~ ' mounted at ' ~ __mp) -%}
+      {%-     elif __mp == '[SWAP]' -%}
+      {%-       set _ = __ns.reasons.append(__kname ~ ' is active swap') -%}
+      {%-     endif -%}
+      {%-   endif -%}
+      {%-   if ('/dev/' ~ __kname) in __swaps -%}
+      {%-     set _ = __ns.reasons.append(__kname ~ ' is active swap') -%}
+      {%-   endif -%}
+      {%-   set __um = __l | ansible.builtin.regex_search('UUID="[^"]+"') -%}
+      {%-   if __um -%}
+      {%-     set __uuid = (__um.split('"'))[1] -%}
+      {%-     for __fl in __fstab.splitlines() -%}
+      {%-       set __ff = __fl.split() -%}
+      {%-       if (__ff | length) >= 2 and ('UUID=' ~ __uuid) == (__ff[0]) and (__ff[1]) != __allowed -%}
+      {%-         set _ = __ns.reasons.append(__kname ~ ' referenced by /etc/fstab (' ~ __ff[1] ~ ')') -%}
+      {%-       endif -%}
+      {%-     endfor -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {%- for __r in (__disk_linux_wp_holders_result['results'] | ansible.builtin.default([])) -%}
+      {%-   if (__r['matched'] | ansible.builtin.default(0)) > 0 -%}
+      {%-     set __holders = __r['files'] | map(attribute='path')
+                          | map('ansible.builtin.basename') | join(', ') -%}
+      {%-     set _ = __ns.reasons.append(__r['__disk_linux_wp_kname'] ~ ' held by ' ~ __holders) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{
+        (__disk_linux_wipe_violations | ansible.builtin.default([]))
+        + ([{'device': __disk_linux_wp_device, 'reasons': __ns.reasons | ansible.builtin.unique}] if ((__ns.reasons | ansible.builtin.length) > 0) else [])
+      }}

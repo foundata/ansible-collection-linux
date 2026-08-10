@@ -55,20 +55,6 @@
   register: __disk_linux_mounts_result
 
 
-- name: "Config | Default | Determine whether /etc/fstab exists"
-  ansible.builtin.stat:
-    path: "/etc/fstab"
-  register: __disk_linux_fstab_stat_result
-
-
-- name: "Config | Default | Read /etc/fstab"
-  ansible.builtin.slurp:
-    src: "/etc/fstab"
-  when:
-    - __disk_linux_fstab_stat_result['stat']['exists']
-  register: __disk_linux_fstab_result
-
-
 - name: "Config | Default | Initialize the per-device plan"
   ansible.builtin.set_fact:
     __disk_linux_plan: []
@@ -140,6 +126,42 @@
   loop_control:
     label: "{{ __disk_linux_item['entry']['path'] }} ({{ __disk_linux_item['action'] }})"
     loop_var: "__disk_linux_item"
+
+
+# Every absent entry with wipe enabled is activity-checked BEFORE the first
+# one is touched: a busy disk discovered mid-loop would come too late, after
+# earlier candidates were already destroyed. The entry's own declared
+# mountpoint is exempt (its unmount is part of the absent handling); an
+# immediate recheck runs again right before each wipe.
+- name: "Config | Default | Reset the wipe violation aggregate"
+  ansible.builtin.set_fact:
+    __disk_linux_wipe_violations: []
+
+
+- name: "Config | Default | Run the wipe activity preflight for the absent entries"
+  ansible.builtin.include_tasks:
+    file: "{{ role_path }}/tasks/shared/wipe_preflight.yml"
+  vars:
+    __disk_linux_wp_device: "{{ __disk_linux_wp_entry['device'] }}"
+    __disk_linux_wp_allowed_mountpoint: "{{ __disk_linux_wp_entry['path'] }}"
+  when:
+    - __disk_linux_wp_entry['wipe'] | ansible.builtin.bool
+    - __disk_linux_device_exists[__disk_linux_wp_entry['device']] | ansible.builtin.default(false)
+  loop: "{{ __disk_linux_devices_effective_absent }}"
+  loop_control:
+    loop_var: "__disk_linux_wp_entry"
+    label: "{{ __disk_linux_wp_entry['device'] }}"
+
+
+- name: "Config | Default | Check every absent entry's device tree is inactive"
+  ansible.builtin.assert:
+    that:
+      - (__disk_linux_wipe_violations | ansible.builtin.length) == 0
+    fail_msg: >-
+      Refusing the wipe of absent entries: device tree(s) still active
+      ({{ __disk_linux_wipe_violations | ansible.builtin.join('; ') }}).
+      Unmount or deactivate them first; nothing was changed.
+    quiet: true
 
 
 - name: "Config | Default | Per-item absent cleanup (child-first)"

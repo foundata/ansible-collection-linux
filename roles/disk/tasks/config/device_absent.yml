@@ -56,6 +56,39 @@
         - __disk_linux_entry['on_missing'] == 'fail'
 
 
+    # Immediate recheck right before the wipe: the aggregate pre-pass ran
+    # earlier, this narrows the race between discovery and destruction (the
+    # declared mount is unmounted by now, so nothing may be active anymore).
+    - name: "Absent | Reset the wipe violation aggregate (immediate recheck)"
+      ansible.builtin.set_fact:
+        __disk_linux_wipe_violations: []
+      when:
+        - __disk_linux_absent_stat_result['stat']['exists']
+
+
+    - name: "Absent | Run the wipe activity preflight (immediate recheck)"
+      ansible.builtin.include_tasks:
+        file: "{{ role_path }}/tasks/shared/wipe_preflight.yml"
+      vars:
+        __disk_linux_wp_device: "{{ __disk_linux_entry['device'] }}"
+        __disk_linux_wp_allowed_mountpoint: ""
+      when:
+        - __disk_linux_absent_stat_result['stat']['exists']
+
+
+    - name: "Absent | Check the device tree is inactive (immediate recheck)"
+      ansible.builtin.assert:
+        that:
+          - (__disk_linux_wipe_violations | ansible.builtin.length) == 0
+        fail_msg: >-
+          Refusing to wipe {{ __disk_linux_entry['device'] }}: its device
+          tree became active again
+          ({{ __disk_linux_wipe_violations | ansible.builtin.join('; ') }}).
+        quiet: true
+      when:
+        - __disk_linux_absent_stat_result['stat']['exists']
+
+
     - name: "Absent | Notice about the skipped wipe of the missing device"
       ansible.builtin.debug:
         msg: >-

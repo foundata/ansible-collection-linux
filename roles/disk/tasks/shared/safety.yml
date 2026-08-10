@@ -105,11 +105,12 @@
 - name: "Safety | Enforce whole-disk devices and reject aliased duplicates"
   ansible.builtin.assert:
     that:
-      # every existing device must be a whole disk, not a partition or a
-      # device-mapper/LVM child
+      # every existing device must be a whole disk (loop devices count:
+      # they are legitimate whole-disk targets for tests and image files),
+      # not a partition or a device-mapper/LVM child
       - >-
         (__disk_linux_blockdev | ansible.builtin.dict2items
-         | ansible.builtin.rejectattr('value.type', 'ansible.builtin.equalto', 'disk')
+         | ansible.builtin.rejectattr('value.type', 'ansible.builtin.in', ['disk', 'loop'])
          | ansible.builtin.length) == 0
       # no two entries may address the same physical disk through aliases;
       # canonical identity is the major:minor pair
@@ -132,6 +133,20 @@
       }}
   when:
     - (__disk_linux_blockdev | ansible.builtin.length) > 0
+
+
+- name: "Safety | Determine whether /etc/fstab exists"
+  ansible.builtin.stat:
+    path: "/etc/fstab"
+  register: __disk_linux_fstab_stat_result
+
+
+- name: "Safety | Read /etc/fstab"
+  ansible.builtin.slurp:
+    src: "/etc/fstab"
+  when:
+    - __disk_linux_fstab_stat_result['stat']['exists']
+  register: __disk_linux_fstab_result
 
 
 - name: "Safety | Determine the sources backing critical system paths"
@@ -322,7 +337,7 @@
         | ansible.builtin.map(attribute='stdout_lines')
         | ansible.builtin.flatten
         | ansible.builtin.map('ansible.builtin.trim')
-        | ansible.builtin.select('ansible.builtin.match', '^\S+\s+disk\s+\S+$')
+        | ansible.builtin.select('ansible.builtin.match', '^\S+\s+(disk|loop)\s+\S+$')
         | ansible.builtin.map('ansible.builtin.split')
         | ansible.builtin.map(attribute='2')
         | ansible.builtin.unique

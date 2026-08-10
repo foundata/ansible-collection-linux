@@ -272,6 +272,221 @@
     success_msg: "A mismatch wipe on a mounted device tree is refused before mutation."
 
 
+## Multi-device Btrfs system-disk protection (loop devices)
+
+- name: "Molecule | Verify | disk | Btrfs: install tooling and create two loop devices"
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      command -v mkfs.btrfs >/dev/null 2>&1 || {
+        (command -v apt-get >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get -qq install -y btrfs-progs) \
+        || (command -v dnf >/dev/null && dnf -q -y install btrfs-progs) \
+        || zypper -q -n install btrfsprogs
+      } >/dev/null 2>&1
+      mkdir -p /var/tmp/molecule-loops /mnt/molecule-btrfs
+      truncate -s 200M /var/tmp/molecule-loops/btrfs0.img /var/tmp/molecule-loops/btrfs1.img
+      L0=$(losetup --find --show /var/tmp/molecule-loops/btrfs0.img)
+      L1=$(losetup --find --show /var/tmp/molecule-loops/btrfs1.img)
+      mkfs.btrfs -f -d single -m single "$L0" "$L1" >/dev/null
+      mount "$L0" /mnt/molecule-btrfs
+      printf '%s %s\n' "$L0" "$L1"
+  args:
+    executable: "/bin/bash"
+  register: __testing_disk_btrfs_setup
+  changed_when:
+    - true
+
+
+- name: "Molecule | Verify | disk | Btrfs: set the loop device facts"
+  ansible.builtin.set_fact:
+    __testing_disk_btrfs_loops: "{{ __testing_disk_btrfs_setup['stdout_lines'][-1].split() }}"
+
+
+# Declaring EITHER member has to be rejected: the second member is a peer of
+# the mount source, not an ancestor (regression: only the source's ancestors
+# were protected).
+- name: "Molecule | Verify | disk | Btrfs: reset the attempt results"
+  ansible.builtin.set_fact:
+    __testing_attempt_results: []
+
+
+- name: "Molecule | Verify | disk | Btrfs: attempt to manage each member of the critical filesystem"
+  ansible.builtin.include_tasks:
+    file: "../helpers/disk-attempt.yml"
+  vars:
+    __testing_attempt_critical:
+      - "/mnt/molecule-btrfs"
+    __testing_attempt_devices:
+      - device: "{{ __testing_disk_btrfs_member }}"
+        mount:
+          path: "/srv/molecule-btrfs-member"
+  loop: "{{ __testing_disk_btrfs_loops }}"
+  loop_control:
+    loop_var: "__testing_disk_btrfs_member"
+
+
+- name: "Molecule | Verify | disk | Btrfs: assert both members are protected"
+  ansible.builtin.assert:
+    that:
+      - __testing_attempt_results == [true, true]
+    fail_msg: >-
+      A member of the critical multi-device Btrfs filesystem passed the
+      system-disk safeguard (rejections: {{ __testing_attempt_results }}).
+    success_msg: "Both Btrfs members are protected, peers included."
+
+
+- name: "Molecule | Verify | disk | Btrfs: tear the loop filesystem down again"
+  ansible.builtin.shell:
+    cmd: |
+      set -u
+      umount /mnt/molecule-btrfs || true
+      for l in {{ __testing_disk_btrfs_loops | ansible.builtin.join(' ') }}; do losetup -d "$l" || true; done
+      rm -rf /var/tmp/molecule-loops /mnt/molecule-btrfs
+  args:
+    executable: "/bin/bash"
+  changed_when:
+    - true
+
+
+## Atomic wipe refusal on an active unmounted stack (loop device + LUKS)
+
+- name: "Molecule | Verify | disk | LUKS: build a two-partition loop disk with an open unmounted mapping"
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      command -v cryptsetup >/dev/null 2>&1 || {
+        (command -v apt-get >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get -qq install -y cryptsetup) \
+        || (command -v dnf >/dev/null && dnf -q -y install cryptsetup) \
+        || zypper -q -n install cryptsetup
+      } >/dev/null 2>&1
+      mkdir -p /var/tmp/molecule-loops
+      # sparse; >=512M so the role-created partition stays above the
+      # mkfs.xfs 300MB minimum in the final wipe-succeeds step
+      truncate -s 512M /var/tmp/molecule-loops/luks.img
+      L=$(losetup --find --show --partscan /var/tmp/molecule-loops/luks.img)
+      parted --script "$L" mklabel gpt mkpart p1 ext4 1MiB 50% mkpart p2 ext4 50% 100%
+      udevadm settle || true
+      mkfs.ext4 -q "${L}p1"
+      echo -n "molecule-luks-pass" | cryptsetup luksFormat --batch-mode --pbkdf pbkdf2 --pbkdf-force-iterations 1000 "${L}p2" -
+      echo -n "molecule-luks-pass" | cryptsetup open "${L}p2" molecule-luks-hold -
+      blkid --match-tag UUID --output value "${L}p1"
+      echo "$L"
+  args:
+    executable: "/bin/bash"
+  register: __testing_disk_luks_setup
+  changed_when:
+    - true
+
+
+- name: "Molecule | Verify | disk | LUKS: set the fixture facts"
+  ansible.builtin.set_fact:
+    __testing_disk_luks_loop: "{{ __testing_disk_luks_setup['stdout_lines'][-1] }}"
+    __testing_disk_luks_p1_uuid: "{{ __testing_disk_luks_setup['stdout_lines'][-2] }}"
+
+
+# The mismatch wipe and the absent wipe must both refuse the disk while the
+# unmounted LUKS mapping holds partition 2, and partition 1's signature has
+# to survive the refusal untouched (atomic failure, nothing partially wiped).
+- name: "Molecule | Verify | disk | LUKS: reset the attempt results"
+  ansible.builtin.set_fact:
+    __testing_attempt_results: []
+
+
+- name: "Molecule | Verify | disk | LUKS: attempt a mismatch wipe and an absent wipe of the held disk"
+  ansible.builtin.include_tasks:
+    file: "../helpers/disk-attempt.yml"
+  vars:
+    __testing_attempt_devices:
+      - "{{ __testing_disk_luks_declaration }}"
+  loop:
+    - device: "{{ __testing_disk_luks_loop }}"
+      on_mismatch: "wipe"
+      mount:
+        path: "/srv/molecule-luks-test"
+    - device: "{{ __testing_disk_luks_loop }}"
+      state: "absent"
+      wipe: true
+      mount:
+        path: "/srv/molecule-luks-test"
+  loop_control:
+    loop_var: "__testing_disk_luks_declaration"
+    label: "{{ __testing_disk_luks_declaration['state'] | ansible.builtin.default('present') }}"
+
+
+- name: "Molecule | Verify | disk | LUKS: read partition 1's signature after the refusals"
+  ansible.builtin.command:
+    argv: ["blkid", "--match-tag", "UUID", "--output", "value", "{{ __testing_disk_luks_loop }}p1"]
+  register: __testing_disk_luks_p1_after
+  changed_when:
+    - false
+
+
+- name: "Molecule | Verify | disk | LUKS: assert both wipes were refused atomically"
+  ansible.builtin.assert:
+    that:
+      - __testing_attempt_results == [true, true]
+      # nothing was partially wiped before the refusal
+      - __testing_disk_luks_p1_after['stdout'] == __testing_disk_luks_p1_uuid
+    fail_msg: >-
+      A wipe of the LUKS-held disk was not refused atomically (rejections:
+      {{ __testing_attempt_results }}, p1 UUID before:
+      {{ __testing_disk_luks_p1_uuid }}, after:
+      {{ __testing_disk_luks_p1_after['stdout'] }}).
+    success_msg: "Both wipe paths refuse the held disk before touching any signature."
+
+
+- name: "Molecule | Verify | disk | LUKS: close the mapping"
+  ansible.builtin.command:
+    argv: ["cryptsetup", "close", "molecule-luks-hold"]
+  changed_when:
+    - true
+
+
+- name: "Molecule | Verify | disk | LUKS: repeat the mismatch wipe on the now-inactive disk"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  vars:
+    disk_linux_devices:
+      - device: "{{ __testing_disk_luks_loop }}"
+        on_mismatch: "wipe"
+        mount:
+          path: "/srv/molecule-luks-test"
+
+
+- name: "Molecule | Verify | disk | LUKS: assert the inactive disk was repurposed"
+  ansible.builtin.command:
+    argv: ["findmnt", "--noheadings", "--output", "SOURCE", "/srv/molecule-luks-test"]
+  register: __testing_disk_luks_mounted
+  changed_when:
+    - false
+  failed_when:
+    - __testing_disk_luks_loop not in __testing_disk_luks_mounted['stdout']
+
+
+- name: "Molecule | Verify | disk | LUKS: tear the fixture down again"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  vars:
+    disk_linux_devices:
+      - device: "{{ __testing_disk_luks_loop }}"
+        state: "absent"
+        mount:
+          path: "/srv/molecule-luks-test"
+
+
+- name: "Molecule | Verify | disk | LUKS: release the loop device"
+  ansible.builtin.shell:
+    cmd: |
+      set -u
+      losetup -d {{ __testing_disk_luks_loop }} || true
+      rm -rf /var/tmp/molecule-loops
+      rmdir /srv/molecule-luks-test 2>/dev/null || true
+  args:
+    executable: "/bin/bash"
+  changed_when:
+    - true
+
+
 ## Check mode on the deployed state
 #
 # A --check run must succeed as a dry run (regression: the read-only
