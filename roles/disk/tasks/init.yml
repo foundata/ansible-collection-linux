@@ -156,10 +156,14 @@
       - item['device'] is ansible.builtin.match('^/')
       - item['path'] is ansible.builtin.match('^/')
       - item['path'] != '/'
+      # no "." or ".." segments: "/srv/.." normalizes to "/" and would slip
+      # past the literal check above
+      - not (item['path'] is ansible.builtin.search('(^|/)\.\.?(/|$)'))
     quiet: true
     fail_msg: >-
       Entry for device "{{ item['device'] }}": device and mount['path'] must be
-      absolute paths, and "/" cannot be a managed mountpoint.
+      absolute, normalized paths without "." or ".." segments, and "/" cannot
+      be a managed mountpoint.
   loop: "{{ __disk_linux_devices_effective }}"
   loop_control:
     label: "{{ item['path'] }}"
