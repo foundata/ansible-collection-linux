@@ -301,10 +301,13 @@
               Refusing on_nonempty "copy" for {{ __disk_linux_entry['path'] }}:
               the declared nested mountpoints
               {{ __disk_linux_pf_nested_populated | ansible.builtin.join(', ') }}
-              are not mounted yet and contain files. Migrating nested unmounted
-              trees in one pass is not supported. Apply the nested entries
-              first (their own migration mounts them), then run again for this
-              entry.
+              are not mounted yet and contain files. Migrating nested
+              unmounted trees is not supported (neither in one pass nor
+              child-first: an active child mount would then block this
+              entry). Required manual sequence: apply the nested entries,
+              unmount them again, remove the migrated content below their
+              source directories, apply this entry, mount the nested entries
+              again.
           vars:
             __disk_linux_pf_nested_populated: >-
               {{

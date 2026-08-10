@@ -597,16 +597,18 @@ argument_specs:
                     An aborted copy leaves the system unchanged: the real mount
                     only happens after a completed copy.
 
-                    Limit: `copy` is refused when another managed mountpoint
-                    below this entry's path is not mounted yet and its
-                    directory is populated. Migrating nested unmounted trees
-                    in one pass would either duplicate the nested data onto
-                    the parent filesystem or hide it before the nested
-                    migration can read it; supporting this is deliberately out
-                    of scope for a provisioning role. Escape: apply the nested
-                    entry first (its own migration mounts it), then run again
-                    for the parent - a mounted nested mountpoint is recreated
-                    empty and never descended into.
+                    Limit: migrating nested trees is not supported. `copy`
+                    is refused when another managed mountpoint below this
+                    entry's path is unmounted and populated (one pass would
+                    duplicate the nested data onto the parent filesystem or
+                    hide it), and mounting is also refused while a nested
+                    mountpoint is actively mounted (the mount would hide it).
+                    Supporting this is deliberately out of scope for a
+                    provisioning role; the manual escape sequence is: apply
+                    the nested entry (its own migration mounts it), unmount
+                    it again, remove the migrated content below its source
+                    directory, apply this parent entry, then mount the nested
+                    entry again (for example by re-running the role).
                   - `hide`: mount anyway. The existing content stays on the
                     parent filesystem, hidden below the new mount, and keeps
                     occupying its space there.
