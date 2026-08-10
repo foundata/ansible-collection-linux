@@ -725,3 +725,122 @@
   ansible.builtin.set_fact:
     auto_update_linux_timer_settings: "{{ __testing_timer_settings_saved }}"
     auto_update_linux_reboot_timer_settings: "{{ __testing_timer_reboot_settings_saved }}"
+
+
+## Kernel release comparison in the reboot helper (prefix collision)
+#
+# The installed helper mirrors the reboot role's checks, so it carries the
+# same regression: an installed "6.1.0-30" was accepted as the running
+# "6.1.0-3" (substring match) and the reboot was never scheduled. The helper
+# is executed with a PATH shim in front, so its "shutdown" call is recorded
+# instead of rebooting the instance.
+
+- name: "Molecule | Verify | auto_update | Kernel prefix: create the shim directory"
+  ansible.builtin.file:
+    path: "/var/tmp/molecule-reboot-shim"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "u=rwx,g=rx,o=rx"
+
+
+- name: "Molecule | Verify | auto_update | Kernel prefix: create the shutdown shim"
+  ansible.builtin.copy:
+    dest: "/var/tmp/molecule-reboot-shim/{{ item }}"
+    content: |
+      #!/bin/sh
+      echo "$0 $*" >> /var/tmp/molecule-reboot-shim/calls.log
+      exit 0
+    owner: "root"
+    group: "root"
+    mode: "u=rwx,g=rx,o=rx"
+  loop:
+    - "shutdown"
+    - "logger"
+
+
+- name: "Molecule | Verify | auto_update | Kernel prefix: run the helper without a decoy (baseline)"
+  ansible.builtin.command:
+    argv: ["/bin/sh", "{{ __auto_update_linux_reboot_script_path }}"]
+  environment:
+    PATH: "/var/tmp/molecule-reboot-shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  changed_when:
+    - false
+  register: __testing_autoupdate_helper_baseline_run
+
+
+- name: "Molecule | Verify | auto_update | Kernel prefix: read the recorded calls (baseline)"
+  ansible.builtin.slurp:
+    src: "/var/tmp/molecule-reboot-shim/calls.log"
+  register: __testing_autoupdate_helper_baseline_calls
+  failed_when:
+    - __testing_autoupdate_helper_baseline_calls['msg'] is ansible.builtin.defined
+    - "'file not found' not in (__testing_autoupdate_helper_baseline_calls['msg'] | ansible.builtin.lower)"
+
+
+- name: "Molecule | Verify | auto_update | Kernel prefix: save the baseline"
+  ansible.builtin.set_fact:
+    __testing_autoupdate_helper_baseline: >-
+      {{
+        'shutdown' in
+        (__testing_autoupdate_helper_baseline_calls['content'] | ansible.builtin.default('') | ansible.builtin.b64decode)
+      }}
+
+
+- name: "Molecule | Verify | auto_update | Kernel prefix: isolate the run and place a colliding decoy kernel"
+  when:
+    - not (__testing_autoupdate_helper_baseline | ansible.builtin.bool)
+  block:
+
+    - name: "Molecule | Verify | auto_update | Kernel prefix: place a prefix-colliding decoy kernel"
+      ansible.builtin.file:
+        path: "/boot/vmlinuz-{{ ansible_facts['kernel'] }}0"
+        state: "touch"
+        owner: "root"
+        group: "root"
+        mode: "u=rw,g=r,o=r"
+
+
+    - name: "Molecule | Verify | auto_update | Kernel prefix: run the helper with the decoy in place"
+      ansible.builtin.command:
+        argv: ["/bin/sh", "{{ __auto_update_linux_reboot_script_path }}"]
+      environment:
+        PATH: "/var/tmp/molecule-reboot-shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      changed_when:
+        - false
+
+
+    - name: "Molecule | Verify | auto_update | Kernel prefix: read the recorded calls"
+      ansible.builtin.slurp:
+        src: "/var/tmp/molecule-reboot-shim/calls.log"
+      register: __testing_autoupdate_helper_calls
+      failed_when:
+        - __testing_autoupdate_helper_calls['msg'] is ansible.builtin.defined
+        - "'file not found' not in (__testing_autoupdate_helper_calls['msg'] | ansible.builtin.lower)"
+
+
+    - name: "Molecule | Verify | auto_update | Kernel prefix: assert the helper scheduled the reboot"
+      ansible.builtin.assert:
+        that:
+          - >-
+            'shutdown' in
+            (__testing_autoupdate_helper_calls['content'] | ansible.builtin.default('') | ansible.builtin.b64decode)
+        fail_msg: >-
+          The helper did not schedule a reboot although an installed kernel
+          ({{ ansible_facts['kernel'] }}0) is newer than the running one
+          ({{ ansible_facts['kernel'] }}); its release merely starts with the
+          running release.
+        success_msg: "The helper schedules a reboot for a prefix-colliding newer kernel."
+
+  always:
+
+    - name: "Molecule | Verify | auto_update | Kernel prefix: remove the decoy kernel again"
+      ansible.builtin.file:
+        path: "/boot/vmlinuz-{{ ansible_facts['kernel'] }}0"
+        state: "absent"
+
+
+- name: "Molecule | Verify | auto_update | Kernel prefix: remove the shim"
+  ansible.builtin.file:
+    path: "/var/tmp/molecule-reboot-shim"
+    state: "absent"

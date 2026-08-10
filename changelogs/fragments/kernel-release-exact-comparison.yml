@@ -1,0 +1,10 @@
+---
+
+bugfixes:
+  - >-
+    reboot, auto_update: the reboot detection matched the running kernel
+    release as a SUBSTRING of the newest installed `vmlinuz-*` filename, so an
+    installed `6.1.0-30` was accepted as the running `6.1.0-3` and the
+    required reboot was missed. Both implementations now strip the filename
+    prefix and compare the releases exactly, ignoring rescue kernels and
+    backup or boot-loader artifacts.

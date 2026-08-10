@@ -173,19 +173,26 @@
         unset __zypper_rc
       fi
 
-      # Check if running kernel differs from newest installed kernel
+      # Check if running kernel differs from newest installed kernel.
+      # The releases are compared EXACTLY (the filename prefix is stripped
+      # first): a substring test would accept a running "6.1.0-3" as the
+      # installed "6.1.0-30" and miss the required reboot. Rescue kernels and
+      # backup/boot-loader artifacts are not release candidates.
       if [ "${__reboot_required}" != '1' ]; then
         __kernel_installed=''
         if [ -d '/boot' ]; then
           __kernel_installed="$(
-            find /boot -maxdepth 1 -name 'vmlinuz-*' -printf '%f\n' \
+            find /boot -maxdepth 1 -name 'vmlinuz-*' \
+              ! -name 'vmlinuz-0-rescue-*' ! -name '*.old' \
+              ! -name '*.efi' ! -name '*.img' -printf '%f\n' \
+            | sed -e 's/^vmlinuz-//' \
             | sort -V \
             | tail -n 1
           )"
         fi
         __kernel_current="$(uname -r)"
         if [ -n "${__kernel_installed}" ] \
-          && ! printf '%s' "${__kernel_installed}" | grep -q -F -e "${__kernel_current}"; then
+          && [ "${__kernel_installed}" != "${__kernel_current}" ]; then
           __reboot_required='1'
         fi
         unset __kernel_installed __kernel_current

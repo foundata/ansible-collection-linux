@@ -28,3 +28,91 @@
       reboot_linux_result has wrong types (rebooted={{ reboot_linux_result['rebooted'] }},
       elapsed={{ reboot_linux_result['elapsed'] }}): rebooted must be boolean and elapsed numeric.
     success_msg: "reboot_linux_result types are correct (rebooted is boolean, elapsed is numeric)."
+
+
+## Kernel release comparison (prefix collision)
+#
+# Regression: the running release was matched as a SUBSTRING of the newest
+# installed vmlinuz filename, so an installed "6.1.0-30" was accepted as the
+# running "6.1.0-3" and the required reboot was missed. The decoy below has
+# exactly that shape: the running release plus one digit, which sorts newer
+# and contains the running release as a prefix.
+
+- name: "Molecule | Verify | reboot | Kernel prefix: run the role's init without a decoy (baseline)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.reboot"
+    tasks_from: "init"
+    public: true
+
+
+- name: "Molecule | Verify | reboot | Kernel prefix: save the baseline"
+  ansible.builtin.set_fact:
+    __testing_reboot_kernel_baseline: "{{ __reboot_linux_required | ansible.builtin.bool }}"
+
+
+- name: "Molecule | Verify | reboot | Kernel prefix: place a prefix-colliding decoy kernel"
+  ansible.builtin.file:
+    path: "/boot/vmlinuz-{{ ansible_facts['kernel'] }}0"
+    state: "touch"
+    owner: "root"
+    group: "root"
+    mode: "u=rw,g=r,o=r"
+  when:
+    - not (__testing_reboot_kernel_baseline | ansible.builtin.bool)
+
+
+- name: "Molecule | Verify | reboot | Kernel prefix: run the role's init with the decoy in place"
+  ansible.builtin.include_role:
+    name: "foundata.linux.reboot"
+    tasks_from: "init"
+    public: true
+  when:
+    - not (__testing_reboot_kernel_baseline | ansible.builtin.bool)
+
+
+- name: "Molecule | Verify | reboot | Kernel prefix: assert the newer kernel was detected"
+  ansible.builtin.assert:
+    that:
+      - __reboot_linux_required | ansible.builtin.bool
+    fail_msg: >-
+      An installed kernel whose release merely starts with the running release
+      ({{ ansible_facts['kernel'] }}0 vs {{ ansible_facts['kernel'] }}) was
+      accepted as the running one, so the required reboot is missed.
+    success_msg: "A prefix-colliding newer kernel is detected as requiring a reboot."
+  when:
+    - not (__testing_reboot_kernel_baseline | ansible.builtin.bool)
+
+
+- name: "Molecule | Verify | reboot | Kernel prefix: report a skipped check"
+  ansible.builtin.debug:
+    msg: >-
+      A reboot is already required on this instance for other reasons, so the
+      kernel comparison cannot be isolated; the prefix collision check is
+      skipped here.
+  when:
+    - __testing_reboot_kernel_baseline | ansible.builtin.bool
+
+
+- name: "Molecule | Verify | reboot | Kernel prefix: remove the decoy kernel again"
+  ansible.builtin.file:
+    path: "/boot/vmlinuz-{{ ansible_facts['kernel'] }}0"
+    state: "absent"
+
+
+- name: "Molecule | Verify | reboot | Kernel prefix: run the role's init again (must be back to the baseline)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.reboot"
+    tasks_from: "init"
+    public: true
+
+
+- name: "Molecule | Verify | reboot | Kernel prefix: assert the decoy removal restored the baseline"
+  ansible.builtin.assert:
+    that:
+      - (__reboot_linux_required | ansible.builtin.bool) == (__testing_reboot_kernel_baseline | ansible.builtin.bool)
+    fail_msg: >-
+      The kernel comparison does not return to its baseline after the decoy was
+      removed (baseline: {{ __testing_reboot_kernel_baseline }}, now:
+      {{ __reboot_linux_required }}); an up-to-date kernel is reported as
+      needing a reboot.
+    success_msg: "An up-to-date running kernel is not reported as requiring a reboot."
