@@ -11,6 +11,125 @@
 
 ---
 
+# A stale declaration must not tear down a replacement: after a disk swap
+# the declared mountpoint may be supplied by a DIFFERENT device, and an
+# absent entry still addressing the old disk would unmount the replacement
+# and remove its /etc/fstab entry. Any active or fstab source resolving to
+# an existing device OUTSIDE the declared device's tree is refused below.
+# Sources resolving to no existing device (the normal remains of an
+# already-detached disk; findmnt --evaluate leaves them blank or as a dead
+# path) stay removable, keeping the detached-disk cleanup working.
+
+- name: "Absent | Determine the canonical name of the declared device"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_lsblk_exec_path }}"
+      - "--noheadings"
+      - "--nodeps"
+      - "--output"
+      - "KNAME"
+      - "{{ __disk_linux_entry['device'] }}"
+  changed_when:
+    - false
+  # a detached declared device has no canonical name; every resolvable
+  # source is foreign then
+  failed_when:
+    - false
+  register: __disk_linux_absent_kname_result
+
+
+- name: "Absent | Determine the active source of the declared mountpoint"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_findmnt_exec_path }}"
+      - "--noheadings"
+      - "--output"
+      - "SOURCE"
+      - "--mountpoint"
+      - "{{ __disk_linux_entry['path'] }}"
+  changed_when:
+    - false
+  failed_when:
+    - __disk_linux_absent_active_result['rc'] not in [0, 1]
+  register: __disk_linux_absent_active_result
+
+
+- name: "Absent | Determine the /etc/fstab source of the declared mountpoint"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_findmnt_exec_path }}"
+      - "--fstab"
+      - "--evaluate"
+      - "--noheadings"
+      - "--output"
+      - "SOURCE"
+      - "--mountpoint"
+      - "{{ __disk_linux_entry['path'] }}"
+  changed_when:
+    - false
+  failed_when:
+    - __disk_linux_absent_fstab_result['rc'] not in [0, 1]
+  register: __disk_linux_absent_fstab_result
+
+
+- name: "Absent | Resolve the ancestors of every source"
+  ansible.builtin.command:
+    argv:
+      - "{{ __disk_linux_lsblk_exec_path }}"
+      - "--noheadings"
+      - "--inverse"
+      - "--output"
+      - "KNAME"
+      - "{{ __disk_linux_absent_source }}"
+  changed_when:
+    - false
+  # sources without an existing block device are exactly the stale remains
+  # this cleanup exists for
+  failed_when:
+    - false
+  loop: >-
+    {{
+      ((__disk_linux_absent_active_result['stdout_lines'] | ansible.builtin.default([]))
+       + (__disk_linux_absent_fstab_result['stdout_lines'] | ansible.builtin.default([])))
+      | ansible.builtin.map('ansible.builtin.trim')
+      | ansible.builtin.reject('ansible.builtin.equalto', '')
+      | ansible.builtin.unique
+      | ansible.builtin.list
+    }}
+  loop_control:
+    loop_var: "__disk_linux_absent_source"
+  register: __disk_linux_absent_ancestry_result
+
+
+- name: "Absent | Check every source belongs to the declared device"
+  ansible.builtin.assert:
+    that:
+      - (__disk_linux_absent_foreign | ansible.builtin.length) == 0
+    fail_msg: >-
+      Refusing the absent cleanup of {{ __disk_linux_entry['path'] }}: the
+      active mount or its /etc/fstab entry is backed by
+      {{ __disk_linux_absent_foreign | ansible.builtin.join(', ') }}, which
+      does not belong to the declared device
+      {{ __disk_linux_entry['device'] }}. Update or remove the stale
+      declaration; the role never touches the resources of other devices.
+    quiet: true
+  vars:
+    __disk_linux_absent_kname: "{{ __disk_linux_absent_kname_result['stdout'] | ansible.builtin.default('') | ansible.builtin.trim }}"
+    __disk_linux_absent_foreign: >-
+      {%- set __ns = namespace(foreign=[]) -%}
+      {%- for __r in (__disk_linux_absent_ancestry_result['results'] | ansible.builtin.default([])) -%}
+      {%-   if (__r['rc'] | ansible.builtin.default(1)) == 0 -%}
+      {%-     set __ancestors = (__r['stdout_lines'] | ansible.builtin.default([]))
+                | ansible.builtin.map('ansible.builtin.trim') | ansible.builtin.list -%}
+      {%-     if ((__disk_linux_absent_kname | ansible.builtin.length) == 0)
+                or (__disk_linux_absent_kname not in __ancestors) -%}
+      {%-       set _ = __ns.foreign.append(__r['__disk_linux_absent_source']) -%}
+      {%-     endif -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ __ns.foreign }}
+
+
 - name: "Absent | Unmount the filesystem"
   ansible.posix.mount:
     path: "{{ __disk_linux_entry['path'] }}"

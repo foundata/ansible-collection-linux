@@ -748,6 +748,175 @@
     - true
 
 
+## Absent-state device identity
+#
+# Regression: absent entries unmounted and de-fstab'ed purely by target
+# path. After a disk replacement the path is supplied by a different device,
+# and a stale absent declaration for the OLD device tore down the
+# replacement. A blank second loop device plays the stale old disk here: the
+# absent cleanup must refuse it and leave the replacement untouched.
+
+- name: "Molecule | Verify | disk | Absent identity: create the replacement and the stale disk"
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      mkdir -p /var/tmp/molecule-loops
+      truncate -s 512M /var/tmp/molecule-loops/replacement.img
+      truncate -s 512M /var/tmp/molecule-loops/staledisk.img
+      RL=$(losetup --find --show /var/tmp/molecule-loops/replacement.img)
+      SL=$(losetup --find --show /var/tmp/molecule-loops/staledisk.img)
+      # loop numbers are reused across the fixtures in this file: a
+      # re-attached device still carries the kernel partition entries of the
+      # previous image, which makes the blank disk look partitioned
+      for l in "$RL" "$SL"; do
+        wipefs --all "$l" >/dev/null
+        partx --delete "$l" >/dev/null 2>&1 || true
+        blockdev --flushbufs "$l"
+        blockdev --rereadpt "$l" >/dev/null 2>&1 || true
+      done
+      echo "$RL"
+      echo "$SL"
+  args:
+    executable: "/bin/bash"
+  register: __testing_disk_absentid_setup
+  changed_when:
+    - true
+
+
+- name: "Molecule | Verify | disk | Absent identity: pick up the loop device names"
+  ansible.builtin.set_fact:
+    __testing_disk_absentid_replacement: "{{ __testing_disk_absentid_setup['stdout_lines'][-2] }}"
+    __testing_disk_absentid_stale: "{{ __testing_disk_absentid_setup['stdout_lines'][-1] }}"
+
+
+- name: "Molecule | Verify | disk | Absent identity: query the fixture devices"
+  ansible.builtin.command:
+    argv: ["lsblk", "--noheadings", "--output", "NAME,TYPE,PTTYPE,FSTYPE", "{{ item }}"]
+  register: __testing_disk_absentid_blank
+  changed_when:
+    - false
+  loop:
+    - "{{ __testing_disk_absentid_replacement }}"
+    - "{{ __testing_disk_absentid_stale }}"
+
+
+- name: "Molecule | Verify | disk | Absent identity: assert the fixture devices are blank"
+  ansible.builtin.assert:
+    that:
+      - (item['stdout_lines'] | ansible.builtin.length) == 1
+    fail_msg: >-
+      The fixture device {{ item['item'] }} is not blank
+      ({{ item['stdout_lines'] }}); a reused loop number still carries the
+      kernel partition entries of an earlier fixture.
+    success_msg: "The fixture devices are blank."
+  loop: "{{ __testing_disk_absentid_blank['results'] }}"
+  loop_control:
+    label: "{{ item['item'] }}"
+
+
+- name: "Molecule | Verify | disk | Absent identity: provision the replacement at the mountpoint"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  vars:
+    disk_linux_devices:
+      - device: "{{ __testing_disk_absentid_replacement }}"
+        mount:
+          path: "/srv/molecule-absentid-test"
+
+
+- name: "Molecule | Verify | disk | Absent identity: declare the stale disk absent (must fail)"
+  block:
+
+    - name: "Molecule | Verify | disk | Absent identity: run the role with the stale absent declaration"
+      ansible.builtin.include_role:
+        name: "foundata.linux.disk"
+      vars:
+        disk_linux_devices:
+          - device: "{{ __testing_disk_absentid_stale }}"
+            state: "absent"
+            mount:
+              path: "/srv/molecule-absentid-test"
+
+    - name: "Molecule | Verify | disk | Absent identity: fail because the stale declaration was accepted"
+      ansible.builtin.fail:
+        msg: "An absent declaration for a different device tore down the replacement's mount."
+
+  rescue:
+
+    - name: "Molecule | Verify | disk | Absent identity: assert the failure is the identity refusal"
+      ansible.builtin.assert:
+        that:
+          - >-
+            'Refusing the absent cleanup' in
+            (ansible_failed_result['msg'] | ansible.builtin.default(''))
+        fail_msg: >-
+          The role failed for an unexpected reason:
+          {{ ansible_failed_result['msg'] | ansible.builtin.default('(no message)') }}
+        success_msg: "The stale absent declaration was refused by the device identity check."
+
+
+- name: "Molecule | Verify | disk | Absent identity: query the replacement mount and fstab entry"
+  ansible.builtin.command:
+    argv: "{{ item }}"
+  register: __testing_disk_absentid_state
+  changed_when:
+    - false
+  loop:
+    - ["findmnt", "--noheadings", "--output", "SOURCE", "--mountpoint", "/srv/molecule-absentid-test"]
+    - ["findmnt", "--fstab", "--noheadings", "--output", "SOURCE", "--mountpoint", "/srv/molecule-absentid-test"]
+
+
+- name: "Molecule | Verify | disk | Absent identity: assert the replacement survived untouched"
+  ansible.builtin.assert:
+    that:
+      - __testing_disk_absentid_replacement in __testing_disk_absentid_state['results'][0]['stdout']
+      - (__testing_disk_absentid_state['results'][1]['stdout'] | ansible.builtin.length) > 0
+    fail_msg: >-
+      The refused absent declaration still touched the replacement (mount:
+      {{ __testing_disk_absentid_state['results'][0]['stdout'] }}, fstab:
+      {{ __testing_disk_absentid_state['results'][1]['stdout'] }}).
+    success_msg: "The replacement's mount and /etc/fstab entry survived untouched."
+
+
+# The correctly-addressed cleanup must still work, detached remains
+# included: the replacement is declared absent by ITS device.
+- name: "Molecule | Verify | disk | Absent identity: tear the replacement down by its own device"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  vars:
+    disk_linux_devices:
+      - device: "{{ __testing_disk_absentid_replacement }}"
+        state: "absent"
+        mount:
+          path: "/srv/molecule-absentid-test"
+
+
+- name: "Molecule | Verify | disk | Absent identity: assert the correctly-addressed cleanup worked"
+  ansible.builtin.command:
+    argv: ["findmnt", "--noheadings", "--output", "SOURCE", "--mountpoint", "/srv/molecule-absentid-test"]
+  register: __testing_disk_absentid_gone
+  changed_when:
+    - false
+  failed_when:
+    - __testing_disk_absentid_gone['rc'] != 1
+
+
+- name: "Molecule | Verify | disk | Absent identity: release the fixtures"
+  ansible.builtin.shell:
+    cmd: |
+      set -u
+      for l in {{ __testing_disk_absentid_replacement }} {{ __testing_disk_absentid_stale }}; do
+        partx --delete "$l" >/dev/null 2>&1 || true
+        losetup -d "$l" || true
+      done
+      rm -rf /var/tmp/molecule-loops
+      rm -rf /srv/molecule-absentid-test
+  args:
+    executable: "/bin/bash"
+  changed_when:
+    - true
+
+
 ## Check mode on the deployed state
 #
 # A --check run must succeed as a dry run (regression: the read-only
