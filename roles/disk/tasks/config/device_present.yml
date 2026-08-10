@@ -333,6 +333,13 @@
               register: __disk_linux_apply_lostfound_result
 
 
+            # The in-progress marker proves the staged filesystem carries
+            # nothing but the remains of an interrupted copy of this role:
+            # with the marker present, ALL staged content (a partial copy,
+            # orphans a fsck recovered into lost+found) is cleared below and
+            # the copy starts over. Without the marker, only an empty
+            # filesystem (modulo an empty mkfs-created lost+found) is
+            # accepted.
             - name: "Config | Device | Fail when the destination already carries other data (copy never merges)"
               ansible.builtin.fail:
                 msg: >-
@@ -342,6 +349,12 @@
                   migration attempt of this role or created by mkfs. Copying
                   would merge onto existing data, which is never done.
               vars:
+                __disk_linux_apply_marker_present: >-
+                  {{
+                    (__disk_linux_migration_mountpoint ~ '/' ~ __disk_linux_migration_marker) in
+                    (__disk_linux_apply_stagefind_result['files'] | ansible.builtin.default([])
+                     | ansible.builtin.map(attribute='path') | ansible.builtin.list)
+                  }}
                 __disk_linux_apply_other_entries: >-
                   {{
                     __disk_linux_apply_stagefind_result['files'] | ansible.builtin.default([])
@@ -354,11 +367,13 @@
                     | ansible.builtin.list
                   }}
               when:
+                - not (__disk_linux_apply_marker_present | ansible.builtin.bool)
                 - (__disk_linux_apply_other_entries | ansible.builtin.length) > 0
 
 
-            # lost+found is kept: e2fsck expects it and it was just proven
-            # empty (or the fail task above already aborted the migration)
+            # lost+found itself is kept: e2fsck expects it. Its content is
+            # cleared when the marker proves it stems from an interrupted
+            # copy (the fail task above already aborted otherwise).
             - name: "Config | Device | Clear the remains of an earlier aborted migration"
               ansible.builtin.file:
                 path: "{{ item['path'] }}"
@@ -367,6 +382,24 @@
                 - (__disk_linux_apply_stagefind_result['matched'] | ansible.builtin.default(0)) > 0
                 - item['path'] != (__disk_linux_migration_mountpoint ~ '/lost+found')
               loop: "{{ __disk_linux_apply_stagefind_result['files'] | ansible.builtin.default([]) }}"
+              loop_control:
+                label: "{{ item['path'] }}"
+
+
+            - name: "Config | Device | Clear the recovered orphans of an earlier aborted migration"
+              ansible.builtin.file:
+                path: "{{ item['path'] }}"
+                state: "absent"
+              vars:
+                __disk_linux_apply_marker_present: >-
+                  {{
+                    (__disk_linux_migration_mountpoint ~ '/' ~ __disk_linux_migration_marker) in
+                    (__disk_linux_apply_stagefind_result['files'] | ansible.builtin.default([])
+                     | ansible.builtin.map(attribute='path') | ansible.builtin.list)
+                  }}
+              when:
+                - __disk_linux_apply_marker_present | ansible.builtin.bool
+              loop: "{{ __disk_linux_apply_lostfound_result['files'] | ansible.builtin.default([]) }}"
               loop_control:
                 label: "{{ item['path'] }}"
 

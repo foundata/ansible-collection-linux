@@ -606,6 +606,148 @@
     - true
 
 
+## Interrupted copy migration recovery
+#
+# Regression: the in-progress marker was placed before the copy, but a
+# partial copy next to the marker was classified as foreign data on the
+# retry and rejected, so an interrupted migration could never recover as
+# documented. The interrupted state is fabricated here: a role-created
+# filesystem carrying the marker and a partial file, unmounted again, with
+# the source directory still populated.
+
+- name: "Molecule | Verify | disk | Interrupted copy: create the loop device"
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      mkdir -p /var/tmp/molecule-loops
+      truncate -s 512M /var/tmp/molecule-loops/interrupt.img
+      IL=$(losetup --find --show /var/tmp/molecule-loops/interrupt.img)
+      wipefs --all "$IL" >/dev/null
+      partx --delete "$IL" >/dev/null 2>&1 || true
+      blockdev --flushbufs "$IL"
+      blockdev --rereadpt "$IL" >/dev/null 2>&1 || true
+      echo "$IL"
+  args:
+    executable: "/bin/bash"
+  register: __testing_disk_interrupt_setup
+  changed_when:
+    - true
+
+
+- name: "Molecule | Verify | disk | Interrupted copy: pick up the loop device name"
+  ansible.builtin.set_fact:
+    __testing_disk_interrupt_loop: "{{ __testing_disk_interrupt_setup['stdout_lines'][-1] }}"
+
+
+- name: "Molecule | Verify | disk | Interrupted copy: provision the filesystem (empty source)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  vars:
+    disk_linux_devices:
+      - device: "{{ __testing_disk_interrupt_loop }}"
+        mount:
+          path: "/srv/molecule-interrupt-test"
+
+
+- name: "Molecule | Verify | disk | Interrupted copy: fabricate the remains of an aborted copy"
+  ansible.builtin.copy:
+    dest: "{{ item['dest'] }}"
+    content: "{{ item['content'] }}"
+    owner: "root"
+    group: "root"
+    mode: "u=rw,g=,o="
+  loop:
+    - dest: "/srv/molecule-interrupt-test/.ansible-disk-migration-in-progress"
+      content: ""
+    - dest: "/srv/molecule-interrupt-test/partial.txt"
+      content: "partial copy remains\n"
+  loop_control:
+    label: "{{ item['dest'] }}"
+
+
+- name: "Molecule | Verify | disk | Interrupted copy: unmount again (declared absent by its own device)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  vars:
+    disk_linux_devices:
+      - device: "{{ __testing_disk_interrupt_loop }}"
+        state: "absent"
+        mount:
+          path: "/srv/molecule-interrupt-test"
+
+
+- name: "Molecule | Verify | disk | Interrupted copy: seed the source directory"
+  ansible.builtin.copy:
+    dest: "/srv/molecule-interrupt-test/seeded.txt"
+    content: "real source content\n"
+    owner: "root"
+    group: "root"
+    mode: "u=rw,g=r,o=r"
+
+
+- name: "Molecule | Verify | disk | Interrupted copy: retry the migration"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  vars:
+    disk_linux_devices:
+      - device: "{{ __testing_disk_interrupt_loop }}"
+        mount:
+          path: "/srv/molecule-interrupt-test"
+          on_nonempty: "copy"
+
+
+- name: "Molecule | Verify | disk | Interrupted copy: get information about the outcome"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: __testing_disk_interrupt_files
+  loop:
+    - "/srv/molecule-interrupt-test/seeded.txt"
+    - "/srv/molecule-interrupt-test/partial.txt"
+    - "/srv/molecule-interrupt-test/.ansible-disk-migration-in-progress"
+
+
+- name: "Molecule | Verify | disk | Interrupted copy: assert the retry recovered"
+  ansible.builtin.assert:
+    that:
+      # the real source content was migrated
+      - __testing_disk_interrupt_files['results'][0]['stat']['exists'] | ansible.builtin.bool
+      # the partial copy and the marker were cleared, not merged onto
+      - not (__testing_disk_interrupt_files['results'][1]['stat']['exists'] | ansible.builtin.bool)
+      - not (__testing_disk_interrupt_files['results'][2]['stat']['exists'] | ansible.builtin.bool)
+    fail_msg: >-
+      The retry after an interrupted copy did not recover as documented
+      (files: {{ __testing_disk_interrupt_files['results']
+                 | ansible.builtin.map(attribute='stat.exists') | ansible.builtin.list }}).
+    success_msg: >-
+      The marker-owned remains were cleared and the migration restarted from
+      scratch.
+
+
+- name: "Molecule | Verify | disk | Interrupted copy: tear the fixture down again"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  vars:
+    disk_linux_devices:
+      - device: "{{ __testing_disk_interrupt_loop }}"
+        state: "absent"
+        mount:
+          path: "/srv/molecule-interrupt-test"
+
+
+- name: "Molecule | Verify | disk | Interrupted copy: release the fixtures"
+  ansible.builtin.shell:
+    cmd: |
+      set -u
+      partx --delete {{ __testing_disk_interrupt_loop }} >/dev/null 2>&1 || true
+      losetup -d {{ __testing_disk_interrupt_loop }} || true
+      rm -rf /var/tmp/molecule-loops
+      rm -rf /srv/molecule-interrupt-test
+  args:
+    executable: "/bin/bash"
+  changed_when:
+    - true
+
+
 ## Check mode on the deployed state
 #
 # A --check run must succeed as a dry run (regression: the read-only
