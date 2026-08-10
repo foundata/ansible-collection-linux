@@ -230,3 +230,290 @@
   ansible.builtin.file:
     path: "/etc/sysctl.d/zz-testing-modules.conf"
     state: "absent"
+
+
+## Boot-time module registration (fixed role-owned file)
+#
+# Regression 1: the role made the profile modules persistent but never
+# removed that registration again. Regression 2: the registration followed
+# the configurable sysctl drop-in filename, so a filename change orphaned
+# the old modules-load file, which kept loading modules at boot forever.
+# The registration now lives in the fixed, marker-owned
+# /etc/modules-load.d/zz-managed.conf, regardless of the sysctl filename.
+# Only meaningful where the kernel can actually load the module.
+
+- name: "Molecule | Verify | sysctl modules | Registration checks (br_netfilter loadable)"
+  when:
+    - __testing_sysctl_brnf_available | ansible.builtin.bool
+  block:
+
+    # Historical fixtures: files the RELEASED role versions created through
+    # the modprobe persistency (one per module, no marker). Their ownership
+    # is unknowable, so the role must never touch them.
+    - name: "Molecule | Verify | sysctl modules | Registration: plant historical per-module files"
+      ansible.builtin.copy:
+        dest: "/etc/modules-load.d/{{ item }}.conf"
+        content: "{{ item }}\n"
+        owner: "root"
+        group: "root"
+        mode: "u=rw,g=r,o=r"
+      loop:
+        - "br_netfilter"
+        - "nf_conntrack"
+
+    - name: "Molecule | Verify | sysctl modules | Registration: apply a module-gated profile (first filename)"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+      vars:
+        sysctl_linux_profile: ["container"]
+        sysctl_linux_parameters: {}
+        sysctl_linux_config_dropin_file_name: "zz-first.conf"
+
+    - name: "Molecule | Verify | sysctl modules | Registration: read the fixed modules-load file"
+      ansible.builtin.slurp:
+        src: "/etc/modules-load.d/zz-managed.conf"
+      register: __testing_sysctl_modreg_slurp
+
+    - name: "Molecule | Verify | sysctl modules | Registration: get information about filename-derived paths"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: __testing_sysctl_modreg_paths
+      loop:
+        - "/etc/sysctl.d/zz-first.conf"
+        - "/etc/modules-load.d/zz-first.conf"
+
+    - name: "Molecule | Verify | sysctl modules | Registration: assert the fixed file carries marker and module"
+      ansible.builtin.assert:
+        that:
+          - >-
+            (__testing_sysctl_modreg_content.splitlines() | ansible.builtin.first)
+            == '# Managed by Ansible (foundata.linux.sysctl)'
+          - "'br_netfilter' in __testing_sysctl_modreg_content.splitlines()"
+          # the sysctl drop-in uses the configurable name, the registration does NOT
+          - __testing_sysctl_modreg_paths['results'][0]['stat']['exists'] | ansible.builtin.bool
+          - not (__testing_sysctl_modreg_paths['results'][1]['stat']['exists'] | ansible.builtin.bool)
+        fail_msg: >-
+          The module registration does not use the fixed marker-owned file
+          ({{ __testing_sysctl_modreg_content }};
+          {{ __testing_sysctl_modreg_paths['results'] | ansible.builtin.map(attribute='stat.exists') | ansible.builtin.list }}).
+        success_msg: "The registration is marker-owned and independent of the sysctl filename."
+      vars:
+        __testing_sysctl_modreg_content: "{{ __testing_sysctl_modreg_slurp['content'] | ansible.builtin.b64decode }}"
+
+    - name: "Molecule | Verify | sysctl modules | Registration: apply the profile again with a changed filename"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+      vars:
+        sysctl_linux_profile: ["container"]
+        sysctl_linux_parameters: {}
+        sysctl_linux_config_dropin_file_name: "zz-second.conf"
+
+    - name: "Molecule | Verify | sysctl modules | Registration: get information after the filename change"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: __testing_sysctl_modreg_renamed
+      loop:
+        - "/etc/modules-load.d/zz-managed.conf"
+        - "/etc/modules-load.d/zz-first.conf"
+        - "/etc/modules-load.d/zz-second.conf"
+
+    - name: "Molecule | Verify | sysctl modules | Registration: assert the filename change orphans nothing"
+      ansible.builtin.assert:
+        that:
+          - __testing_sysctl_modreg_renamed['results'][0]['stat']['exists'] | ansible.builtin.bool
+          - not (__testing_sysctl_modreg_renamed['results'][1]['stat']['exists'] | ansible.builtin.bool)
+          - not (__testing_sysctl_modreg_renamed['results'][2]['stat']['exists'] | ansible.builtin.bool)
+        fail_msg: "A sysctl filename change created or left a filename-derived modules-load file."
+        success_msg: "The registration survives a sysctl filename change at the fixed path only."
+
+    - name: "Molecule | Verify | sysctl modules | Registration: drop the profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+      vars:
+        sysctl_linux_profile: []
+        sysctl_linux_parameters: {}
+        sysctl_linux_config_dropin_file_name: "zz-second.conf"
+
+    - name: "Molecule | Verify | sysctl modules | Registration: get information after dropping the profile"
+      ansible.builtin.stat:
+        path: "/etc/modules-load.d/zz-managed.conf"
+      register: __testing_sysctl_modreg_dropped
+
+    - name: "Molecule | Verify | sysctl modules | Registration: query the running module"
+      ansible.builtin.command:
+        argv: ["lsmod"]
+      register: __testing_sysctl_modreg_lsmod
+      changed_when:
+        - false
+
+    - name: "Molecule | Verify | sysctl modules | Registration: assert the registration went, the module stayed"
+      ansible.builtin.assert:
+        that:
+          - not (__testing_sysctl_modreg_dropped['stat']['exists'] | ansible.builtin.bool)
+          - "'br_netfilter' in __testing_sysctl_modreg_lsmod['stdout']"
+        fail_msg: >-
+          Dropping the profile did not remove the fixed registration, or it
+          unloaded the running module.
+        success_msg: "Dropping the profiles removes the boot registration and leaves the running module loaded."
+
+    # state absent must remove the fixed file regardless of the current
+    # filename or profile list
+    - name: "Molecule | Verify | sysctl modules | Registration: re-apply the profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+      vars:
+        sysctl_linux_profile: ["container"]
+        sysctl_linux_parameters: {}
+        sysctl_linux_config_dropin_file_name: "zz-second.conf"
+
+    - name: "Molecule | Verify | sysctl modules | Registration: run state absent with a different filename and no profile"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+      vars:
+        sysctl_linux_state: "absent"
+        sysctl_linux_profile: []
+        sysctl_linux_parameters: {}
+        sysctl_linux_config_dropin_file_name: "zz-third.conf"
+
+    - name: "Molecule | Verify | sysctl modules | Registration: get information after state absent"
+      ansible.builtin.stat:
+        path: "/etc/modules-load.d/zz-managed.conf"
+      register: __testing_sysctl_modreg_absent
+
+    - name: "Molecule | Verify | sysctl modules | Registration: assert state absent removed the fixed file"
+      ansible.builtin.assert:
+        that:
+          - not (__testing_sysctl_modreg_absent['stat']['exists'] | ansible.builtin.bool)
+        fail_msg: "sysctl_linux_state absent left the fixed modules-load registration behind."
+        success_msg: "state absent removes the fixed registration regardless of filename and profile list."
+
+    ## Foreign file at the fixed path
+
+    - name: "Molecule | Verify | sysctl modules | Registration: plant an unmarked file at the fixed path"
+      ansible.builtin.copy:
+        dest: "/etc/modules-load.d/zz-managed.conf"
+        content: "some_admin_module\n"
+        owner: "root"
+        group: "root"
+        mode: "u=rw,g=r,o=r"
+
+    - name: "Molecule | Verify | sysctl modules | Registration: apply the profile over the foreign file (must fail)"
+      block:
+
+        - name: "Molecule | Verify | sysctl modules | Registration: include the role over the foreign file"
+          ansible.builtin.include_role:
+            name: "foundata.linux.sysctl"
+          vars:
+            sysctl_linux_profile: ["container"]
+            sysctl_linux_parameters: {}
+            sysctl_linux_config_dropin_file_name: "zz-second.conf"
+
+        - name: "Molecule | Verify | sysctl modules | Registration: fail because the foreign file was accepted"
+          ansible.builtin.fail:
+            msg: "The role overwrote an unmarked file at the fixed modules-load path."
+
+      rescue:
+
+        - name: "Molecule | Verify | sysctl modules | Registration: assert the collision was refused"
+          ansible.builtin.assert:
+            that:
+              - >-
+                'does not carry this role' in
+                (ansible_failed_result['msg'] | ansible.builtin.default(''))
+            fail_msg: >-
+              The run failed, but not in the ownership check:
+              {{ ansible_failed_result['msg'] | ansible.builtin.default('(no message)') }}
+            success_msg: "An unmarked file at the fixed path is refused, not overwritten."
+
+    - name: "Molecule | Verify | sysctl modules | Registration: repeat the collision in check mode (must fail)"
+      block:
+
+        - name: "Molecule | Verify | sysctl modules | Registration: include the role in check mode over the foreign file"
+          ansible.builtin.include_role:
+            name: "foundata.linux.sysctl"
+            apply:
+              check_mode: true
+          vars:
+            sysctl_linux_profile: ["container"]
+            sysctl_linux_parameters: {}
+            sysctl_linux_config_dropin_file_name: "zz-second.conf"
+
+        - name: "Molecule | Verify | sysctl modules | Registration: fail because check mode accepted the foreign file"
+          ansible.builtin.fail:
+            msg: "Check mode did not report the ownership collision."
+
+      rescue:
+
+        - name: "Molecule | Verify | sysctl modules | Registration: assert the check mode collision"
+          ansible.builtin.assert:
+            that:
+              - >-
+                'does not carry this role' in
+                (ansible_failed_result['msg'] | ansible.builtin.default(''))
+            fail_msg: >-
+              The check mode run failed, but not in the ownership check:
+              {{ ansible_failed_result['msg'] | ansible.builtin.default('(no message)') }}
+            success_msg: "Check mode reports the ownership collision."
+
+    - name: "Molecule | Verify | sysctl modules | Registration: run state absent over the foreign file"
+      ansible.builtin.include_role:
+        name: "foundata.linux.sysctl"
+      vars:
+        sysctl_linux_state: "absent"
+        sysctl_linux_profile: []
+        sysctl_linux_parameters: {}
+
+    - name: "Molecule | Verify | sysctl modules | Registration: read the foreign file after the collision runs"
+      ansible.builtin.slurp:
+        src: "/etc/modules-load.d/zz-managed.conf"
+      register: __testing_sysctl_modreg_foreign
+
+    - name: "Molecule | Verify | sysctl modules | Registration: assert the foreign file survived unchanged"
+      ansible.builtin.assert:
+        that:
+          - >-
+            (__testing_sysctl_modreg_foreign['content'] | ansible.builtin.b64decode
+             | ansible.builtin.trim) == 'some_admin_module'
+        fail_msg: "A collision run modified or removed the unmarked file at the fixed path."
+        success_msg: "Present, check mode and absent runs all preserve an unmarked file at the fixed path."
+
+    - name: "Molecule | Verify | sysctl modules | Registration: read the historical per-module files"
+      ansible.builtin.slurp:
+        src: "/etc/modules-load.d/{{ item }}.conf"
+      register: __testing_sysctl_modreg_legacy
+      loop:
+        - "br_netfilter"
+        - "nf_conntrack"
+
+    - name: "Molecule | Verify | sysctl modules | Registration: assert the historical files stayed untouched"
+      ansible.builtin.assert:
+        that:
+          - (item['content'] | ansible.builtin.b64decode | ansible.builtin.trim) == item['item']
+        fail_msg: "The role touched the historical per-module file {{ item['item'] }}.conf (ownership is unknowable)."
+        success_msg: "Historical per-module files are never touched."
+      loop: "{{ __testing_sysctl_modreg_legacy['results'] }}"
+      loop_control:
+        label: "{{ item['item'] }}"
+
+  always:
+
+    - name: "Molecule | Verify | sysctl modules | Registration: remove the fixtures again"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: "absent"
+      loop:
+        - "/etc/modules-load.d/zz-managed.conf"
+        - "/etc/modules-load.d/br_netfilter.conf"
+        - "/etc/modules-load.d/nf_conntrack.conf"
+        - "/etc/sysctl.d/zz-first.conf"
+        - "/etc/sysctl.d/zz-second.conf"
+        - "/etc/sysctl.d/zz-third.conf"
+
+
+- name: "Molecule | Verify | sysctl modules | Registration: report a skipped check"
+  ansible.builtin.debug:
+    msg: >-
+      The running kernel cannot load br_netfilter here, so the boot
+      registration reconciliation cannot be observed on this platform.
+  when:
+    - not (__testing_sysctl_brnf_available | ansible.builtin.bool)

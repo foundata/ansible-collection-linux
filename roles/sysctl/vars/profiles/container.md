@@ -7,7 +7,7 @@ This profile targets container host function; stack others for security hardenin
 
 ## Kernel modules
 
-The profile depends on two kernel modules, loaded best-effort (persistently, via `community.general.modprobe`) when it is selected:
+The profile depends on two kernel modules, loaded best-effort when it is selected (and registered for boot in the role-owned `/etc/modules-load.d/zz-managed.conf`; the registration is removed again when the profile is dropped):
 
 - `nf_conntrack` provides the `net.netfilter.nf_conntrack_*` keys.
 - `br_netfilter` provides the `net.bridge.bridge-nf-call-*` keys.

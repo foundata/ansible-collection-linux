@@ -196,8 +196,17 @@ Profiles are applied in the given order and, for a parameter set by more than
 one profile, the later profile wins. The required kernel modules (if any) of
 all selected profiles are loaded automatically - best effort by default:
 when a module cannot be loaded, the parameters it gates are skipped with
-a notice (see `sysctl_linux_modules_required`). An empty list (the default)
-applies no profile; and only explicit `sysctl_linux_parameters` are set then.
+a notice (see `sysctl_linux_modules_required`). Modules that did load are
+also registered for boot in the fixed, role-owned file
+`/etc/modules-load.d/zz-managed.conf` (recognizable by the ownership
+marker in its first line; a foreign file at that path is never
+overwritten or removed). Dropping the profiles (or
+`sysctl_linux_state: "absent"`) removes that registration again, so a
+reboot no longer loads the modules. Modules already loaded are never
+unloaded, because other software may depend on them by the time the
+profile changes. An empty list (the
+default) applies no profile; and only explicit `sysctl_linux_parameters`
+are set then.
 
 A single profile is a one-element list, e.g. `["web"]`. Profiles can be
 stacked, e.g. `["hardening-default", "web", "hardening-extra"]` to add a workload

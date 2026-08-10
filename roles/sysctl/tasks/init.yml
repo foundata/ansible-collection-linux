@@ -240,7 +240,10 @@
   community.general.modprobe:
     name: "{{ item['key'] }}"
     state: "present"
-    persistent: "present"
+    # Boot-time loading is handled by the config phase through a file the role
+    # owns; the module's own persistency writes one file per module and its
+    # removal mode edits every file in the directory, including foreign ones.
+    persistent: "disabled"
   when:
     - sysctl_linux_state == 'present'
     - (__sysctl_linux_profile_modules | ansible.builtin.length) > 0

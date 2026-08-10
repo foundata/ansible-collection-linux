@@ -240,3 +240,85 @@
     - __sysctl_linux_config_file_stat['stat']['exists'] | ansible.builtin.default(false)
   notify:
     - "sysctl_linux: reload"
+
+
+### Boot-time loading of the kernel modules the selected profiles depend on
+#
+# init.yml loads them for the running system; without a persistent entry the
+# module-gated parameters would silently disappear after a reboot. The role
+# owns exactly one file with a fixed private name (see vars/main.yml) and
+# rewrites it from the currently required modules, so changing or dropping a
+# profile also reverts the boot behavior. Runtime modules are never unloaded:
+# something else may rely on them by now, and unloading can disrupt a running
+# system.
+
+- name: "Config | Default | Read the managed modules-load drop-in file (if any)"
+  ansible.builtin.slurp:
+    src: "{{ __sysctl_linux_modules_load_dropin_file_path }}"
+  register: __sysctl_linux_modules_dropin_slurp
+  failed_when:
+    - __sysctl_linux_modules_dropin_slurp['msg'] is ansible.builtin.defined
+    - "'file not found' not in (__sysctl_linux_modules_dropin_slurp['msg'] | ansible.builtin.lower)"
+
+
+- name: "Config | Default | Determine the modules to load at boot and the ownership of the drop-in file"
+  ansible.builtin.set_fact:
+    # only modules that actually loaded: persisting one the kernel does not
+    # have (container, missing kernel-modules-extra) would promise something
+    # this host cannot deliver
+    __sysctl_linux_modules_persist: >-
+      {{
+        (__sysctl_linux_profile_modules | ansible.builtin.default({}, true) | ansible.builtin.list)
+        | ansible.builtin.reject('ansible.builtin.in', __sysctl_linux_modules_unavailable | ansible.builtin.default([]))
+        | ansible.builtin.sort
+        | ansible.builtin.list
+      }}
+    __sysctl_linux_modules_dropin_exists: >-
+      {{ __sysctl_linux_modules_dropin_slurp['content'] is ansible.builtin.defined }}
+    # ownership is the exact marker in the first line; anything else at the
+    # fixed path is foreign
+    __sysctl_linux_modules_dropin_owned: >-
+      {{
+        ((__sysctl_linux_modules_dropin_slurp['content'] | ansible.builtin.default('') | ansible.builtin.b64decode)
+         .splitlines() | ansible.builtin.first | ansible.builtin.default(''))
+        == __sysctl_linux_modules_load_marker
+      }}
+
+
+# Fails in check mode as well (the probe above runs there), so a collision is
+# reported without modifying anything.
+- name: "Config | Default | Check the modules-load drop-in file is not foreign"
+  ansible.builtin.assert:
+    that:
+      - (not __sysctl_linux_modules_dropin_exists) or __sysctl_linux_modules_dropin_owned
+    fail_msg: >-
+      Refusing to manage {{ __sysctl_linux_modules_load_dropin_file_path }}:
+      the existing file does not carry this role's ownership marker
+      ('{{ __sysctl_linux_modules_load_marker }}' as its first line) and may
+      belong to the administrator or other software. Move it aside or merge
+      its content, then run again.
+    quiet: true
+  when:
+    - (__sysctl_linux_modules_persist | ansible.builtin.length) > 0
+
+
+- name: "Config | Default | Ensure the managed modules-load drop-in file"
+  ansible.builtin.copy:
+    content: "{{ __sysctl_linux_modules_load_marker ~ '\n' ~ (__sysctl_linux_modules_persist | ansible.builtin.join('\n')) ~ '\n' }}"
+    dest: "{{ __sysctl_linux_modules_load_dropin_file_path }}"
+    owner: "{{ __sysctl_linux_config_file_owner }}"
+    group: "{{ __sysctl_linux_config_file_group }}"
+    mode: "{{ __sysctl_linux_config_file_mode }}"
+  when:
+    - (__sysctl_linux_modules_persist | ansible.builtin.length) > 0
+
+
+# A foreign file at the fixed path is left alone here: with no modules to
+# register the role holds no claim on the path.
+- name: "Config | Default | Remove the managed modules-load drop-in file (no modules required)"
+  ansible.builtin.file:
+    path: "{{ __sysctl_linux_modules_load_dropin_file_path }}"
+    state: "absent"
+  when:
+    - (__sysctl_linux_modules_persist | ansible.builtin.length) == 0
+    - __sysctl_linux_modules_dropin_owned | ansible.builtin.bool

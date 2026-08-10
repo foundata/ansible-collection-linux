@@ -145,6 +145,23 @@ __sysctl_linux_config_dropin_file_mode: "{{ __sysctl_linux_config_file_mode }}"
 __sysctl_linux_main_disabled_marker: "#ANSIBLE_DISABLED "
 
 
+# Boot-time loading of the kernel modules a profile depends on. The role owns
+# exactly this ONE file with a FIXED, private name and reconciles it
+# (rewritten when the selected profiles change, removed when no profile needs
+# modules and on uninstall), so a profile change or removal also reverts the
+# boot behavior. Deliberately NOT derived from the configurable
+# sysctl_linux_config_dropin_file_name: a filename change would orphan the
+# previous registration, which would keep loading modules at boot forever.
+# Ownership is proven by the exact marker in the file's first line; a file at
+# this path without the marker is foreign and never overwritten or removed.
+#
+# The persistency of community.general.modprobe is deliberately NOT used: its
+# "absent" mode comments the module out of EVERY file in the directory,
+# including files other software or the administrator owns.
+__sysctl_linux_modules_load_dropin_file_path: "/etc/modules-load.d/zz-managed.conf"
+__sysctl_linux_modules_load_marker: "# Managed by Ansible (foundata.linux.sysctl)"
+
+
 # Executable paths
 __sysctl_linux_sysctl_executable: "/usr/sbin/sysctl"
 

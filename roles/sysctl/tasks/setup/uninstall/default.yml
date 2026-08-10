@@ -23,6 +23,54 @@
     - "sysctl_linux: reload"
 
 
+# Boot-time module loading the role configured has to go as well, otherwise a
+# reboot still loads what a removed profile asked for. The modules stay loaded
+# in the running system on purpose (unloading can disrupt whatever started
+# using them in the meantime). Only the role's own file (proven by the exact
+# ownership marker) is removed; a foreign file at the fixed path is preserved
+# with a notice.
+- name: "Setup | Uninstall | Read the managed modules-load drop-in file (if any)"
+  ansible.builtin.slurp:
+    src: "{{ __sysctl_linux_modules_load_dropin_file_path }}"
+  register: __sysctl_linux_uninstall_modules_slurp
+  failed_when:
+    - __sysctl_linux_uninstall_modules_slurp['msg'] is ansible.builtin.defined
+    - "'file not found' not in (__sysctl_linux_uninstall_modules_slurp['msg'] | ansible.builtin.lower)"
+
+
+- name: "Setup | Uninstall | Determine the ownership of the modules-load drop-in file"
+  ansible.builtin.set_fact:
+    __sysctl_linux_uninstall_modules_exists: >-
+      {{ __sysctl_linux_uninstall_modules_slurp['content'] is ansible.builtin.defined }}
+    __sysctl_linux_uninstall_modules_owned: >-
+      {{
+        ((__sysctl_linux_uninstall_modules_slurp['content'] | ansible.builtin.default('') | ansible.builtin.b64decode)
+         .splitlines() | ansible.builtin.first | ansible.builtin.default(''))
+        == __sysctl_linux_modules_load_marker
+      }}
+
+
+- name: "Setup | Uninstall | Remove the managed modules-load drop-in file"
+  ansible.builtin.file:
+    path: "{{ __sysctl_linux_modules_load_dropin_file_path }}"
+    state: "absent"
+  when:
+    - __sysctl_linux_uninstall_modules_owned | ansible.builtin.bool
+
+
+- name: "Setup | Uninstall | Notice about a foreign file at the managed modules-load path"
+  ansible.builtin.debug:
+    msg: >-
+      {{ __sysctl_linux_modules_load_dropin_file_path }} exists but does not
+      carry this role's ownership marker
+      ('{{ __sysctl_linux_modules_load_marker }}' as its first line); it may
+      belong to the administrator or other software and is preserved. Review
+      and remove it manually if it is obsolete.
+  when:
+    - __sysctl_linux_uninstall_modules_exists | ansible.builtin.bool
+    - not (__sysctl_linux_uninstall_modules_owned | ansible.builtin.bool)
+
+
 - name: "Setup | Uninstall | Check if the main sysctl config file exists"
   ansible.builtin.stat:
     path: "{{ __sysctl_linux_config_file_path }}"
