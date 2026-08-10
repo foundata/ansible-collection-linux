@@ -487,6 +487,125 @@
     - true
 
 
+## Migration staging path safety
+#
+# Regression: the copy migration staged at the fixed path
+# /mnt/.disk-migration; a foreign directory or mount already sitting there
+# was unmounted and recursively deleted by the staging cleanup. The staging
+# area is a unique per-run directory now, so a foreign /mnt/.disk-migration
+# must survive a copy migration completely untouched, mount included.
+
+- name: "Molecule | Verify | disk | Staging: plant a foreign mount at the old fixed staging path"
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      mkdir -p /var/tmp/molecule-loops
+      truncate -s 64M /var/tmp/molecule-loops/foreignstage.img
+      mkfs.ext4 -q /var/tmp/molecule-loops/foreignstage.img
+      FL=$(losetup --find --show /var/tmp/molecule-loops/foreignstage.img)
+      mkdir -p /mnt/.disk-migration
+      mount "$FL" /mnt/.disk-migration
+      echo "foreign canary" > /mnt/.disk-migration/canary.txt
+      truncate -s 512M /var/tmp/molecule-loops/stagemig.img
+      ML=$(losetup --find --show /var/tmp/molecule-loops/stagemig.img)
+      wipefs --all "$ML" >/dev/null
+      partx --delete "$ML" >/dev/null 2>&1 || true
+      blockdev --flushbufs "$ML"
+      blockdev --rereadpt "$ML" >/dev/null 2>&1 || true
+      mkdir -p /srv/molecule-stage-test
+      echo "staged content" > /srv/molecule-stage-test/seeded.txt
+      echo "$FL"
+      echo "$ML"
+  args:
+    executable: "/bin/bash"
+  register: __testing_disk_staging_setup
+  changed_when:
+    - true
+
+
+- name: "Molecule | Verify | disk | Staging: pick up the loop device names"
+  ansible.builtin.set_fact:
+    __testing_disk_staging_foreign_loop: "{{ __testing_disk_staging_setup['stdout_lines'][-2] }}"
+    __testing_disk_staging_migration_loop: "{{ __testing_disk_staging_setup['stdout_lines'][-1] }}"
+
+
+- name: "Molecule | Verify | disk | Staging: run a copy migration"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  vars:
+    disk_linux_devices:
+      - device: "{{ __testing_disk_staging_migration_loop }}"
+        mount:
+          path: "/srv/molecule-stage-test"
+          on_nonempty: "copy"
+
+
+- name: "Molecule | Verify | disk | Staging: query the migrated mount and the foreign mount"
+  ansible.builtin.command:
+    argv: ["findmnt", "--noheadings", "--output", "SOURCE", "{{ item }}"]
+  register: __testing_disk_staging_mounts
+  changed_when:
+    - false
+  loop:
+    - "/srv/molecule-stage-test"
+    - "/mnt/.disk-migration"
+
+
+- name: "Molecule | Verify | disk | Staging: get information about the migrated and the foreign content"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: __testing_disk_staging_files
+  loop:
+    - "/srv/molecule-stage-test/seeded.txt"
+    - "/mnt/.disk-migration/canary.txt"
+
+
+- name: "Molecule | Verify | disk | Staging: assert the migration worked and the foreign mount survived"
+  ansible.builtin.assert:
+    that:
+      # the copy migration itself succeeded onto the new filesystem
+      - __testing_disk_staging_migration_loop in __testing_disk_staging_mounts['results'][0]['stdout']
+      - __testing_disk_staging_files['results'][0]['stat']['exists'] | ansible.builtin.bool
+      # the foreign mount at the old fixed path is still mounted and intact
+      - __testing_disk_staging_foreign_loop in __testing_disk_staging_mounts['results'][1]['stdout']
+      - __testing_disk_staging_files['results'][1]['stat']['exists'] | ansible.builtin.bool
+    fail_msg: >-
+      The copy migration touched a foreign /mnt/.disk-migration (mounts:
+      {{ __testing_disk_staging_mounts['results'] | ansible.builtin.map(attribute='stdout') | ansible.builtin.list }}).
+    success_msg: >-
+      The copy migration used its own staging directory; the foreign mount
+      and its content survived untouched.
+
+
+- name: "Molecule | Verify | disk | Staging: tear the migrated fixture down again"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  vars:
+    disk_linux_devices:
+      - device: "{{ __testing_disk_staging_migration_loop }}"
+        state: "absent"
+        mount:
+          path: "/srv/molecule-stage-test"
+
+
+- name: "Molecule | Verify | disk | Staging: release the fixtures"
+  ansible.builtin.shell:
+    cmd: |
+      set -u
+      umount /mnt/.disk-migration || true
+      rmdir /mnt/.disk-migration 2>/dev/null || true
+      for l in {{ __testing_disk_staging_foreign_loop }} {{ __testing_disk_staging_migration_loop }}; do
+        partx --delete "$l" >/dev/null 2>&1 || true
+        losetup -d "$l" || true
+      done
+      rm -rf /var/tmp/molecule-loops
+      rm -rf /srv/molecule-stage-test
+  args:
+    executable: "/bin/bash"
+  changed_when:
+    - true
+
+
 ## Check mode on the deployed state
 #
 # A --check run must succeed as a dry run (regression: the read-only

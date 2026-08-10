@@ -249,11 +249,13 @@ __disk_linux_pttype_map:
 __disk_linux_grow_slack_bytes: 33554432 # 32 MiB
 
 
-# One-time content migration (mount['on_nonempty'] == 'copy'): staging
-# mountpoint and the in-progress marker that gates retries (a staged
-# filesystem containing only role-created remains of an aborted migration is
-# recognized by the marker, cleared and re-copied; anything else fails).
-__disk_linux_migration_mountpoint: "/mnt/.disk-migration"
+# One-time content migration (mount['on_nonempty'] == 'copy'): the
+# in-progress marker that gates retries (a staged filesystem containing only
+# role-created remains of an aborted migration is recognized by the marker,
+# cleared and re-copied; anything else fails). The staging mountpoint itself
+# is a unique per-run temporary directory (set as a fact at migration time):
+# a fixed path could pre-exist as a foreign directory or mountpoint, and the
+# staging cleanup would delete unrelated data.
 __disk_linux_migration_marker: ".ansible-disk-migration-in-progress"
 
 

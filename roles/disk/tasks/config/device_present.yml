@@ -285,13 +285,20 @@
         - __disk_linux_item['entry']['mount']['on_nonempty'] == 'copy'
       block:
 
+        # A unique directory per invocation on purpose: only a path nothing
+        # else can own makes the unconditional unmount + recursive removal in
+        # the always block safe.
         - name: "Config | Device | Create the temporary migration mountpoint"
-          ansible.builtin.file:
-            path: "{{ __disk_linux_migration_mountpoint }}"
+          ansible.builtin.tempfile:
             state: "directory"
-            owner: "root"
-            group: "root"
-            mode: "u=rwx,g=,o=" # 0700
+            path: "/mnt"
+            prefix: ".disk-migration."
+          register: __disk_linux_apply_migrationdir_result
+
+
+        - name: "Config | Device | Register the migration mountpoint path"
+          ansible.builtin.set_fact:
+            __disk_linux_migration_mountpoint: "{{ __disk_linux_apply_migrationdir_result['path'] }}"
 
 
         - name: "Config | Device | Mount the new filesystem at the migration mountpoint"
