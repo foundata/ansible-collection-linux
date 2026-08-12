@@ -840,6 +840,179 @@
         state: "absent"
 
 
+# The helper's zypper branch: exit code 102 (ZYPPER_EXIT_INF_REBOOT_NEEDED)
+# must schedule the reboot, any other non-zero exit is an error and must NOT.
+# The stub shadows any real zypper via PATH, so the branch is exercised on
+# every platform. Gated on the same baseline: a platform that already wants
+# a reboot for other reasons cannot distinguish the outcomes.
+- name: "Molecule | Verify | auto_update | Zypper stub: run the positive and the negative case"
+  when:
+    - not (__testing_autoupdate_helper_baseline | ansible.builtin.bool)
+  block:
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: create the stub returning 102 (reboot needed)"
+      ansible.builtin.copy:
+        dest: "/var/tmp/molecule-reboot-shim/zypper"
+        content: |
+          #!/bin/sh
+          exit 102
+        owner: "root"
+        group: "root"
+        mode: "u=rwx,g=rx,o=rx"
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: clear the recorded calls"
+      ansible.builtin.copy:
+        dest: "/var/tmp/molecule-reboot-shim/calls.log"
+        content: ""
+        owner: "root"
+        group: "root"
+        mode: "u=rw,g=r,o=r"
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: run the helper against exit code 102"
+      ansible.builtin.command:
+        argv: ["/bin/sh", "{{ __auto_update_linux_reboot_script_path }}"]
+      environment:
+        PATH: "/var/tmp/molecule-reboot-shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      changed_when:
+        - false
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: read the recorded calls (102)"
+      ansible.builtin.slurp:
+        src: "/var/tmp/molecule-reboot-shim/calls.log"
+      register: __testing_autoupdate_zypper_calls_102
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: assert 102 schedules the reboot"
+      ansible.builtin.assert:
+        that:
+          - >-
+            'shutdown' in
+            (__testing_autoupdate_zypper_calls_102['content'] | ansible.builtin.b64decode)
+        fail_msg: >-
+          The helper ignored zypper exit code 102
+          (ZYPPER_EXIT_INF_REBOOT_NEEDED) and did not schedule a reboot.
+        success_msg: "zypper needs-rebooting exit code 102 schedules the reboot."
+
+
+    # The VM is live: the auto-update timer converge enabled (or another
+    # background job) can create a GENUINE reboot condition between two
+    # helper runs, so "no shutdown after an error exit" cannot be asserted
+    # absolutely. A control run with a neutral stub (exit 0) brackets the
+    # error run: only a shutdown that the error exit itself would have
+    # caused counts as a failure.
+    - name: "Molecule | Verify | auto_update | Zypper stub: replace the stub with a neutral one (exit 0, control)"
+      ansible.builtin.copy:
+        dest: "/var/tmp/molecule-reboot-shim/zypper"
+        content: |
+          #!/bin/sh
+          exit 0
+        owner: "root"
+        group: "root"
+        mode: "u=rwx,g=rx,o=rx"
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: clear the recorded calls (control)"
+      ansible.builtin.copy:
+        dest: "/var/tmp/molecule-reboot-shim/calls.log"
+        content: ""
+        owner: "root"
+        group: "root"
+        mode: "u=rw,g=r,o=r"
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: run the helper with the neutral stub"
+      ansible.builtin.command:
+        argv: ["/bin/sh", "{{ __auto_update_linux_reboot_script_path }}"]
+      environment:
+        PATH: "/var/tmp/molecule-reboot-shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      changed_when:
+        - false
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: read the recorded calls (control)"
+      ansible.builtin.slurp:
+        src: "/var/tmp/molecule-reboot-shim/calls.log"
+      register: __testing_autoupdate_zypper_calls_ctl
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: replace the stub with one returning 1 (error)"
+      ansible.builtin.copy:
+        dest: "/var/tmp/molecule-reboot-shim/zypper"
+        content: |
+          #!/bin/sh
+          exit 1
+        owner: "root"
+        group: "root"
+        mode: "u=rwx,g=rx,o=rx"
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: clear the recorded calls again"
+      ansible.builtin.copy:
+        dest: "/var/tmp/molecule-reboot-shim/calls.log"
+        content: ""
+        owner: "root"
+        group: "root"
+        mode: "u=rw,g=r,o=r"
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: run the helper against the error exit"
+      ansible.builtin.command:
+        argv: ["/bin/sh", "{{ __auto_update_linux_reboot_script_path }}"]
+      environment:
+        PATH: "/var/tmp/molecule-reboot-shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      changed_when:
+        - false
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: read the recorded calls (error)"
+      ansible.builtin.slurp:
+        src: "/var/tmp/molecule-reboot-shim/calls.log"
+      register: __testing_autoupdate_zypper_calls_err
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: assert the error exit itself does not schedule a reboot"
+      ansible.builtin.assert:
+        that:
+          # a shutdown only counts when the bracketing control run (neutral
+          # zypper) did NOT schedule one: then the error exit caused it
+          - >-
+            ('shutdown' not in
+             (__testing_autoupdate_zypper_calls_err['content'] | ansible.builtin.b64decode))
+            or
+            ('shutdown' in
+             (__testing_autoupdate_zypper_calls_ctl['content'] | ansible.builtin.b64decode))
+        fail_msg: >-
+          The helper scheduled a reboot on a zypper ERROR exit although the
+          neutral control run did not; only exit code 102 means "reboot
+          required". Control calls:
+          {{ __testing_autoupdate_zypper_calls_ctl['content'] | ansible.builtin.b64decode }};
+          error calls:
+          {{ __testing_autoupdate_zypper_calls_err['content'] | ansible.builtin.b64decode }}
+        success_msg: "A zypper error exit never schedules a reboot by itself."
+
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: report a degraded check"
+      ansible.builtin.debug:
+        msg: >-
+          A genuine reboot condition appeared on the host during the stub
+          checks (the neutral control run scheduled a reboot); the negative
+          case could only be verified differentially.
+      when:
+        - >-
+          'shutdown' in
+          (__testing_autoupdate_zypper_calls_ctl['content'] | ansible.builtin.b64decode)
+
+  always:
+
+    - name: "Molecule | Verify | auto_update | Zypper stub: remove the stub again"
+      ansible.builtin.file:
+        path: "/var/tmp/molecule-reboot-shim/zypper"
+        state: "absent"
+
+
 - name: "Molecule | Verify | auto_update | Kernel prefix: remove the shim"
   ansible.builtin.file:
     path: "/var/tmp/molecule-reboot-shim"

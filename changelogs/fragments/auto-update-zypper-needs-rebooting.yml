@@ -1,0 +1,14 @@
+---
+
+bugfixes:
+  - >-
+    auto_update: the reboot helper did not consult `zypper needs-rebooting`,
+    so openSUSE hosts missed reboots that only zypper reports. Exit code 102
+    now schedules the reboot; any other non-zero exit is an error and never
+    reboots.
+  - >-
+    reboot, auto_update: on hosts with zypper, `zypper needs-rebooting` is
+    now checked before (and instead of) `needs-restarting`. SUSE ships
+    `needs-restarting` as a wrapper that collapses every non-zero zypper
+    exit - the reboot hint and real errors alike - into exit code 1, which
+    turned zypper errors into scheduled or reported reboots.

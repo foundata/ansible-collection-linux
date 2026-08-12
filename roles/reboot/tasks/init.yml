@@ -148,20 +148,8 @@
         __reboot_required='1'
       fi
 
-      # Check RedHat-like OS reboot indicator (needs-restarting).
-      # Only exit code 1 means "reboot required"; any other non-zero code is an
-      # error (e.g. a transient dnf/rpm failure) and must NOT trigger a reboot.
-      if [ "${__reboot_required}" != '1' ] \
-        && command -v 'needs-restarting' >/dev/null 2>&1; then
-        needs-restarting -r >/dev/null 2>&1
-        __needs_restarting_rc="$?"
-        if [ "${__needs_restarting_rc}" = '1' ]; then
-          __reboot_required='1'
-        fi
-        unset __needs_restarting_rc
-      fi
-
-      # Check openSUSE reboot indicator (zypper needs-rebooting)
+      # Check openSUSE reboot indicator (zypper needs-rebooting) FIRST;
+      # authoritative wherever zypper exists.
       # Exit code 102 (ZYPPER_EXIT_INF_REBOOT_NEEDED) = reboot required
       if [ "${__reboot_required}" != '1' ] \
         && command -v 'zypper' >/dev/null 2>&1; then
@@ -171,6 +159,23 @@
           __reboot_required='1'
         fi
         unset __zypper_rc
+      fi
+
+      # Check RedHat-like OS reboot indicator (needs-restarting).
+      # Only exit code 1 means "reboot required"; any other non-zero code is an
+      # error (e.g. a transient dnf/rpm failure) and must NOT trigger a reboot.
+      # Skipped where zypper exists: SUSE ships needs-restarting as a wrapper
+      # collapsing every non-zero zypper exit (reboot hint and errors alike)
+      # into 1, which would turn a zypper error into a reboot.
+      if [ "${__reboot_required}" != '1' ] \
+        && ! command -v 'zypper' >/dev/null 2>&1 \
+        && command -v 'needs-restarting' >/dev/null 2>&1; then
+        needs-restarting -r >/dev/null 2>&1
+        __needs_restarting_rc="$?"
+        if [ "${__needs_restarting_rc}" = '1' ]; then
+          __reboot_required='1'
+        fi
+        unset __needs_restarting_rc
       fi
 
       # Check if running kernel differs from newest installed kernel.
