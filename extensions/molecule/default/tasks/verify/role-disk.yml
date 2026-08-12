@@ -932,6 +932,144 @@
     - __testing_disk_absentid_gone['rc'] != 1
 
 
+# A replacement is not always another block device: tmpfs (or NFS/overlay)
+# sources make lsblk fail, which previously classified them as removable
+# stale remains instead of foreign.
+- name: "Molecule | Verify | disk | Absent identity: mount a tmpfs replacement at the mountpoint"
+  ansible.builtin.command:
+    argv: ["mount", "-t", "tmpfs", "tmpfs", "/srv/molecule-absentid-test"]
+  changed_when:
+    - true
+
+
+- name: "Molecule | Verify | disk | Absent identity: declare the stale disk absent over tmpfs (must fail)"
+  block:
+
+    - name: "Molecule | Verify | disk | Absent identity: run the role against the tmpfs-backed mountpoint"
+      ansible.builtin.include_role:
+        name: "foundata.linux.disk"
+      vars:
+        disk_linux_devices:
+          - device: "{{ __testing_disk_absentid_stale }}"
+            state: "absent"
+            mount:
+              path: "/srv/molecule-absentid-test"
+
+    - name: "Molecule | Verify | disk | Absent identity: fail because the tmpfs mount was accepted"
+      ansible.builtin.fail:
+        msg: "An absent declaration unmounted a tmpfs replacement it cannot prove ownership of."
+
+  rescue:
+
+    - name: "Molecule | Verify | disk | Absent identity: assert the tmpfs refusal"
+      ansible.builtin.assert:
+        that:
+          - >-
+            'Refusing the absent cleanup' in
+            (ansible_failed_result['msg'] | ansible.builtin.default(''))
+        fail_msg: >-
+          The role failed for an unexpected reason:
+          {{ ansible_failed_result['msg'] | ansible.builtin.default('(no message)') }}
+        success_msg: "An unresolvable active source (tmpfs) is refused as foreign."
+
+
+- name: "Molecule | Verify | disk | Absent identity: assert the tmpfs mount survived"
+  ansible.builtin.command:
+    argv: ["findmnt", "--noheadings", "--output", "FSTYPE", "--mountpoint", "/srv/molecule-absentid-test"]
+  register: __testing_disk_absentid_tmpfs
+  changed_when:
+    - false
+  failed_when:
+    - "'tmpfs' not in __testing_disk_absentid_tmpfs['stdout']"
+
+
+- name: "Molecule | Verify | disk | Absent identity: unmount the tmpfs replacement again"
+  ansible.builtin.command:
+    argv: ["umount", "/srv/molecule-absentid-test"]
+  changed_when:
+    - true
+
+
+# A non-block /etc/fstab row (tmpfs, NFS) at the declared mountpoint was
+# never written by this role and must survive an absent declaration.
+- name: "Molecule | Verify | disk | Absent identity: plant a foreign non-block fstab row"
+  ansible.builtin.lineinfile:
+    path: "/etc/fstab"
+    line: "tmpfs /srv/molecule-absentid-test tmpfs defaults 0 0"
+    state: "present"
+
+
+- name: "Molecule | Verify | disk | Absent identity: declare the stale disk absent over the foreign row (must fail)"
+  block:
+
+    - name: "Molecule | Verify | disk | Absent identity: run the role against the foreign fstab row"
+      ansible.builtin.include_role:
+        name: "foundata.linux.disk"
+      vars:
+        disk_linux_devices:
+          - device: "{{ __testing_disk_absentid_stale }}"
+            state: "absent"
+            mount:
+              path: "/srv/molecule-absentid-test"
+
+    - name: "Molecule | Verify | disk | Absent identity: fail because the foreign fstab row was accepted"
+      ansible.builtin.fail:
+        msg: "An absent declaration removed a non-block /etc/fstab row it does not own."
+
+  rescue:
+
+    - name: "Molecule | Verify | disk | Absent identity: assert the foreign-row refusal"
+      ansible.builtin.assert:
+        that:
+          - >-
+            'Refusing the absent cleanup' in
+            (ansible_failed_result['msg'] | ansible.builtin.default(''))
+        fail_msg: >-
+          The role failed for an unexpected reason:
+          {{ ansible_failed_result['msg'] | ansible.builtin.default('(no message)') }}
+        success_msg: "A non-block fstab row at the mountpoint is refused as foreign."
+
+
+- name: "Molecule | Verify | disk | Absent identity: assert the foreign fstab row survived, then remove it"
+  ansible.builtin.lineinfile:
+    path: "/etc/fstab"
+    line: "tmpfs /srv/molecule-absentid-test tmpfs defaults 0 0"
+    state: "absent"
+  register: __testing_disk_absentid_foreignrow
+  failed_when:
+    - not (__testing_disk_absentid_foreignrow['changed'] | ansible.builtin.bool)
+
+
+# The documented detached-disk contract: a dead tag at the declared
+# mountpoint is authoritative and removable without further proof.
+- name: "Molecule | Verify | disk | Absent identity: plant a stale unresolvable fstab row"
+  ansible.builtin.lineinfile:
+    path: "/etc/fstab"
+    line: "UUID=deadbeef-dead-dead-dead-deaddeadbeef /srv/molecule-absentid-test xfs defaults 0 2"
+    state: "present"
+
+
+- name: "Molecule | Verify | disk | Absent identity: declare the stale disk absent over the dead row (must succeed)"
+  ansible.builtin.include_role:
+    name: "foundata.linux.disk"
+  vars:
+    disk_linux_devices:
+      - device: "{{ __testing_disk_absentid_stale }}"
+        state: "absent"
+        mount:
+          path: "/srv/molecule-absentid-test"
+
+
+- name: "Molecule | Verify | disk | Absent identity: assert the dead row was removed"
+  ansible.builtin.command:
+    argv: ["grep", "-c", "deadbeef-dead-dead-dead-deaddeadbeef", "/etc/fstab"]
+  register: __testing_disk_absentid_deadrow
+  changed_when:
+    - false
+  failed_when:
+    - __testing_disk_absentid_deadrow['rc'] != 1
+
+
 - name: "Molecule | Verify | disk | Absent identity: release the fixtures"
   ansible.builtin.shell:
     cmd: |

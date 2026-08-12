@@ -12,13 +12,23 @@
 ---
 
 # A stale declaration must not tear down a replacement: after a disk swap
-# the declared mountpoint may be supplied by a DIFFERENT device, and an
-# absent entry still addressing the old disk would unmount the replacement
-# and remove its /etc/fstab entry. Any active or fstab source resolving to
-# an existing device OUTSIDE the declared device's tree is refused below.
-# Sources resolving to no existing device (the normal remains of an
-# already-detached disk; findmnt --evaluate leaves them blank or as a dead
-# path) stay removable, keeping the detached-disk cleanup working.
+# the declared mountpoint may be supplied by a DIFFERENT device (or by tmpfs,
+# NFS, an overlay, ...), and an absent entry still addressing the old disk
+# would unmount the replacement and remove its /etc/fstab entry.
+#
+# Classification below (the role only ever creates block-device mounts and
+# UUID= fstab rows, which is what makes these rules sound):
+# - A source whose ancestry (inverse lsblk, Btrfs "[/subvolume]" decoration
+#   stripped first) contains the declared device is OWN: removable.
+# - Every other ACTIVE source is FOREIGN - including ones lsblk cannot
+#   resolve (tmpfs, NFS, overlay): whatever is mounted there now, it could
+#   not be proven to be the declared device.
+# - An fstab source that resolves to a different existing device, or that is
+#   not block-device-shaped at all (tmpfs, server:/export), is FOREIGN.
+# - An fstab source that is a dead tag (findmnt --evaluate leaves it blank)
+#   or a dead /dev path is the normal remains of an already-detached disk:
+#   removable WITHOUT further proof of ownership - deliberately no manifest,
+#   the dead row at the declared mountpoint is treated as authoritative.
 
 - name: "Absent | Determine the canonical name of the declared device"
   ansible.builtin.command:
@@ -80,24 +90,38 @@
       - "--inverse"
       - "--output"
       - "KNAME"
-      - "{{ __disk_linux_absent_source }}"
+      - "{{ __disk_linux_absent_source['normalized'] }}"
   changed_when:
     - false
   # sources without an existing block device are exactly the stale remains
   # this cleanup exists for
   failed_when:
     - false
+  # provenance is preserved: an unresolvable ACTIVE source is foreign, an
+  # unresolvable fstab source may be the removable remains of a dead disk
   loop: >-
-    {{
-      ((__disk_linux_absent_active_result['stdout_lines'] | ansible.builtin.default([]))
-       + (__disk_linux_absent_fstab_result['stdout_lines'] | ansible.builtin.default([])))
-      | ansible.builtin.map('ansible.builtin.trim')
-      | ansible.builtin.reject('ansible.builtin.equalto', '')
-      | ansible.builtin.unique
-      | ansible.builtin.list
-    }}
+    {%- set __ns = namespace(rows=[], seen=[]) -%}
+    {%- set __groups = [
+          ['active', __disk_linux_absent_active_result['stdout_lines'] | ansible.builtin.default([])],
+          ['fstab', __disk_linux_absent_fstab_result['stdout_lines'] | ansible.builtin.default([])],
+        ] -%}
+    {%- for __origin, __lines in __groups -%}
+    {%-   for __line in __lines -%}
+    {%-     set __src = __line | ansible.builtin.trim -%}
+    {#-     blank = a tag findmnt --evaluate could not resolve (dead disk) -#}
+    {%-     if (__src | ansible.builtin.length) > 0 -%}
+    {%-       set __norm = __src | ansible.builtin.regex_replace('\[.*\]$', '') -%}
+    {%-       if (__origin ~ ':' ~ __norm) not in __ns.seen -%}
+    {%-         set _ = __ns.seen.append(__origin ~ ':' ~ __norm) -%}
+    {%-         set _ = __ns.rows.append({'source': __src, 'normalized': __norm, 'origin': __origin}) -%}
+    {%-       endif -%}
+    {%-     endif -%}
+    {%-   endfor -%}
+    {%- endfor -%}
+    {{ __ns.rows }}
   loop_control:
     loop_var: "__disk_linux_absent_source"
+    label: "{{ __disk_linux_absent_source['origin'] }}: {{ __disk_linux_absent_source['source'] }}"
   register: __disk_linux_absent_ancestry_result
 
 
@@ -118,13 +142,22 @@
     __disk_linux_absent_foreign: >-
       {%- set __ns = namespace(foreign=[]) -%}
       {%- for __r in (__disk_linux_absent_ancestry_result['results'] | ansible.builtin.default([])) -%}
+      {%-   set __src = __r['__disk_linux_absent_source'] -%}
       {%-   if (__r['rc'] | ansible.builtin.default(1)) == 0 -%}
       {%-     set __ancestors = (__r['stdout_lines'] | ansible.builtin.default([]))
                 | ansible.builtin.map('ansible.builtin.trim') | ansible.builtin.list -%}
       {%-     if ((__disk_linux_absent_kname | ansible.builtin.length) == 0)
                 or (__disk_linux_absent_kname not in __ancestors) -%}
-      {%-       set _ = __ns.foreign.append(__r['__disk_linux_absent_source']) -%}
+      {%-       set _ = __ns.foreign.append(__src['origin'] ~ ' source ' ~ __src['source']) -%}
       {%-     endif -%}
+      {%-   elif __src['origin'] == 'active' -%}
+      {#-     an active mount that could not be proven ours (tmpfs, NFS,
+              overlay, vanished device) is never unmounted -#}
+      {%-     set _ = __ns.foreign.append('active source ' ~ __src['source'] ~ ' (unresolvable)') -%}
+      {%-   elif not (__src['normalized'] is ansible.builtin.match('^/dev/')) -%}
+      {#-     a non-block fstab row (tmpfs, server:/export) was never written
+              by this role; a dead /dev path stays removable -#}
+      {%-     set _ = __ns.foreign.append('fstab source ' ~ __src['source'] ~ ' (not a block device)') -%}
       {%-   endif -%}
       {%- endfor -%}
       {{ __ns.foreign }}
