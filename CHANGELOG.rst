@@ -4,6 +4,72 @@ foundata.linux Ansible collection Release Notes
 
 .. contents:: Topics
 
+v1.3.0
+======
+
+Release Summary
+---------------
+
+Release Date: 2026-08-13
+
+Feature and bugfix release.
+
+Minor Changes
+-------------
+
+- disk role - added the new ``foundata.linux.disk`` role for managing dedicated data disks: a single partition spanning the disk, an XFS or ext4 filesystem and a mount plus ``/etc/fstab`` entry by filesystem UUID. Existing data is never reformatted or destroyed by default (declared layout verification, explicit ``on_mismatch``/``on_nonempty``/``wipe`` policies), with optional one-time content migration for populated mountpoints and online growth after disk enlargement.
+
+Bugfixes
+--------
+
+- ``sysctl`` - Kernel modules required by profiles are now registered for boot in the fixed, role-owned ``/etc/modules-load.d/zz-managed.conf`` file. The module registration no longer follows ``sysctl_linux_config_dropin_file_name``, so changing the configurable sysctl drop-in filename cannot leave an old module-registration file active. Dropping the profile or using ``sysctl_linux_state: "absent"`` removes the registration; already loaded modules are not unloaded.
+- auto_update: the reboot helper did not consult `zypper needs-rebooting`, so openSUSE hosts missed reboots that only zypper reports. Exit code 102 now schedules the reboot; any other non-zero exit is an error and never reboots.
+- reboot, auto_update: on hosts with zypper, `zypper needs-rebooting` is now checked before (and instead of) `needs-restarting`. SUSE ships `needs-restarting` as a wrapper that collapses every non-zero zypper exit - the reboot hint and real errors alike - into exit code 1, which turned zypper errors into scheduled or reported reboots.
+- reboot, auto_update: the reboot detection matched the running kernel release as a SUBSTRING of the newest installed `vmlinuz-*` filename, so an installed `6.1.0-30` was accepted as the running `6.1.0-3` and the required reboot was missed. Both implementations now strip the filename prefix and compare the releases exactly, ignoring rescue kernels and backup or boot-loader artifacts.
+
+Known Issues
+------------
+
+- ``sysctl`` - Older collection versions persisted profile modules through
+  one file per module, normally
+  ``/etc/modules-load.d/br_netfilter.conf`` and
+  ``/etc/modules-load.d/nf_conntrack.conf``. Those files have no ownership
+  marker and may also have been created by an administrator or other
+  software. The role therefore does not remove them automatically.
+
+  Hosts that previously used the ``container`` or ``router`` profiles can
+  inspect possible legacy registrations:
+
+  .. code-block:: shell
+
+     grep -RnsE '^[[:space:]]*(br_netfilter|nf_conntrack)([[:space:]]|$)' \
+       /etc/modules-load.d /run/modules-load.d /usr/lib/modules-load.d 2>/dev/null
+
+     stat /etc/modules-load.d/br_netfilter.conf \
+       /etc/modules-load.d/nf_conntrack.conf 2>/dev/null
+
+  A file named after the module and containing only that module name is
+  consistent with the former role output, but is not proof of ownership.
+  Check configuration-management history and whether another service still
+  requires the module at boot.
+
+  When ownership or continued use is uncertain, leave the files in place.
+  Loading these modules unnecessarily normally causes only modest resource
+  and attack-surface overhead, whereas removing a registration still needed
+  by networking, firewall or container workloads can cause failures after
+  the next reboot.
+
+  Files confirmed to be obsolete can be removed manually:
+
+  .. code-block:: shell
+
+     sudo rm -f -- /etc/modules-load.d/br_netfilter.conf \
+       /etc/modules-load.d/nf_conntrack.conf
+
+  Removing these files affects future boots only. Do not unload the running
+  modules solely as part of this cleanup because active workloads may depend
+  on them.
+
 v1.2.0
 ======
 

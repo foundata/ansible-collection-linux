@@ -1,6 +1,76 @@
 ---
 ancestor: null
 releases:
+  1.3.0:
+    changes:
+      bugfixes:
+        - '``sysctl`` - Kernel modules required by profiles are now registered for
+          boot in the fixed, role-owned ``/etc/modules-load.d/zz-managed.conf`` file.
+          The module registration no longer follows ``sysctl_linux_config_dropin_file_name``,
+          so changing the configurable sysctl drop-in filename cannot leave an old
+          module-registration file active. Dropping the profile or using ``sysctl_linux_state:
+          "absent"`` removes the registration; already loaded modules are not unloaded.'
+        - 'auto_update: the reboot helper did not consult `zypper needs-rebooting`,
+          so openSUSE hosts missed reboots that only zypper reports. Exit code 102
+          now schedules the reboot; any other non-zero exit is an error and never
+          reboots.'
+        - 'reboot, auto_update: on hosts with zypper, `zypper needs-rebooting` is
+          now checked before (and instead of) `needs-restarting`. SUSE ships `needs-restarting`
+          as a wrapper that collapses every non-zero zypper exit - the reboot hint
+          and real errors alike - into exit code 1, which turned zypper errors into
+          scheduled or reported reboots.'
+        - 'reboot, auto_update: the reboot detection matched the running kernel release
+          as a SUBSTRING of the newest installed `vmlinuz-*` filename, so an installed
+          `6.1.0-30` was accepted as the running `6.1.0-3` and the required reboot
+          was missed. Both implementations now strip the filename prefix and compare
+          the releases exactly, ignoring rescue kernels and backup or boot-loader
+          artifacts.'
+      known_issues:
+        - "``sysctl`` - Older collection versions persisted profile modules through\n\
+          one file per module, normally\n``/etc/modules-load.d/br_netfilter.conf``\
+          \ and\n``/etc/modules-load.d/nf_conntrack.conf``. Those files have no ownership\n\
+          marker and may also have been created by an administrator or other\nsoftware.\
+          \ The role therefore does not remove them automatically.\n\nHosts that previously\
+          \ used the ``container`` or ``router`` profiles can\ninspect possible legacy\
+          \ registrations:\n\n.. code-block:: shell\n\n   grep -RnsE '^[[:space:]]*(br_netfilter|nf_conntrack)([[:space:]]|$)'\
+          \ \\\n     /etc/modules-load.d /run/modules-load.d /usr/lib/modules-load.d\
+          \ 2>/dev/null\n\n   stat /etc/modules-load.d/br_netfilter.conf \\\n    \
+          \ /etc/modules-load.d/nf_conntrack.conf 2>/dev/null\n\nA file named after\
+          \ the module and containing only that module name is\nconsistent with the\
+          \ former role output, but is not proof of ownership.\nCheck configuration-management\
+          \ history and whether another service still\nrequires the module at boot.\n\
+          \nWhen ownership or continued use is uncertain, leave the files in place.\n\
+          Loading these modules unnecessarily normally causes only modest resource\n\
+          and attack-surface overhead, whereas removing a registration still needed\n\
+          by networking, firewall or container workloads can cause failures after\n\
+          the next reboot.\n\nFiles confirmed to be obsolete can be removed manually:\n\
+          \n.. code-block:: shell\n\n   sudo rm -f -- /etc/modules-load.d/br_netfilter.conf\
+          \ \\\n     /etc/modules-load.d/nf_conntrack.conf\n\nRemoving these files\
+          \ affects future boots only. Do not unload the running\nmodules solely as\
+          \ part of this cleanup because active workloads may depend\non them."
+      minor_changes:
+        - 'disk role - added the new ``foundata.linux.disk`` role for managing dedicated
+          data disks: a single partition spanning the disk, an XFS or ext4 filesystem
+          and a mount plus ``/etc/fstab`` entry by filesystem UUID. Existing data
+          is never reformatted or destroyed by default (declared layout verification,
+          explicit ``on_mismatch``/``on_nonempty``/``wipe`` policies), with optional
+          one-time content migration for populated mountpoints and online growth after
+          disk enlargement.
+
+          '
+      release_summary: 'Release Date: 2026-08-13
+
+
+        Feature and bugfix release.
+
+        '
+    fragments:
+      - 1.3.0-release.yaml
+      - auto-update-zypper-needs-rebooting.yml
+      - disk-role.yaml
+      - kernel-release-exact-comparison.yml
+      - sysctl-module-boot-registration.yml
+    release_date: '2026-08-13'
   1.2.0:
     changes:
       bugfixes:
