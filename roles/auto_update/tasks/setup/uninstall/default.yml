@@ -33,14 +33,15 @@
 
 - name: "Setup | Uninstall | Remove scheduled reboot timer units and helper script"
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ __auto_update_linux_reboot_timer_item }}"
     state: "absent"
   loop:
     - "{{ __auto_update_linux_reboot_timer_unit_path }}"
     - "{{ __auto_update_linux_reboot_service_unit_path }}"
     - "{{ __auto_update_linux_reboot_script_path }}"
   loop_control:
-    label: "{{ item }}"
+    loop_var: "__auto_update_linux_reboot_timer_item"
+    label: "{{ __auto_update_linux_reboot_timer_item }}"
   notify:
     - "auto_update_linux: systemd daemon-reload"
 

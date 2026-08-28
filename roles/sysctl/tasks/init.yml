@@ -122,10 +122,12 @@
   ansible.builtin.include_vars:
     file: "{{ __sysctl_linux_vars_file }}"
   vars:
-    __sysctl_linux_vars_file: "{{ role_path }}/vars/{{ item }}"
+    __sysctl_linux_vars_file: "{{ role_path }}/vars/{{ __sysctl_linux_varsfile_item }}"
   when:
     - __sysctl_linux_vars_file is ansible.builtin.file
   loop: "{{ __sysctl_linux_platform_filenames_most_specific_last }}"
+  loop_control:
+    loop_var: "__sysctl_linux_varsfile_item"
 
 
 ### sysctl specific
@@ -150,13 +152,13 @@
 
 - name: "Init | Show effective merged variables (computed lazily in vars/main.yml)"
   ansible.builtin.debug:
-    msg: "{{ __sysctl_linux_effective_var }} = {{ lookup('ansible.builtin.vars', __sysctl_linux_effective_var) }}"
+    msg: "{{ __sysctl_linux_effective_var_item }} = {{ lookup('ansible.builtin.vars', __sysctl_linux_effective_var_item) }}"
     verbosity: 3
   loop:
     - "__sysctl_linux_effective_parameters"
   loop_control:
-    loop_var: "__sysctl_linux_effective_var"
-    label: "{{ __sysctl_linux_effective_var }}"
+    loop_var: "__sysctl_linux_effective_var_item"
+    label: "{{ __sysctl_linux_effective_var_item }}"
 
 
 # Profiles are stacked: each entry of the sysctl_linux_profile list is loaded in
@@ -238,7 +240,7 @@
 # skip set.
 - name: "Init | Load kernel modules required by the selected profile (best effort by default)"
   community.general.modprobe:
-    name: "{{ item['key'] }}"
+    name: "{{ __sysctl_linux_module_item['key'] }}"
     state: "present"
     # Boot-time loading is handled by the config phase through a file the role
     # owns; the module's own persistency writes one file per module and its
@@ -249,7 +251,8 @@
     - (__sysctl_linux_profile_modules | ansible.builtin.length) > 0
   loop: "{{ __sysctl_linux_profile_modules | ansible.builtin.dict2items }}"
   loop_control:
-    label: "{{ item['key'] }}"
+    loop_var: "__sysctl_linux_module_item"
+    label: "{{ __sysctl_linux_module_item['key'] }}"
   register: __sysctl_linux_modprobe_result
   ignore_errors: true # noqa: ignore-errors
 
@@ -260,14 +263,14 @@
       {{
         __sysctl_linux_modprobe_result['results'] | ansible.builtin.default([])
         | ansible.builtin.select('ansible.builtin.failed')
-        | ansible.builtin.map(attribute='item') | ansible.builtin.map(attribute='key')
+        | ansible.builtin.map(attribute='__sysctl_linux_module_item') | ansible.builtin.map(attribute='key')
         | ansible.builtin.list
       }}
     __sysctl_linux_module_gated_prefixes_unavailable: >-
       {{
         __sysctl_linux_modprobe_result['results'] | ansible.builtin.default([])
         | ansible.builtin.select('ansible.builtin.failed')
-        | ansible.builtin.map(attribute='item') | ansible.builtin.map(attribute='value')
+        | ansible.builtin.map(attribute='__sysctl_linux_module_item') | ansible.builtin.map(attribute='value')
         | ansible.builtin.flatten | ansible.builtin.unique
         | ansible.builtin.list
       }}

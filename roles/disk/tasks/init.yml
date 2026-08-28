@@ -122,10 +122,12 @@
   ansible.builtin.include_vars:
     file: "{{ __disk_linux_vars_file }}"
   vars:
-    __disk_linux_vars_file: "{{ role_path }}/vars/{{ item }}"
+    __disk_linux_vars_file: "{{ role_path }}/vars/{{ __disk_linux_varsfile_item }}"
   when:
     - __disk_linux_vars_file is ansible.builtin.file
   loop: "{{ __disk_linux_platform_filenames_most_specific_last }}"
+  loop_control:
+    loop_var: "__disk_linux_varsfile_item"
 
 
 ### foundata.linux.disk specific
@@ -153,20 +155,21 @@
 - name: "Init | Assert per-item invariants of disk_linux_devices"
   ansible.builtin.assert:
     that:
-      - item['device'] is ansible.builtin.match('^/')
-      - item['path'] is ansible.builtin.match('^/')
-      - item['path'] != '/'
+      - __disk_linux_invariant_item['device'] is ansible.builtin.match('^/')
+      - __disk_linux_invariant_item['path'] is ansible.builtin.match('^/')
+      - __disk_linux_invariant_item['path'] != '/'
       # no "." or ".." segments: "/srv/.." normalizes to "/" and would slip
       # past the literal check above
-      - not (item['path'] is ansible.builtin.search('(^|/)\.\.?(/|$)'))
+      - not (__disk_linux_invariant_item['path'] is ansible.builtin.search('(^|/)\.\.?(/|$)'))
     quiet: true
     fail_msg: >-
-      Entry for device "{{ item['device'] }}": device and mount['path'] must be
+      Entry for device "{{ __disk_linux_invariant_item['device'] }}": device and mount['path'] must be
       absolute, normalized paths without "." or ".." segments, and "/" cannot
       be a managed mountpoint.
   loop: "{{ __disk_linux_devices_effective }}"
   loop_control:
-    label: "{{ item['path'] }}"
+    loop_var: "__disk_linux_invariant_item"
+    label: "{{ __disk_linux_invariant_item['path'] }}"
 
 
 - name: "Init | Fail on structurally contradictory parent/child states"

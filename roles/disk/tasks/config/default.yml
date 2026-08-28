@@ -89,8 +89,8 @@
     file: "{{ role_path }}/tasks/config/preflight.yml"
   loop: "{{ __disk_linux_devices_effective_present }}"
   loop_control:
-    label: "{{ __disk_linux_entry['path'] }}"
-    loop_var: "__disk_linux_entry"
+    label: "{{ __disk_linux_entry_item['path'] }}"
+    loop_var: "__disk_linux_entry_item"
 
 
 # In check mode the discovery, preflight and plan above ARE the dry run: the
@@ -142,15 +142,15 @@
   ansible.builtin.include_tasks:
     file: "{{ role_path }}/tasks/shared/wipe_preflight.yml"
   vars:
-    __disk_linux_wp_device: "{{ __disk_linux_wp_entry['device'] }}"
-    __disk_linux_wp_allowed_mountpoint: "{{ __disk_linux_wp_entry['path'] }}"
+    __disk_linux_wp_device: "{{ __disk_linux_wp_entry_item['device'] }}"
+    __disk_linux_wp_allowed_mountpoint: "{{ __disk_linux_wp_entry_item['path'] }}"
   when:
-    - __disk_linux_wp_entry['wipe'] | ansible.builtin.bool
-    - __disk_linux_device_exists[__disk_linux_wp_entry['device']] | ansible.builtin.default(false)
+    - __disk_linux_wp_entry_item['wipe'] | ansible.builtin.bool
+    - __disk_linux_device_exists[__disk_linux_wp_entry_item['device']] | ansible.builtin.default(false)
   loop: "{{ __disk_linux_devices_effective_absent }}"
   loop_control:
-    loop_var: "__disk_linux_wp_entry"
-    label: "{{ __disk_linux_wp_entry['device'] }}"
+    loop_var: "__disk_linux_wp_entry_item"
+    label: "{{ __disk_linux_wp_entry_item['device'] }}"
 
 
 - name: "Config | Default | Check every absent entry's device tree is inactive"
@@ -171,5 +171,5 @@
     - not (__disk_linux_check_mode | ansible.builtin.bool)
   loop: "{{ __disk_linux_devices_effective_absent }}"
   loop_control:
-    label: "{{ __disk_linux_entry['path'] }}"
-    loop_var: "__disk_linux_entry"
+    label: "{{ __disk_linux_entry_item['path'] }}"
+    loop_var: "__disk_linux_entry_item"

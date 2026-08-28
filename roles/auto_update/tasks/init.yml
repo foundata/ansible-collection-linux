@@ -122,10 +122,12 @@
   ansible.builtin.include_vars:
     file: "{{ __auto_update_linux_vars_file }}"
   vars:
-    __auto_update_linux_vars_file: "{{ role_path }}/vars/{{ item }}"
+    __auto_update_linux_vars_file: "{{ role_path }}/vars/{{ __auto_update_linux_varsfile_item }}"
   when:
     - __auto_update_linux_vars_file is ansible.builtin.file
   loop: "{{ __auto_update_linux_platform_filenames_most_specific_last }}"
+  loop_control:
+    loop_var: "__auto_update_linux_varsfile_item"
 
 
 ### auto_update specific
@@ -133,14 +135,14 @@
 
 - name: "Init | Show effective merged variables (computed lazily in vars/main.yml)"
   ansible.builtin.debug:
-    msg: "{{ __auto_update_linux_effective_var }} = {{ lookup('ansible.builtin.vars', __auto_update_linux_effective_var) }}"
+    msg: "{{ __auto_update_linux_effective_var_item }} = {{ lookup('ansible.builtin.vars', __auto_update_linux_effective_var_item) }}"
     verbosity: 3
   loop:
     - "__auto_update_linux_effective_timer_settings"
     - "__auto_update_linux_effective_reboot_timer_settings"
   loop_control:
-    loop_var: "__auto_update_linux_effective_var"
-    label: "{{ __auto_update_linux_effective_var }}"
+    loop_var: "__auto_update_linux_effective_var_item"
+    label: "{{ __auto_update_linux_effective_var_item }}"
 
 
 # The timer templates accept the following values per directive. The six

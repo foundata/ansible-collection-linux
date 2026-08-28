@@ -9,11 +9,12 @@
 
 - name: "Safety | Determine device existence"
   ansible.builtin.stat:
-    path: "{{ item['device'] }}"
+    path: "{{ __disk_linux_stat_device_item['device'] }}"
     follow: true
   loop: "{{ __disk_linux_devices_effective }}"
   loop_control:
-    label: "{{ item['device'] }}"
+    loop_var: "__disk_linux_stat_device_item"
+    label: "{{ __disk_linux_stat_device_item['device'] }}"
   register: __disk_linux_stat_result
 
 
@@ -22,7 +23,7 @@
     __disk_linux_device_exists: >-
       {%- set __ns = namespace(map={}) -%}
       {%- for __r in __disk_linux_stat_result['results'] -%}
-      {%-   set _ = __ns.map.update({__r['item']['device']: (__r['stat']['exists'] | ansible.builtin.bool)}) -%}
+      {%-   set _ = __ns.map.update({__r['__disk_linux_stat_device_item']['device']: (__r['stat']['exists'] | ansible.builtin.bool)}) -%}
       {%- endfor -%}
       {{ __ns.map }}
 
@@ -70,9 +71,9 @@
       - "--bytes"
       - "--output"
       - "KNAME,TYPE,MAJ:MIN,SIZE"
-      - "{{ item['device'] }}"
+      - "{{ __disk_linux_identity_device_item['device'] }}"
   when:
-    - __disk_linux_device_exists[item['device']]
+    - __disk_linux_device_exists[__disk_linux_identity_device_item['device']]
   changed_when:
     - false
   # The probe is read-only; run it under "--check" too, otherwise it is
@@ -80,7 +81,8 @@
   check_mode: false
   loop: "{{ __disk_linux_devices_effective }}"
   loop_control:
-    label: "{{ item['device'] }}"
+    loop_var: "__disk_linux_identity_device_item"
+    label: "{{ __disk_linux_identity_device_item['device'] }}"
   register: __disk_linux_identity_result
 
 
@@ -91,7 +93,7 @@
       {%- for __r in __disk_linux_identity_result['results'] -%}
       {%-   if __r is not ansible.builtin.skipped -%}
       {%-     set __b = (__r['stdout'] | ansible.builtin.from_json)['blockdevices'][0] -%}
-      {%-     set _ = __ns.map.update({__r['item']['device']: {
+      {%-     set _ = __ns.map.update({__r['__disk_linux_identity_device_item']['device']: {
                 'kname': __b['kname'],
                 'type': __b['type'],
                 'majmin': __b['maj:min'],
@@ -158,7 +160,7 @@
       - "--output"
       - "SOURCE,FSTYPE,UUID"
       - "--mountpoint"
-      - "{{ item }}"
+      - "{{ __disk_linux_critical_mountpoint_item }}"
   changed_when:
     - false
   # a path that is no own mountpoint is normal (rc 1); real resolution
@@ -169,6 +171,8 @@
   # skipped and the discovery dereferences its missing result.
   check_mode: false
   loop: "{{ __disk_linux_critical_mountpoints }}"
+  loop_control:
+    loop_var: "__disk_linux_critical_mountpoint_item"
   register: __disk_linux_sysmount_result
 
 
@@ -185,7 +189,7 @@
 # cannot be confused by an unrelated clone carrying the same UUID.
 - name: "Safety | Enumerate the members of critical Btrfs filesystems"
   ansible.builtin.find:
-    paths: "/sys/fs/btrfs/{{ __disk_linux_btrfs_uuid }}/devices"
+    paths: "/sys/fs/btrfs/{{ __disk_linux_btrfs_uuid_item }}/devices"
     file_type: "any"
   register: __disk_linux_btrfs_members_result
   vars:
@@ -203,7 +207,7 @@
       {{ __ns.uuids | ansible.builtin.unique }}
   loop: "{{ __disk_linux_btrfs_uuids }}"
   loop_control:
-    loop_var: "__disk_linux_btrfs_uuid"
+    loop_var: "__disk_linux_btrfs_uuid_item"
 
 
 # Fail closed: a critical Btrfs filesystem whose member enumeration yields
@@ -243,7 +247,7 @@
       - "--noheadings"
       - "--output"
       - "KNAME,TYPE,MAJ:MIN"
-      - "{{ item }}"
+      - "{{ __disk_linux_critical_source_item }}"
   changed_when:
     - false
   # evaluated below: an unresolvable critical source fails CLOSED
@@ -278,6 +282,8 @@
         | ansible.builtin.unique
       }}
   loop: "{{ __disk_linux_system_sources }}"
+  loop_control:
+    loop_var: "__disk_linux_critical_source_item"
   register: __disk_linux_sysdisk_result
 
 
@@ -306,7 +312,7 @@
         __disk_linux_sysdisk_result['results'] | ansible.builtin.default([])
         | ansible.builtin.selectattr('rc', 'ansible.builtin.defined')
         | ansible.builtin.rejectattr('rc', 'ansible.builtin.equalto', 0)
-        | ansible.builtin.map(attribute='item') | ansible.builtin.join(', ')
+        | ansible.builtin.map(attribute='__disk_linux_critical_source_item') | ansible.builtin.join(', ')
       }}
       (root source:
       {{ __disk_linux_sysmount_result['results'][0]['stdout'] | ansible.builtin.default('unknown') }}).

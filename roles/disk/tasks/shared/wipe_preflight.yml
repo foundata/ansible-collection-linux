@@ -32,7 +32,7 @@
 
 - name: "Safety | Wipe preflight | Inspect the sysfs holders of every tree member"
   ansible.builtin.find:
-    paths: "/sys/class/block/{{ __disk_linux_wp_kname }}/holders"
+    paths: "/sys/class/block/{{ __disk_linux_wp_kname_item }}/holders"
     file_type: "any"
   register: __disk_linux_wp_holders_result
   vars:
@@ -47,7 +47,7 @@
       {{ __ns.knames }}
   loop: "{{ __disk_linux_wp_knames }}"
   loop_control:
-    loop_var: "__disk_linux_wp_kname"
+    loop_var: "__disk_linux_wp_kname_item"
 
 
 # /etc/fstab is re-read here on purpose: the run may legitimately have
@@ -102,7 +102,7 @@
       {%-   if (__r['matched'] | ansible.builtin.default(0)) > 0 -%}
       {%-     set __holders = __r['files'] | ansible.builtin.map(attribute='path')
                           | ansible.builtin.map('ansible.builtin.basename') | ansible.builtin.join(', ') -%}
-      {%-     set _ = __ns.reasons.append(__r['__disk_linux_wp_kname'] ~ ' held by ' ~ __holders) -%}
+      {%-     set _ = __ns.reasons.append(__r['__disk_linux_wp_kname_item'] ~ ' held by ' ~ __holders) -%}
       {%-   endif -%}
       {%- endfor -%}
       {{

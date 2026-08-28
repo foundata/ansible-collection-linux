@@ -4,10 +4,11 @@
 
 - name: "Setup | Uninstall | Debian | Remove managed apt configuration files"
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ __auto_update_linux_apt_config_item }}"
     state: "absent"
   loop:
     - "{{ __auto_update_linux_apt_periodic_file_path }}"
     - "{{ __auto_update_linux_apt_config_file_path }}"
   loop_control:
-    label: "{{ item }}"
+    loop_var: "__auto_update_linux_apt_config_item"
+    label: "{{ __auto_update_linux_apt_config_item }}"

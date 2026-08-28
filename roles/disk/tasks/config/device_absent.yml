@@ -1,4 +1,4 @@
-# Absent-state handling for ONE device entry (loop_var __disk_linux_entry):
+# Absent-state handling for ONE device entry (loop_var __disk_linux_entry_item):
 # unmount and remove the /etc/fstab entry, keeping the mountpoint directory,
 # the partition, the filesystem and all data. Destroying the on-disk
 # structures additionally requires wipe (already normalized to be true only
@@ -38,7 +38,7 @@
       - "--nodeps"
       - "--output"
       - "KNAME"
-      - "{{ __disk_linux_entry['device'] }}"
+      - "{{ __disk_linux_entry_item['device'] }}"
   changed_when:
     - false
   # a detached declared device has no canonical name; every resolvable
@@ -56,7 +56,7 @@
       - "--output"
       - "SOURCE"
       - "--mountpoint"
-      - "{{ __disk_linux_entry['path'] }}"
+      - "{{ __disk_linux_entry_item['path'] }}"
   changed_when:
     - false
   failed_when:
@@ -74,7 +74,7 @@
       - "--output"
       - "SOURCE"
       - "--mountpoint"
-      - "{{ __disk_linux_entry['path'] }}"
+      - "{{ __disk_linux_entry_item['path'] }}"
   changed_when:
     - false
   failed_when:
@@ -90,7 +90,7 @@
       - "--inverse"
       - "--output"
       - "KNAME"
-      - "{{ __disk_linux_absent_source['normalized'] }}"
+      - "{{ __disk_linux_absent_source_item['normalized'] }}"
   changed_when:
     - false
   # sources without an existing block device are exactly the stale remains
@@ -120,8 +120,8 @@
     {%- endfor -%}
     {{ __ns.rows }}
   loop_control:
-    loop_var: "__disk_linux_absent_source"
-    label: "{{ __disk_linux_absent_source['origin'] }}: {{ __disk_linux_absent_source['source'] }}"
+    loop_var: "__disk_linux_absent_source_item"
+    label: "{{ __disk_linux_absent_source_item['origin'] }}: {{ __disk_linux_absent_source_item['source'] }}"
   register: __disk_linux_absent_ancestry_result
 
 
@@ -130,11 +130,11 @@
     that:
       - (__disk_linux_absent_foreign | ansible.builtin.length) == 0
     fail_msg: >-
-      Refusing the absent cleanup of {{ __disk_linux_entry['path'] }}: the
+      Refusing the absent cleanup of {{ __disk_linux_entry_item['path'] }}: the
       active mount or its /etc/fstab entry is backed by
       {{ __disk_linux_absent_foreign | ansible.builtin.join(', ') }}, which
       does not belong to the declared device
-      {{ __disk_linux_entry['device'] }}. Update or remove the stale
+      {{ __disk_linux_entry_item['device'] }}. Update or remove the stale
       declaration; the role never touches the resources of other devices.
     quiet: true
   vars:
@@ -142,7 +142,7 @@
     __disk_linux_absent_foreign: >-
       {%- set __ns = namespace(foreign=[]) -%}
       {%- for __r in (__disk_linux_absent_ancestry_result['results'] | ansible.builtin.default([])) -%}
-      {%-   set __src = __r['__disk_linux_absent_source'] -%}
+      {%-   set __src = __r['__disk_linux_absent_source_item'] -%}
       {%-   if (__r['rc'] | ansible.builtin.default(1)) == 0 -%}
       {%-     set __ancestors = (__r['stdout_lines'] | ansible.builtin.default([]))
                 | ansible.builtin.map('ansible.builtin.trim') | ansible.builtin.list -%}
@@ -165,13 +165,13 @@
 
 - name: "Absent | Unmount the filesystem"
   ansible.posix.mount:
-    path: "{{ __disk_linux_entry['path'] }}"
+    path: "{{ __disk_linux_entry_item['path'] }}"
     state: "unmounted"
 
 
 - name: "Absent | Remove the /etc/fstab entry"
   ansible.posix.mount:
-    path: "{{ __disk_linux_entry['path'] }}"
+    path: "{{ __disk_linux_entry_item['path'] }}"
     state: "absent_from_fstab"
 
 
@@ -187,12 +187,12 @@
 
 - name: "Absent | Destroy the on-disk structures (wipe)"
   when:
-    - __disk_linux_entry['wipe'] | ansible.builtin.bool
+    - __disk_linux_entry_item['wipe'] | ansible.builtin.bool
   block:
 
     - name: "Absent | Determine device existence for the wipe"
       ansible.builtin.stat:
-        path: "{{ __disk_linux_entry['device'] }}"
+        path: "{{ __disk_linux_entry_item['device'] }}"
         follow: true
       register: __disk_linux_absent_stat_result
 
@@ -200,12 +200,12 @@
     - name: "Absent | Fail on a missing device with on_missing policy fail"
       ansible.builtin.fail:
         msg: >-
-          Cannot wipe {{ __disk_linux_entry['device'] }}: the device does not
+          Cannot wipe {{ __disk_linux_entry_item['device'] }}: the device does not
           exist and its on_missing policy is "fail". Attach the disk or set
           on_missing to "skip" to perform the cleanup without the wipe.
       when:
         - not __disk_linux_absent_stat_result['stat']['exists']
-        - __disk_linux_entry['on_missing'] == 'fail'
+        - __disk_linux_entry_item['on_missing'] == 'fail'
 
 
     # Immediate recheck right before the wipe: the aggregate pre-pass ran
@@ -222,7 +222,7 @@
       ansible.builtin.include_tasks:
         file: "{{ role_path }}/tasks/shared/wipe_preflight.yml"
       vars:
-        __disk_linux_wp_device: "{{ __disk_linux_entry['device'] }}"
+        __disk_linux_wp_device: "{{ __disk_linux_entry_item['device'] }}"
         __disk_linux_wp_allowed_mountpoint: ""
       when:
         - __disk_linux_absent_stat_result['stat']['exists']
@@ -233,7 +233,7 @@
         that:
           - (__disk_linux_wipe_violations | ansible.builtin.length) == 0
         fail_msg: >-
-          Refusing to wipe {{ __disk_linux_entry['device'] }}: its device
+          Refusing to wipe {{ __disk_linux_entry_item['device'] }}: its device
           tree became active again
           ({{ __disk_linux_wipe_violations | ansible.builtin.join('; ') }}).
         quiet: true
@@ -244,7 +244,7 @@
     - name: "Absent | Notice about the skipped wipe of the missing device"
       ansible.builtin.debug:
         msg: >-
-          Notice: skipping the wipe of {{ __disk_linux_entry['device'] }} - the
+          Notice: skipping the wipe of {{ __disk_linux_entry_item['device'] }} - the
           device does not exist (on_missing policy is "skip"). The unmount and
           /etc/fstab cleanup was performed.
       when:
@@ -265,7 +265,7 @@
               # NAME must be part of the output: lsblk only nests the
               # "children" arrays in its JSON when the NAME column is present
               - "NAME,KNAME,MOUNTPOINTS"
-              - "{{ __disk_linux_entry['device'] }}"
+              - "{{ __disk_linux_entry_item['device'] }}"
           changed_when:
             - false
           register: __disk_linux_absent_lsblk_result
@@ -296,16 +296,18 @@
             msg: >-
               WARNING: "wipe: true" is about to erase the filesystem
               signatures and the partition table of
-              {{ __disk_linux_entry['device'] }}. All data on this disk becomes
+              {{ __disk_linux_entry_item['device'] }}. All data on this disk becomes
               inaccessible. This is logical destruction, not secure erasure -
               use dedicated tooling before disposing of the medium.
 
 
         - name: "Absent | Unmount any remaining mounts of the disk"
           ansible.posix.mount:
-            path: "{{ item }}"
+            path: "{{ __disk_linux_absent_mount_item }}"
             state: "unmounted"
           loop: "{{ __disk_linux_absent_mounted_paths }}"
+          loop_control:
+            loop_var: "__disk_linux_absent_mount_item"
 
 
         - name: "Absent | Erase the partition signatures"
@@ -313,10 +315,12 @@
             argv:
               - "{{ __disk_linux_wipefs_exec_path }}"
               - "--all"
-              - "/dev/{{ item }}"
+              - "/dev/{{ __disk_linux_absent_kname_item }}"
           changed_when:
             - (__disk_linux_absent_wipefs_part_result['stdout'] | ansible.builtin.default('', true) | ansible.builtin.length) > 0
           loop: "{{ __disk_linux_absent_children }}"
+          loop_control:
+            loop_var: "__disk_linux_absent_kname_item"
           register: __disk_linux_absent_wipefs_part_result
 
 
@@ -325,7 +329,7 @@
             argv:
               - "{{ __disk_linux_wipefs_exec_path }}"
               - "--all"
-              - "{{ __disk_linux_entry['device'] }}"
+              - "{{ __disk_linux_entry_item['device'] }}"
           changed_when:
             - (__disk_linux_absent_wipefs_disk_result['stdout'] | ansible.builtin.length) > 0
           register: __disk_linux_absent_wipefs_disk_result

@@ -42,25 +42,29 @@
               - "UUID"
               - "--output"
               - "value"
-              - "/dev/{{ item }}"
+              - "/dev/{{ __disk_linux_olduuid_kname_item }}"
           changed_when:
             - false
           failed_when:
             - false
           loop: "{{ __disk_linux_item['child_knames'] }}"
+          loop_control:
+            loop_var: "__disk_linux_olduuid_kname_item"
           register: __disk_linux_apply_olduuid_result
 
 
         - name: "Config | Device | Unmount the old filesystems"
           ansible.posix.mount:
-            path: "{{ item }}"
+            path: "{{ __disk_linux_old_mount_item }}"
             state: "unmounted"
           loop: "{{ __disk_linux_item['mounted_paths'] }}"
+          loop_control:
+            loop_var: "__disk_linux_old_mount_item"
 
 
         - name: "Config | Device | Remove /etc/fstab entries of the destroyed filesystems"
           ansible.posix.mount:
-            path: "{{ item['target'] }}"
+            path: "{{ __disk_linux_fstab_entry_item['target'] }}"
             state: "absent_from_fstab"
           vars:
             __disk_linux_apply_old_uuids: >-
@@ -72,11 +76,12 @@
                 | ansible.builtin.list
               }}
           when:
-            - item['source'] is ansible.builtin.match('^UUID=')
-            - (item['source'] | ansible.builtin.regex_replace('^UUID=', '')) in __disk_linux_apply_old_uuids
+            - __disk_linux_fstab_entry_item['source'] is ansible.builtin.match('^UUID=')
+            - (__disk_linux_fstab_entry_item['source'] | ansible.builtin.regex_replace('^UUID=', '')) in __disk_linux_apply_old_uuids
           loop: "{{ __disk_linux_fstab }}"
           loop_control:
-            label: "{{ item['target'] }}"
+            loop_var: "__disk_linux_fstab_entry_item"
+            label: "{{ __disk_linux_fstab_entry_item['target'] }}"
 
 
         # Immediate recheck right before the wipe (the planning-phase
@@ -111,10 +116,12 @@
             argv:
               - "{{ __disk_linux_wipefs_exec_path }}"
               - "--all"
-              - "/dev/{{ item }}"
+              - "/dev/{{ __disk_linux_wipe_kname_item }}"
           changed_when:
             - (__disk_linux_apply_wipefs_part_result['stdout'] | ansible.builtin.default('', true) | ansible.builtin.length) > 0
           loop: "{{ __disk_linux_item['child_knames'] }}"
+          loop_control:
+            loop_var: "__disk_linux_wipe_kname_item"
           register: __disk_linux_apply_wipefs_part_result
 
 
@@ -376,19 +383,20 @@
             # copy (the fail task above already aborted otherwise).
             - name: "Config | Device | Clear the remains of an earlier aborted migration"
               ansible.builtin.file:
-                path: "{{ item['path'] }}"
+                path: "{{ __disk_linux_migration_remain_item['path'] }}"
                 state: "absent"
               when:
                 - (__disk_linux_apply_stagefind_result['matched'] | ansible.builtin.default(0)) > 0
-                - item['path'] != (__disk_linux_migration_mountpoint ~ '/lost+found')
+                - __disk_linux_migration_remain_item['path'] != (__disk_linux_migration_mountpoint ~ '/lost+found')
               loop: "{{ __disk_linux_apply_stagefind_result['files'] | ansible.builtin.default([]) }}"
               loop_control:
-                label: "{{ item['path'] }}"
+                loop_var: "__disk_linux_migration_remain_item"
+                label: "{{ __disk_linux_migration_remain_item['path'] }}"
 
 
             - name: "Config | Device | Clear the recovered orphans of an earlier aborted migration"
               ansible.builtin.file:
-                path: "{{ item['path'] }}"
+                path: "{{ __disk_linux_migration_orphan_item['path'] }}"
                 state: "absent"
               vars:
                 __disk_linux_apply_marker_present: >-
@@ -401,7 +409,8 @@
                 - __disk_linux_apply_marker_present | ansible.builtin.bool
               loop: "{{ __disk_linux_apply_lostfound_result['files'] | ansible.builtin.default([]) }}"
               loop_control:
-                label: "{{ item['path'] }}"
+                loop_var: "__disk_linux_migration_orphan_item"
+                label: "{{ __disk_linux_migration_orphan_item['path'] }}"
 
 
             - name: "Config | Device | Determine the size of the content to migrate"

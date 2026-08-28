@@ -122,7 +122,9 @@
   ansible.builtin.include_vars:
     file: "{{ __sudo_linux_vars_file }}"
   vars:
-    __sudo_linux_vars_file: "{{ role_path }}/vars/{{ item }}"
+    __sudo_linux_vars_file: "{{ role_path }}/vars/{{ __sudo_linux_varsfile_item }}"
   when:
     - __sudo_linux_vars_file is ansible.builtin.file
   loop: "{{ __sudo_linux_platform_filenames_most_specific_last }}"
+  loop_control:
+    loop_var: "__sudo_linux_varsfile_item"
