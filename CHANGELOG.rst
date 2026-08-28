@@ -4,6 +4,21 @@ foundata.linux Ansible collection Release Notes
 
 .. contents:: Topics
 
+v1.4.0
+======
+
+Release Summary
+---------------
+
+Release Date: 2026-08-28
+
+Maintenance release.
+
+Minor Changes
+-------------
+
+- ``auto_update``, ``disk``, ``reboot``, ``sudo``, ``sysctl``, ``user`` - Improve Ansible compatibility for roles and collections used in the wild by giving every loop in the roles a private, purpose-specific loop variable derived from the role's public variable prefix (for example ``__disk_linux_*_item``) instead of ``item``. This avoids rebinding a caller's ``item`` when role parameters reference it, such as when a role itself is included from a loop, and makes the roles behave more robustly across common Ansible usage patterns.
+
 v1.3.0
 ======
 

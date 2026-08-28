@@ -1,6 +1,28 @@
 ---
 ancestor: null
 releases:
+  1.4.0:
+    changes:
+      minor_changes:
+        - '``auto_update``, ``disk``, ``reboot``, ``sudo``, ``sysctl``, ``user`` -
+          Improve Ansible compatibility for roles and collections used in the wild
+          by giving every loop in the roles a private, purpose-specific loop variable
+          derived from the role''s public variable prefix (for example ``__disk_linux_*_item``)
+          instead of ``item``. This avoids rebinding a caller''s ``item`` when role
+          parameters reference it, such as when a role itself is included from a loop,
+          and makes the roles behave more robustly across common Ansible usage patterns.
+
+          '
+      release_summary: 'Release Date: 2026-08-28
+
+
+        Maintenance release.
+
+        '
+    fragments:
+      - 1.4.0-release.yaml
+      - loop-variable-shadowing.yml
+    release_date: '2026-08-28'
   1.3.0:
     changes:
       bugfixes:
