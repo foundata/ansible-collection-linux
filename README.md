@@ -2,8 +2,12 @@
 
 This repository contains the `foundata.linux` Ansible Collection.
 
-It provides roles for managing common Linux host concerns: automatic updates, conditional reboots, sudo policy, kernel parameters, and local users and groups.
+It provides roles for managing common Linux host concerns: automatic updates,
+conditional reboots, sudo policy, kernel parameters, and local users and groups.
 
+
+<!-- Preserve the existing centered project banner. -->
+<!-- rumdl-disable MD033 -->
 
 <div align="center" id="project-readme-header">
 <br>
@@ -15,6 +19,8 @@ It provides roles for managing common Linux host concerns: automatic updates, co
 
 <br>
 </div>
+
+<!-- rumdl-enable MD033 -->
 
 
 
@@ -37,8 +43,11 @@ It provides roles for managing common Linux host concerns: automatic updates, co
 
 ### Role: `foundata.linux.auto_update`<a id="content-role-auto_update"></a>
 
-Configures each supported distribution's native unattended-update service through a consistent interface, including update scope, schedules, exclusions, notifications, and controlled reboot policies.
-[Its `README.md`](./roles/auto_update/README.md) covers configuration, usage examples, and more:
+Configures each supported distribution's native unattended-update service
+through a consistent interface, including update scope, schedules, exclusions,
+notifications, and controlled reboot policies.
+[Its `README.md`](./roles/auto_update/README.md) covers configuration, usage
+examples, and more:
 
 <!-- ANSIBLE DOCSMITH TOC-FULL auto_update START -->
 - [Ansible role: `foundata.linux.auto_update`](roles/auto_update/README.md#ansible-role-foundatalinuxauto_update)
@@ -70,7 +79,11 @@ Configures each supported distribution's native unattended-update service throug
 
 ### Role: `foundata.linux.disk`<a id="content-role-disk"></a>
 
-Manages dedicated data disks: single partition spanning the disk, filesystem (XFS or ext4), mount plus `/etc/fstab` entry by filesystem UUID — with safe handling of existing data, mountpoint content preservation on first mount, and one-time SELinux relabeling. [Its `README.md`](./roles/disk/README.md) covers configuration, usage examples, and more:
+Manages dedicated data disks: single partition spanning the disk, filesystem
+(XFS or ext4), mount plus `/etc/fstab` entry by filesystem UUID — with safe
+handling of existing data, mountpoint content preservation on first mount, and
+one-time SELinux relabeling. [Its `README.md`](./roles/disk/README.md) covers
+configuration, usage examples, and more:
 
 <!-- ANSIBLE DOCSMITH TOC-FULL disk START -->
 - [Ansible role: `foundata.linux.disk`](roles/disk/README.md#ansible-role-foundatalinuxdisk)
@@ -123,7 +136,10 @@ Manages dedicated data disks: single partition spanning the disk, filesystem (XF
 
 ### Role: `foundata.linux.reboot`<a id="content-role-reboot"></a>
 
-Detects whether Linux systems require a reboot and performs it safely, with cross-platform checks and configurable connection, timeout, messaging, and readiness validation. [Its `README.md`](./roles/reboot/README.md) covers configuration, usage examples, and more:
+Detects whether Linux systems require a reboot and performs it safely, with
+cross-platform checks and configurable connection, timeout, messaging, and
+readiness validation. [Its `README.md`](./roles/reboot/README.md) covers
+configuration, usage examples, and more:
 
 <!-- ANSIBLE DOCSMITH TOC-FULL reboot START -->
 - [Ansible role: `foundata.linux.reboot`](roles/reboot/README.md#ansible-role-foundatalinuxreboot)
@@ -149,7 +165,10 @@ Detects whether Linux systems require a reboot and performs it safely, with cros
 
 ### Role: `foundata.linux.sudo`<a id="content-role-sudo"></a>
 
-Installs and configures sudo through declarative, `visudo`-validated rules and defaults, with optional authoritative cleanup of unmanaged drop-ins. [Its `README.md`](./roles/sudo/README.md) covers configuration, usage examples, and more:
+Installs and configures sudo through declarative, `visudo`-validated rules and
+defaults, with optional authoritative cleanup of unmanaged drop-ins.
+[Its `README.md`](./roles/sudo/README.md) covers configuration, usage examples,
+and more:
 
 <!-- ANSIBLE DOCSMITH TOC-FULL sudo START -->
 - [Ansible role: `foundata.linux.sudo`](roles/sudo/README.md#ansible-role-foundatalinuxsudo)
@@ -185,7 +204,10 @@ Installs and configures sudo through declarative, `visudo`-validated rules and d
 
 ### Role: `foundata.linux.sysctl`<a id="content-role-sysctl"></a>
 
-Manages Linux kernel parameters through `sysctl`, combining explicit overrides with stackable, resource-aware workload and security profiles. [Its `README.md`](./roles/sysctl/README.md) covers configuration, usage examples, and more:
+Manages Linux kernel parameters through `sysctl`, combining explicit overrides
+with stackable, resource-aware workload and security profiles.
+[Its `README.md`](./roles/sysctl/README.md) covers configuration, usage
+examples, and more:
 
 <!-- ANSIBLE DOCSMITH TOC-FULL sysctl START -->
 - [Ansible role: `foundata.linux.sysctl`](roles/sysctl/README.md#ansible-role-foundatalinuxsysctl)
@@ -212,7 +234,10 @@ Manages Linux kernel parameters through `sysctl`, combining explicit overrides w
 
 ### Role: `foundata.linux.user`<a id="content-role-user"></a>
 
-Manages local users and groups declaratively, including account defaults, home directories, password policies, SSH authorized keys, and optional cleanup of unmanaged accounts. [Its `README.md`](./roles/user/README.md) covers configuration, usage examples, and more:
+Manages local users and groups declaratively, including account defaults, home
+directories, password policies, SSH authorized keys, and optional cleanup of
+unmanaged accounts. [Its `README.md`](./roles/user/README.md) covers
+configuration, usage examples, and more:
 
 <!-- ANSIBLE DOCSMITH TOC-FULL user START -->
 - [Ansible role: `foundata.linux.user`](roles/user/README.md#ansible-role-foundatalinuxuser)
@@ -285,9 +310,19 @@ Copyright (c) 2026, [foundata GmbH](https://foundata.com/)
 (https://foundata.com)
 <!-- rumdl-enable MD034 -->
 
-This project is licensed under the GNU General Public License v3.0 or later (SPDX-License-Identifier: `GPL-3.0-or-later`), see [`LICENSES/GPL-3.0-or-later.txt`](LICENSES/GPL-3.0-or-later.txt) for the full text.
+This project is licensed under the GNU General Public License v3.0 or later
+(SPDX-License-Identifier: `GPL-3.0-or-later`), see
+[`LICENSES/GPL-3.0-or-later.txt`](LICENSES/GPL-3.0-or-later.txt) for the full
+text.
 
-The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright information in a human- and machine-readable format. This includes parts that may be subject to different licensing or usage terms, such as third-party components. The repository conforms to the [REUSE specification](https://reuse.software/spec/). You can use [`reuse spdx`](https://reuse.readthedocs.io/en/latest/readme.html#cli) to create a [SPDX software bill of materials (SBOM)](https://en.wikipedia.org/wiki/Software_Package_Data_Exchange).
+The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright
+information in a human- and machine-readable format. This includes parts that
+may be subject to different licensing or usage terms, such as third-party
+components. The repository conforms to the
+[REUSE specification](https://reuse.software/spec/). You can use
+[`reuse spdx`](https://reuse.readthedocs.io/en/latest/readme.html#cli) to create
+a
+[SPDX software bill of materials (SBOM)](https://en.wikipedia.org/wiki/Software_Package_Data_Exchange).
 <!--REUSE-IgnoreEnd-->
 
 [![REUSE status](https://api.reuse.software/badge/github.com/foundata/ansible-collection-linux)](https://api.reuse.software/info/github.com/foundata/ansible-collection-linux)
@@ -299,4 +334,6 @@ The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright in
 This [project](https://foundata.com/en/projects/) was created and is maintained
 by [foundata](https://foundata.com/).
 
-Initially based on an [Ansible skeleton](https://foundata.com/en/projects/ansible-skeletons/) developed by [foundata](https://foundata.com/).
+Initially based on an
+[Ansible skeleton](https://foundata.com/en/projects/ansible-skeletons/)
+developed by [foundata](https://foundata.com/).
