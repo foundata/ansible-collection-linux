@@ -10,6 +10,9 @@
 # Violations are appended to __disk_linux_wipe_violations; the caller
 # asserts on the aggregate BEFORE the first wipefs call, so one busy disk
 # cannot be discovered after another one was already destroyed.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

@@ -5,6 +5,9 @@
 # the "dnf5-plugin-automatic" package and the "dnf5-automatic.timer" unit. The
 # configuration file (/etc/dnf/automatic.conf) and backend identifier are
 # identical to dnf4 and therefore inherited from vars/redhat.yml.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

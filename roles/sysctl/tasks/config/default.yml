@@ -2,6 +2,9 @@
 #
 # This file contains the core logic for setting sysctl parameters using
 # the ansible.posix.sysctl module.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

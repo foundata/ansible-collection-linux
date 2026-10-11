@@ -1,5 +1,10 @@
 # sysctl profile `postgresql`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Tuning for PostgreSQL database servers. PostgreSQL keeps a large working set resident and relies on the OS page cache for most caching, so it benefits from a swap-averse memory policy, bounded write-back to avoid checkpoint/fsync stalls, and high file-descriptor limits for many backends and relation files.
 
 This profile targets performance; stack others for security hardening (see "Security hardening" below). All values can be overridden with `sysctl_linux_parameters`; set a value to `null` to stop managing it.

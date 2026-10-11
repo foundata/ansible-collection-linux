@@ -21,6 +21,9 @@
     make every reset wipe the triggers rendered before it, so only the last
     configured trigger would survive. See systemd.timer(5) and systemd.unit(5):
     "assigning the empty string [...] resets the list".
+
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
 -#}
 {%- set tpl_timer_trigger_directives = [
       'OnCalendar',

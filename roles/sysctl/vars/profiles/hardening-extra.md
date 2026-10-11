@@ -1,5 +1,10 @@
 # sysctl profile `hardening-extra`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Conservative kernel-level security hardening, meant to be **stacked** on top of a workload profile (and `hardening-default`) rather than used alone:
 
 ```yaml

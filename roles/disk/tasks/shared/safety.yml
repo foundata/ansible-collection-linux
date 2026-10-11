@@ -4,6 +4,9 @@
 # Lives in tasks/shared/ because it is phase-neutral: included by
 # tasks/config/default.yml AND tasks/setup/uninstall/default.yml, so a wipe
 # can never run without these checks.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

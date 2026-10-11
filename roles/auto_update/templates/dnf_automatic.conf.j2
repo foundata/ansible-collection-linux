@@ -5,6 +5,9 @@
   Section dictionaries are built from the dedicated parameters first, then the
   user's auto_update_linux_extra_config['dnf-automatic'] (keyed by section) is
   merged on top so it takes precedence.
+
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
 -#}
 # {{ ansible_managed }}
 {% set extra = auto_update_linux_extra_config['dnf-automatic'] | ansible.builtin.default({}) %}

@@ -11,6 +11,9 @@
 # (A run with the pure default is not possible here: the converge-time
 # sysctl_linux_* set_fact variables survive even ansible.builtin.meta
 # clear_facts and would shadow the role default.)
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: "Molecule | Verify | sysctl default name | Load the role defaults from the installed collection"
   ansible.builtin.include_vars:

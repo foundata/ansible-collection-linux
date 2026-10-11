@@ -1,5 +1,10 @@
 # sysctl profile `container-rootless`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Tuning for hosts that run **only rootless OCI containers with user-mode networking** (Podman with pasta or slirp4netns). Such a host never bridges or NATs container traffic: outbound traffic and published ports are handled by a userspace proxy running as the container user. The kernel therefore needs none of the routing machinery a rootful/bridged container host needs. What actually runs out are the per-UID kernel quotas that all containers of one rootless user share.
 
 For hosts with rootful or bridged container networking (Docker, rootful Podman/netavark, containerd/CRI-O, Kubernetes nodes), use the [`container`](./container.md) profile instead. All values can be overridden with `sysctl_linux_parameters`; set a value to `null` to stop managing it.

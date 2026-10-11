@@ -1,5 +1,10 @@
 # sysctl profile `hardening-default`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 A shared baseline of network, kernel and filesystem security hardening. The workload/application profiles (`web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`, `virtualization`, `router`) focus on performance and reliability and intentionally do not carry these keys, so this profile is the single, central place for the common safe defaults.
 
 It is meant to be **stacked**, usually first, before an application profile:

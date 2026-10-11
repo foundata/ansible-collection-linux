@@ -2,6 +2,9 @@
 # device entry (loop_var __disk_linux_entry_item from tasks/config/default.yml).
 # Appends the planned action to __disk_linux_plan; every hard failure fires
 # here, before any disk has been changed.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

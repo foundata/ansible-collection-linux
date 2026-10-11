@@ -2,6 +2,9 @@
 # ({varname, label, settings}). Applies invalid timer settings, runs the role's
 # init and expects it to fail in the timer settings validation. The previous
 # value is restored afterwards, so later tasks keep seeing the converge state.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: "Molecule | Verify | Timer reject | save the current settings: {{ __testing_reject_case['label'] }}"
   ansible.builtin.set_fact:

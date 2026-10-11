@@ -1,4 +1,7 @@
 # Execute the collection role "reboot" against all driver-created instances.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: "Molecule | Converge | Include the foundata.linux.reboot role"
   ansible.builtin.include_role:

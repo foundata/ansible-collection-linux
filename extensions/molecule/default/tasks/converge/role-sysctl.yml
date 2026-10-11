@@ -3,6 +3,9 @@
 # The molecule instances are virtual machines, so the role applies the values
 # to a real kernel (live `sysctl -w` included) and the verify stage asserts
 # them; nothing needs to be skipped or opted out.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: "Molecule | Converge | Store sysctl_linux_* role parameters in __testing_state"
   ansible.builtin.include_tasks:

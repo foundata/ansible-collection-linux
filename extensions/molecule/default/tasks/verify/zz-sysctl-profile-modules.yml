@@ -14,6 +14,9 @@
 # packages), unlike the stock cloud images of the original incident. The
 # synthetic-negative section afterwards therefore forces the unloadable case
 # deterministically on every platform.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: "Molecule | Verify | sysctl modules | Probe which profile kernel modules the running kernel can resolve"
   ansible.builtin.command:

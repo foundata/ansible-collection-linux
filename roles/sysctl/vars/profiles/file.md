@@ -1,5 +1,10 @@
 # sysctl profile `file`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Tuning for file servers and backup targets (NFS, Samba/CIFS, SFTP, rsync, borg/restic, ..). These workloads move large amounts of data over the network and to/from storage and serve many client connections, so they benefit from large *maximum* socket buffers, throughput-oriented TCP options, larger accept/ingress queues and bounded write-back.
 
 This profile targets performance; stack others for security hardening (see "Security hardening" below). All values can be overridden with `sysctl_linux_parameters`; set a value to `null` to stop managing it.

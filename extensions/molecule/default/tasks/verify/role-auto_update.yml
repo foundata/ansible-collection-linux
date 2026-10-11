@@ -1,4 +1,7 @@
 # Check collection role "auto_update" outcomes.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: "Molecule | Verify | Set auto_update_linux_* and __testing_* parameters as facts from __testing_state"
   ansible.builtin.set_fact:

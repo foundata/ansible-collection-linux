@@ -2,6 +2,9 @@
 # the first extra disk on the hypervisor side (virtio-blk propagates the new
 # capacity to the running guest), re-run the role and assert partition and
 # filesystem were grown online. Runs once, between idempotence and verify.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 
 - name: "Molecule | Side effect | disk | Grow the first extra disk image on the hypervisor"

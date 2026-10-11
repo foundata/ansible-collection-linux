@@ -1,5 +1,10 @@
 # Ansible role: `foundata.linux.auto_update`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 The `foundata.linux.auto_update` Ansible role (part of the `foundata.linux` Ansible collection).
 
 

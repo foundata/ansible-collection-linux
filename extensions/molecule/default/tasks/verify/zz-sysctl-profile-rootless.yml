@@ -1,6 +1,9 @@
 # Coverage for the "container-rootless" profile: only the per-UID quota keys,
 # no networking machinery and no kernel modules (so it must converge even on
 # kernels that cannot load optional modules, e.g. EL10 cloud images).
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: "Molecule | Verify | sysctl rootless | Include the sysctl role with the container-rootless profile"
   ansible.builtin.include_role:

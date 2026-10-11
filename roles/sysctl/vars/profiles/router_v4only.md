@@ -1,5 +1,10 @@
 # sysctl profile `router_v4only`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Same as the [`router`](./router.md) profile in every respect (connection tracking, neighbor tables, loose reverse-path filtering) **except IP forwarding**. See [`router.md`](./router.md) for the full reasoning behind all shared settings.
 
 Like `router`, this profile targets performance; stack others for security hardening (see "Security hardening" below). All values can be overridden with `sysctl_linux_parameters`; set a value to `null` to stop managing it.

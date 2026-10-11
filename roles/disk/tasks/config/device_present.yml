@@ -1,6 +1,9 @@
 # Apply the planned action for ONE effectively present device entry
 # (loop_var __disk_linux_item from tasks/config/default.yml; produced by
 # tasks/config/preflight.yml). All read-only checks already happened there.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

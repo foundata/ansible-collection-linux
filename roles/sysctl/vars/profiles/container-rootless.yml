@@ -17,6 +17,9 @@
 # net.ipv4.ip_unprivileged_port_start lowered - a host-wide relaxation this
 # profile deliberately does NOT apply; set it via sysctl_linux_parameters if
 # needed.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

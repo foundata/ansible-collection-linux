@@ -1,5 +1,10 @@
 # Ansible role: `foundata.linux.user`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 The `foundata.linux.user` Ansible role (part of the `foundata.linux` Ansible collection).
 
 Manage local user accounts on Linux systems.

@@ -14,6 +14,9 @@
 # strings, which breaks the auto-calculation. include_vars cannot merge on its
 # own (each call would overwrite), and a loop runs only one task, hence this
 # two-task helper file.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

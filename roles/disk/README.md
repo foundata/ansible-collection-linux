@@ -1,5 +1,10 @@
 # Ansible role: `foundata.linux.disk`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 The `foundata.linux.disk` Ansible role (part of the `foundata.linux` Ansible collection) manages dedicated data disks. It takes a whole block device from raw disk to mounted filesystem a single partition spanning the disk, a filesystem (XFS or ext4) on it, and a mount plus `/etc/fstab` entry by filesystem UUID.
 
 The role is built to never reformat or destroy existing data by default: it verifies the declared layout (partition table type, single partition, filesystem type) against the disk and fails hard on any deviation (`on_mismatch`) or mount/fstab conflicts.

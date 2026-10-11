@@ -1,5 +1,10 @@
 # Ansible role: `foundata.linux.sysctl`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Manages Linux kernel parameters via `sysctl`, with optional workload-specific profiles that auto-tune values based on system resources.
 
 Choose one or more profiles for your workload (web server, the database engines, file server, virtualization host, container host, or router) and the role applies performance-tuned parameters. Security hardening lives in separate, stackable profiles (`hardening-default`, `hardening-extra`) — stack them with a workload profile, e.g. `["hardening-default", "web"]`. Override any value with `sysctl_linux_parameters`.

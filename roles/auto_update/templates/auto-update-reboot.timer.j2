@@ -2,6 +2,9 @@
   Full systemd timer unit (not a drop-in) for the scheduled "reboot if needed"
   check. The [Timer] directives come from tpl_reboot_timer_settings (the merged
   effective settings). Boolean values are rendered as "true"/"false".
+
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
 -#}
 {%- set tpl_timer_trigger_directives = [
       'OnCalendar',

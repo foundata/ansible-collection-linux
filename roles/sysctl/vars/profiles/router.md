@@ -1,5 +1,10 @@
 # sysctl profile `router`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Tuning for routers, firewalls, NAT gateways and VPN concentrators. A forwarding device needs IP forwarding enabled, a connection-tracking table large enough for all flows passing through it, neighbor (ARP/NDP) tables sized for many peers, and reverse-path filtering relaxed to tolerate the asymmetric routing such devices commonly see.
 
 This is the **canonical router profile and forwards both IPv4 and IPv6**. Two variants share everything here and differ only in the forwarding keys:

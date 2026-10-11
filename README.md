@@ -1,5 +1,10 @@
 # Ansible collection: `foundata.linux`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 This repository contains the `foundata.linux` Ansible Collection.
 
 It provides roles for managing common Linux host concerns: automatic updates,

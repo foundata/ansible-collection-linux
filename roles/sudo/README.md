@@ -1,5 +1,10 @@
 # Ansible role: `foundata.linux.sudo`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 The `foundata.linux.sudo` Ansible role (part of the `foundata.linux` Ansible collection).
 
 

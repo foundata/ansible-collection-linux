@@ -1,5 +1,10 @@
 # sysctl profile `redis`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Tuning for **Redis** (and API-compatible in-memory stores like Valkey/KeyDB). Redis is single-threaded with a large in-memory dataset and forks a child for background persistence (RDB snapshots, AOF rewrite), so the two things that matter most at the kernel level are **memory overcommit** (so the fork cannot fail) and a **high accept backlog**.
 
 This profile targets performance; stack others for security hardening (see "Security hardening" below). All values can be overridden with `sysctl_linux_parameters`; set a value to `null` to stop managing it.

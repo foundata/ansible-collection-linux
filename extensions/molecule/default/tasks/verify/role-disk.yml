@@ -1,4 +1,7 @@
 # Check collection role "disk" outcomes.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: "Molecule | Verify | disk | Initialize the foundata.linux.disk role (expose internal vars without running it)"
   ansible.builtin.include_role:

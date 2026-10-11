@@ -3,6 +3,9 @@
 #
 # Expects __testing_uid_bounds_case: {label, uid_min, uid_max, reason_pattern}
 # where reason_pattern must match the name of the init task expected to fail.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: "Molecule | Verify | user | UID bounds: reject {{ __testing_uid_bounds_case['label'] }}"
   block:

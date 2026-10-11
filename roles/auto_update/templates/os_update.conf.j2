@@ -6,6 +6,9 @@
   os-update only installs updates (no download-only/notify mode), has no
   per-package exclude and no built-in email; those parameters are intentionally
   not represented here (a notice is emitted from tasks/config/suse.yml).
+
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
 -#}
 # {{ ansible_managed }}
 UPDATE_CMD="{{ 'security' if auto_update_linux_type == 'security' else 'auto' }}"

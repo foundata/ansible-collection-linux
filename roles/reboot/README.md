@@ -1,5 +1,10 @@
 # Ansible role: `foundata.linux.reboot`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 The `foundata.linux.reboot` Ansible role (part of the `foundata.linux` Ansible collection) detects if a system reboot is required and performs it if so.
 
 

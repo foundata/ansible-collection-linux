@@ -9,6 +9,9 @@
 #      first mutation.
 #   4. Apply the plan per present entry (parent-first), then per-item
 #      absent cleanup (child-first).
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

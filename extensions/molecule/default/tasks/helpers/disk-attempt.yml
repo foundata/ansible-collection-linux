@@ -3,6 +3,9 @@
 # NOT cover the included tasks, only block/rescue catches their failures.
 # Callers pass __testing_attempt_devices (the disk_linux_devices list) and
 # optionally __testing_attempt_critical (critical-mountpoint override).
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: "Molecule | Verify | disk | Attempt an expected-failure role invocation"
   block:

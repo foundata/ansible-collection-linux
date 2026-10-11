@@ -1,6 +1,9 @@
 # Execute the collection role "disk" against all driver-created instances.
 # The libvirt platforms attach two blank extra disks (see molecule.yml,
 # "extra_disks"), addressable as /dev/disk/by-id/virtio-molecule-data0/1.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 
 # Seeded BEFORE the first role run while the mountpoint is still a plain

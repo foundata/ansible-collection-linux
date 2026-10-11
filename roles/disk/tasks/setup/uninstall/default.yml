@@ -6,6 +6,9 @@
 # honored when the entry's own effective state is "absent" (the global
 # "absent" never enables wiping). Tool packages are never uninstalled
 # (__disk_linux_packages_uninstall is empty), they are base-system components.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

@@ -12,6 +12,9 @@
 # profile sets it (loose mode), where it is functionally needed.
 #
 # Override any value via sysctl_linux_parameters; set it to null to unmanage it.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

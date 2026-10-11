@@ -1,5 +1,10 @@
 # sysctl profile `virtualization`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Tuning for **KVM/QEMU hypervisor hosts** (libvirt, Proxmox VE, ...). These hosts pack many guests onto shared hardware and back guest disks with host storage, so they benefit from memory overcommit, an emergency memory reserve, bounded write-back and generous async-I/O limits.
 
 This profile targets performance; stack others for security hardening (see "Security hardening" below). All values can be overridden with `sysctl_linux_parameters`; set a value to `null` to stop managing it.

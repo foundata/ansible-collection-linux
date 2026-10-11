@@ -8,6 +8,9 @@
 # tasks/setup/uninstall/default.yml (role-global disk_linux_state absent).
 # The non-destructive cleanup always proceeds, even when the disk itself has
 # already been detached.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

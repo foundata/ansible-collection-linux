@@ -4,6 +4,9 @@
 # play-level ignore_unreachable only covers connection errors, not the
 # follow-up local failures of running a whole role against a dead instance,
 # so everything below is gated on an explicit reachability probe.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 
 - name: "Molecule | Cleanup | disk | Probe instance reachability"

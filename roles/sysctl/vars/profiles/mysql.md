@@ -1,5 +1,10 @@
 # sysctl profile `mysql`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Tuning for **MySQL and MariaDB** servers. The InnoDB engine keeps a large buffer pool, opens many table/tablespace files, and uses native asynchronous I/O (libaio), so this profile favours a swap-averse memory policy, bounded write-back, AIO headroom and high file-descriptor limits.
 
 This profile targets performance; stack others for security hardening (see "Security hardening" below). All values can be overridden with `sysctl_linux_parameters`; set a value to `null` to stop managing it.

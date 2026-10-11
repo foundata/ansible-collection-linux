@@ -1,5 +1,10 @@
 # sysctl profile `elasticsearch`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Tuning for Elasticsearch / OpenSearch (Lucene-based search engines). Lucene memory-maps a very large number of index segment files, so the defining kernel requirement is a high `vm.max_map_count`; beyond that the profile applies a swap-averse memory policy, bounded write-back and high file-descriptor limits.
 
 This profile targets performance; stack others for security hardening (see "Security hardening" below). All values can be overridden with `sysctl_linux_parameters`; set a value to `null` to stop managing it.

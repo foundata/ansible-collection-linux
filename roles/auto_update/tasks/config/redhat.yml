@@ -4,6 +4,9 @@
 # as the configuration file format (/etc/dnf/automatic.conf) is identical. The
 # package name and timer unit differ and are set in vars/redhat.yml respectively
 # vars/fedora.yml.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 

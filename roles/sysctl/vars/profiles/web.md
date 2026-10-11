@@ -1,5 +1,10 @@
 # sysctl profile `web`
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Tuning for web servers, API gateways, load balancers and reverse proxies (NGINX, Apache HTTPD, HAProxy, Envoy, Traefik, ..). These workloads are characterised by a high number of concurrent and short-lived connections, large accept/SYN bursts, and a lot of outbound connections when acting as a proxy.
 
 This profile targets performance; stack others for security hardening (see "Security hardening" below). All values can be overridden with `sysctl_linux_parameters`; set a value to `null` to stop managing it.
