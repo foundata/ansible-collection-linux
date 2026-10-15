@@ -39,6 +39,7 @@ conditional reboots, sudo policy, kernel parameters, and local users and groups.
   - [Role: `foundata.linux.sysctl`](#content-role-sysctl)
   - [Role: `foundata.linux.user`](#content-role-user)
 - [Dependencies](#dependencies)
+- [Versioning and deprecation](#versioning-deprecation)
 - [Licensing, copyright](#licensing-copyright)
 - [Author information](#author-information)
 
@@ -304,6 +305,18 @@ configuration, usage examples, and more:
 
 See `dependencies` in [`galaxy.yml`](./galaxy.yml).
 
+
+
+## Versioning and deprecation<a id="versioning-deprecation"></a>
+
+This project follows [Semantic Versioning](https://semver.org/).
+Patch releases contain compatible fixes; minor releases may add compatible
+features or deprecations. Breaking changes, including changes to public
+defaults or removal of supported runtimes, require a major release.
+
+Deprecations are announced in the changelog and relevant documentation,
+with migration guidance and the planned removal version. Deprecated
+interfaces remain available until that major release.
 
 
 ## Licensing, copyright<a id="licensing-copyright"></a>
