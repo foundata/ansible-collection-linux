@@ -10,33 +10,33 @@
 SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 SPDX-License-Identifier: GPL-3.0-or-later
 -#}
-# {{ ansible_managed }}
+# {{ tpl_managed }}
 
 Unattended-Upgrade::Origins-Pattern {
-{% for origin in __auto_update_linux_apt_origins_security | ansible.builtin.default([]) %}
+{% for origin in tpl_apt_origins_security | ansible.builtin.default([]) %}
     "{{ origin }}";
 {% endfor %}
-{% if auto_update_linux_type == 'all' %}
-{% for origin in __auto_update_linux_apt_origins_all_extra | ansible.builtin.default([]) %}
+{% if tpl_type == 'all' %}
+{% for origin in tpl_apt_origins_all_extra | ansible.builtin.default([]) %}
     "{{ origin }}";
 {% endfor %}
 {% endif %}
 };
 
-{% if (auto_update_linux_exclude | ansible.builtin.length) > 0 %}
+{% if (tpl_exclude | ansible.builtin.length) > 0 %}
 Unattended-Upgrade::Package-Blacklist {
-{% for pkg in auto_update_linux_exclude %}
+{% for pkg in tpl_exclude %}
     "{{ pkg }}";
 {% endfor %}
 };
 {% endif %}
-Unattended-Upgrade::Download-Only "{{ 'true' if auto_update_linux_apply in ['download', 'notify'] else 'false' }}";
-Unattended-Upgrade::Automatic-Reboot "{{ 'true' if auto_update_linux_reboot == 'immediate' else 'false' }}";
-{% if (auto_update_linux_notify_email | ansible.builtin.length) > 0 %}
-Unattended-Upgrade::Mail "{{ auto_update_linux_notify_email }}";
+Unattended-Upgrade::Download-Only "{{ 'true' if tpl_apply in ['download', 'notify'] else 'false' }}";
+Unattended-Upgrade::Automatic-Reboot "{{ 'true' if tpl_reboot == 'immediate' else 'false' }}";
+{% if (tpl_notify_email | ansible.builtin.length) > 0 %}
+Unattended-Upgrade::Mail "{{ tpl_notify_email }}";
 Unattended-Upgrade::MailReport "on-change";
 {% endif %}
-{% set _extra = auto_update_linux_extra_config['unattended-upgrades'] | ansible.builtin.default({}) %}
+{% set _extra = tpl_extra_config['unattended-upgrades'] | ansible.builtin.default({}) %}
 {% if (_extra | ansible.builtin.length) > 0 %}
 
 // Additional options from auto_update_linux_extra_config['unattended-upgrades']

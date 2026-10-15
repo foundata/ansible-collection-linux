@@ -14,7 +14,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 # ansible_check_mode is unreliable for roles included with
 # "apply: check_mode: true" (the tasks run in check mode but the variable
 # stays false), so check mode is detected empirically: a plain command task
@@ -23,15 +22,13 @@
   ansible.builtin.command:
     argv:
       - "true"
-  register: __disk_linux_checkmode_canary
   changed_when:
     - false
 
-
+  register: __disk_linux_checkmode_canary
 - name: "Config | Default | Set the check mode fact"
   ansible.builtin.set_fact:
     __disk_linux_check_mode: "{{ __disk_linux_checkmode_canary is ansible.builtin.skipped }}"
-
 
 # Shared destructive-operation safety: device existence and identity, the
 # whole-disk and duplicate enforcement and the system-disk protection live in
@@ -40,7 +37,6 @@
 - name: "Config | Default | Run the shared disk safety preflight"
   ansible.builtin.include_tasks:
     file: "{{ role_path }}/tasks/shared/safety.yml"
-
 
 - name: "Config | Default | Read the current mount table"
   ansible.builtin.command:
@@ -57,7 +53,6 @@
   # skipped and the discovery dereferences its missing result.
   check_mode: false
   register: __disk_linux_mounts_result
-
 
 - name: "Config | Default | Initialize the per-device plan"
   ansible.builtin.set_fact:
@@ -96,7 +91,6 @@
     label: "{{ __disk_linux_entry_item['path'] }}"
     loop_var: "__disk_linux_entry_item"
 
-
 # In check mode the discovery, preflight and plan above ARE the dry run: the
 # apply steps below depend on the results of preceding disk changes
 # (partition devices, filesystem UUIDs) and cannot be simulated meaningfully,
@@ -117,9 +111,9 @@
             | ansible.builtin.list))
         | ansible.builtin.join(', ')
       }}
+    verbosity: 0
   when:
     - __disk_linux_check_mode | ansible.builtin.bool
-
 
 - name: "Config | Default | Apply the plan (parent-first)"
   ansible.builtin.include_tasks:
@@ -130,7 +124,6 @@
   loop_control:
     label: "{{ __disk_linux_item['entry']['path'] }} ({{ __disk_linux_item['action'] }})"
     loop_var: "__disk_linux_item"
-
 
 # Every absent entry with wipe enabled is activity-checked BEFORE the first
 # one is touched: a busy disk discovered mid-loop would come too late, after
@@ -156,7 +149,6 @@
     loop_var: "__disk_linux_wp_entry_item"
     label: "{{ __disk_linux_wp_entry_item['device'] }}"
 
-
 - name: "Config | Default | Check every absent entry's device tree is inactive"
   ansible.builtin.assert:
     that:
@@ -166,7 +158,6 @@
       ({{ __disk_linux_wipe_violations | ansible.builtin.join('; ') }}).
       Unmount or deactivate them first; nothing was changed.
     quiet: true
-
 
 - name: "Config | Default | Per-item absent cleanup (child-first)"
   ansible.builtin.include_tasks:

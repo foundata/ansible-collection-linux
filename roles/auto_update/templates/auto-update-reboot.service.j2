@@ -2,7 +2,7 @@
 SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 SPDX-License-Identifier: GPL-3.0-or-later
 #}
-# {{ ansible_managed }}
+# {{ tpl_managed }}
 [Unit]
 Description=Reboot the system if a reboot is required
 Documentation=https://foundata.com/en/projects/ansible-collection-linux/
@@ -10,4 +10,4 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart={{ __auto_update_linux_reboot_script_path }}
+ExecStart={{ tpl_reboot_script_path }}

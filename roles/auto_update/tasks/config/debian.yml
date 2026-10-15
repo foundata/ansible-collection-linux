@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Config | Debian | Notice: 'notify' apply mode is approximated as download-only"
   ansible.builtin.debug:
     msg: >-
@@ -12,9 +11,9 @@
       auto_update_linux_apply set to 'notify', updates are downloaded but not
       installed (download-only), you can optionally combine this with email
       reports using auto_update_linux_notify_email
+    verbosity: 0
   when:
     - auto_update_linux_apply == 'notify'
-
 
 - name: "Config | Debian | Manage periodic apt maintenance (unattended upgrades)"
   ansible.builtin.template:
@@ -28,9 +27,9 @@
     # timers trigger unattended-upgrades from this periodic flag independently of
     # the role-managed timer, so it would otherwise keep running.
     tpl_unattended_upgrade: "{{ '1' if auto_update_linux_service_state in ['enabled', 'running'] else '0' }}"
+    tpl_managed: "{{ ansible_managed }}"
   when:
     - auto_update_linux_service_state != 'unmanaged'
-
 
 - name: "Config | Debian | Remove role-managed periodic apt maintenance file when unmanaged"
   # periodic flag file is removed to allow the distribution default takes over
@@ -40,7 +39,6 @@
   when:
     - auto_update_linux_service_state == 'unmanaged'
 
-
 - name: "Config | Debian | Create managed unattended-upgrades configuration"
   ansible.builtin.template:
     src: "apt_unattended_upgrades.j2"
@@ -48,3 +46,13 @@
     owner: "{{ __auto_update_linux_apt_config_file_owner }}"
     group: "{{ __auto_update_linux_apt_config_file_group }}"
     mode: "{{ __auto_update_linux_apt_config_file_mode }}"
+  vars:
+    tpl_apt_origins_all_extra: "{{ __auto_update_linux_apt_origins_all_extra }}"
+    tpl_apt_origins_security: "{{ __auto_update_linux_apt_origins_security }}"
+    tpl_managed: "{{ ansible_managed }}"
+    tpl_apply: "{{ auto_update_linux_apply }}"
+    tpl_exclude: "{{ auto_update_linux_exclude }}"
+    tpl_extra_config: "{{ auto_update_linux_extra_config }}"
+    tpl_notify_email: "{{ auto_update_linux_notify_email }}"
+    tpl_reboot: "{{ auto_update_linux_reboot }}"
+    tpl_type: "{{ auto_update_linux_type }}"

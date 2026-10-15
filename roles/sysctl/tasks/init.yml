@@ -4,12 +4,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Init | Include role meta data"
   ansible.builtin.include_vars:
     file: "../meta/main.yml"
     name: "__sysctl_linux_meta"
-
 
 - name: "Init | Check Ansible version requirement and fail if unmet"
   ansible.builtin.fail:
@@ -41,12 +39,9 @@
       or distribution facts are missing.
     verbosity: 1
   when:
-    - ansible_facts['os_family'] is not ansible.builtin.defined or
-      ansible_facts['distribution'] is not ansible.builtin.defined or
-      ansible_facts['distribution_version'] is not ansible.builtin.defined or
-      ansible_facts['distribution_major_version'] is not ansible.builtin.defined or
+    - ansible_facts['os_family'] is not ansible.builtin.defined or ansible_facts['distribution'] is not ansible.builtin.defined or
+      ansible_facts['distribution_version'] is not ansible.builtin.defined or ansible_facts['distribution_major_version'] is not ansible.builtin.defined or
       ((__sysctl_linux_supported_platforms | ansible.builtin.length) == 0)
-
 
 - name: "Init | Warn when platform is unsupported"
   ansible.builtin.fail:
@@ -72,7 +67,6 @@
     - (__sysctl_linux_supported_platforms | ansible.builtin.length) > 0
     - (__sysctl_linux_matched_versions | ansible.builtin.length) == 0
   ignore_errors: true # noqa: ignore-errors
-
 
 - name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
   ansible.builtin.set_fact:
@@ -138,7 +132,6 @@
   loop_control:
     loop_var: "__sysctl_linux_varsfile_item"
 
-
 ### sysctl specific
 
 # The drop-in filename gets concatenated into a path below /etc/sysctl.d. A
@@ -169,16 +162,15 @@
     loop_var: "__sysctl_linux_effective_var_item"
     label: "{{ __sysctl_linux_effective_var_item }}"
 
-
 # Profiles are stacked: each entry of the sysctl_linux_profile list is loaded in
 # order and merged into the accumulators __sysctl_linux_profile_parameters and
-# __sysctl_linux_profile_modules (a mapping of kernel module name to the
+# __sysctl_linux_effective_profile_modules (a mapping of kernel module name to the
 # parameter key prefixes it gates), so a later profile wins on a key set by an
 # earlier one and the module mappings are merged.
 - name: "Init | Reset accumulated sysctl profile parameters and modules"
   ansible.builtin.set_fact:
     __sysctl_linux_profile_parameters: {}
-    __sysctl_linux_profile_modules: {}
+    __sysctl_linux_effective_profile_modules: {}
 
 
 - name: "Init | Accumulate sysctl profile variables (listed order; last wins, kernel modules unioned)"
@@ -188,7 +180,6 @@
   loop_control:
     loop_var: "__sysctl_linux_profile_item"
     label: "{{ __sysctl_linux_profile_item }}"
-
 
 # Detect if we run in a container (required for checkability due to read-only kernel
 # parameters in containerized systems)
@@ -213,11 +204,9 @@
     path: "/proc/sys/net/ipv6"
   register: __sysctl_linux_ipv6_stat
 
-
 - name: "Init | Set IPv6 availability fact"
   ansible.builtin.set_fact:
     __sysctl_linux_ipv6_available: "{{ __sysctl_linux_ipv6_stat['stat']['exists'] | ansible.builtin.default(true) }}"
-
 
 - name: "Init | Notify when net.ipv6.* parameters are skipped (IPv6 unavailable)"
   ansible.builtin.debug:
@@ -235,7 +224,6 @@
     verbosity: 1
   when:
     - not __sysctl_linux_ipv6_available
-
 
 # Load kernel modules a profile depends on (e.g. nf_conntrack for routers,
 # br_netfilter for bridged container hosts) so module-gated kernel parameters
@@ -257,15 +245,14 @@
     persistent: "disabled"
   when:
     - sysctl_linux_state == 'present'
-    - (__sysctl_linux_profile_modules | ansible.builtin.length) > 0
-  loop: "{{ __sysctl_linux_profile_modules | ansible.builtin.dict2items }}"
+    - (__sysctl_linux_effective_profile_modules | ansible.builtin.length) > 0
+  ignore_errors: true # noqa: ignore-errors
+
+  loop: "{{ __sysctl_linux_effective_profile_modules | ansible.builtin.dict2items }}"
   loop_control:
     loop_var: "__sysctl_linux_module_item"
     label: "{{ __sysctl_linux_module_item['key'] }}"
   register: __sysctl_linux_modprobe_result
-  ignore_errors: true # noqa: ignore-errors
-
-
 - name: "Init | Determine kernel modules that could not be loaded (and the key prefixes they gate)"
   ansible.builtin.set_fact:
     __sysctl_linux_modules_unavailable: >-
@@ -293,9 +280,9 @@
       Skipping the module-gated parameter(s):
       {{ __sysctl_linux_effective_parameters_dropped_keys | ansible.builtin.join(', ') }}.
       Set 'sysctl_linux_modules_required: true' to fail instead.
+    verbosity: 0
   when:
     - (__sysctl_linux_modules_unavailable | ansible.builtin.length) > 0
-
 
 - name: "Init | Fail when required kernel modules could not be loaded"
   ansible.builtin.fail:

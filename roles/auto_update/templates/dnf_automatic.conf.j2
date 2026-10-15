@@ -9,26 +9,26 @@
 SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 SPDX-License-Identifier: GPL-3.0-or-later
 -#}
-# {{ ansible_managed }}
-{% set extra = auto_update_linux_extra_config['dnf-automatic'] | ansible.builtin.default({}) %}
-{% set emit_via = 'email' if (auto_update_linux_notify_email | ansible.builtin.length) > 0
-   else ('motd' if auto_update_linux_apply == 'notify' else 'stdio') %}
+# {{ tpl_managed }}
+{% set extra = tpl_extra_config['dnf-automatic'] | ansible.builtin.default({}) %}
+{% set emit_via = 'email' if (tpl_notify_email | ansible.builtin.length) > 0
+   else ('motd' if tpl_apply == 'notify' else 'stdio') %}
 {% set sections = {
      'commands': {
-       'upgrade_type': ('security' if auto_update_linux_type == 'security' else 'default'),
-       'download_updates': ('yes' if auto_update_linux_apply in ['install', 'download'] else 'no'),
-       'apply_updates': ('yes' if auto_update_linux_apply == 'install' else 'no'),
-       'reboot': ('when-needed' if auto_update_linux_reboot == 'immediate' else 'never'),
+       'upgrade_type': ('security' if tpl_type == 'security' else 'default'),
+       'download_updates': ('yes' if tpl_apply in ['install', 'download'] else 'no'),
+       'apply_updates': ('yes' if tpl_apply == 'install' else 'no'),
+       'reboot': ('when-needed' if tpl_reboot == 'immediate' else 'never'),
      },
      'emitters': {
        'emit_via': emit_via,
      },
    } %}
-{% if (auto_update_linux_exclude | ansible.builtin.length) > 0 %}
-{%   set sections = sections | ansible.builtin.combine({'base': {'exclude': auto_update_linux_exclude | ansible.builtin.join(' ')}}) %}
+{% if (tpl_exclude | ansible.builtin.length) > 0 %}
+{%   set sections = sections | ansible.builtin.combine({'base': {'exclude': tpl_exclude | ansible.builtin.join(' ')}}) %}
 {% endif %}
-{% if (auto_update_linux_notify_email | ansible.builtin.length) > 0 %}
-{%   set sections = sections | ansible.builtin.combine({'email': {'email_from': 'root', 'email_to': auto_update_linux_notify_email}}) %}
+{% if (tpl_notify_email | ansible.builtin.length) > 0 %}
+{%   set sections = sections | ansible.builtin.combine({'email': {'email_from': 'root', 'email_to': tpl_notify_email}}) %}
 {% endif %}
 {% set section_names = ((sections.keys() | ansible.builtin.list) + (extra.keys() | ansible.builtin.list)) | ansible.builtin.unique %}
 {% for section in section_names %}

@@ -7,7 +7,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Config | Default | Ensure drop-in config directory exists with proper permissions"
   ansible.builtin.file:
     path: "{{ __sysctl_linux_config_dropin_dir_path }}"
@@ -15,7 +14,6 @@
     owner: "{{ __sysctl_linux_config_dropin_dir_owner }}"
     group: "{{ __sysctl_linux_config_dropin_dir_group }}"
     mode: "{{ __sysctl_linux_config_dropin_dir_mode }}"
-
 
 - name: "Config | Default | Ensure drop-in config file exists with proper permissions"
   ansible.builtin.file:
@@ -27,7 +25,6 @@
     access_time: "preserve"
     modification_time: "preserve"
 
-
 - name: "Config | Default | Remove the role's default drop-in config file (if custom filename is used)"
   ansible.builtin.file:
     path: "{{ __sysctl_linux_config_dropin_file_path_default }}"
@@ -35,8 +32,7 @@
   when:
     - __sysctl_linux_config_dropin_file_path != __sysctl_linux_config_dropin_file_path_default
   notify:
-    - "sysctl_linux: reload"
-
+    - "sysctl_linux_reload_kernel_parameters"
 
 - name: "Config | Default | Remove the legacy default drop-in config file of earlier role versions"
   ansible.builtin.file:
@@ -45,27 +41,25 @@
   when:
     - __sysctl_linux_config_dropin_file_path != __sysctl_linux_config_dropin_file_path_legacy
   notify:
-    - "sysctl_linux: reload"
-
+    - "sysctl_linux_reload_kernel_parameters"
 
 # No Jinja template file but ansible.posix.sysctl is used below, so {{ ansible_managed }}
 # cannot be applied. The header is therefore managed explicitly by a task.
 - name: "Config | Default | Ensure 'Ansible managed' header in sysctl drop-in config file"
   ansible.builtin.lineinfile:
     path: "{{ __sysctl_linux_config_dropin_file_path }}"
-    regexp: '(?i)^#\s+ansible\s+managed'
+    regexp: "(?i)^#\\s+ansible\\s+managed"
     line: "# Ansible managed"
     insertbefore: "BOF"
     state: "present"
 
-
 - name: "Config | Default | Read current sysctl drop-in file"
   ansible.builtin.slurp:
     src: "{{ __sysctl_linux_config_dropin_file_path }}"
+  failed_when:
+    - false
+
   register: __sysctl_linux_dropin_file_content
-  failed_when: false
-
-
 - name: "Config | Default | Parse existing parameters from drop-in file"
   ansible.builtin.set_fact:
     # splitlines() (not split('\n')): inside this block scalar Jinja treats '\n'
@@ -106,19 +100,18 @@
     # reloading will be done by handler, following precedence
     reload: false
     ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | ansible.builtin.default(omit) }}"
-  loop: "{{ __sysctl_linux_effective_parameters | ansible.builtin.dict2items }}"
-  loop_control:
-    loop_var: "__sysctl_linux_parameter_item"
-    # human-friendly output like "item=net.ipv4.ip_forward=1"
-    label: "{{ __sysctl_linux_parameter_item['key'] }}={{ __sysctl_linux_parameter_item['value'] }}"
   when:
     - __sysctl_linux_effective_parameters | ansible.builtin.length > 0
     # none (Python / Ansible) == null (YAML)
     - __sysctl_linux_parameter_item['value'] is not ansible.builtin.none
     - __sysctl_linux_parameter_item['value'] | ansible.builtin.string | ansible.builtin.length > 0
+  loop: "{{ __sysctl_linux_effective_parameters | ansible.builtin.dict2items }}"
+  loop_control:
+    loop_var: "__sysctl_linux_parameter_item"
+    # human-friendly output like "item=net.ipv4.ip_forward=1"
+    label: "{{ __sysctl_linux_parameter_item['key'] }}={{ __sysctl_linux_parameter_item['value'] }}"
   notify:
-    - "sysctl_linux: reload"
-
+    - "sysctl_linux_reload_kernel_parameters"
 
 - name: "Config | Default | Build list of sysctl drop-in parameters to remove from config"
   ansible.builtin.set_fact:
@@ -148,22 +141,20 @@
     # reloading will be done by handler, following precedence
     reload: false
     ignoreerrors: "{{ sysctl_linux_ignore_unknown_key_errors | ansible.builtin.default(omit) }}"
+  when:
+    - __sysctl_linux_parameters_remove | ansible.builtin.length > 0
   loop: "{{ __sysctl_linux_parameters_remove }}"
   loop_control:
     loop_var: "__sysctl_linux_removal_parameter_item"
     # human-friendly output like "item=net.ipv4.ip_forward (remove)"
     label: "{{ __sysctl_linux_removal_parameter_item }} (remove)"
-  when:
-    - __sysctl_linux_parameters_remove | ansible.builtin.length > 0
   notify:
-    - "sysctl_linux: reload"
-
+    - "sysctl_linux_reload_kernel_parameters"
 
 - name: "Config | Default | Check if main config file exists"
   ansible.builtin.stat:
     path: "{{ __sysctl_linux_config_file_path }}"
   register: __sysctl_linux_config_file_stat
-
 
 - name: "Config | Default | Build list of sysctl drop-in parameters that should take precedence"
   ansible.builtin.set_fact:
@@ -185,7 +176,6 @@
       }}
   when:
     - __sysctl_linux_config_file_stat['stat']['exists'] | ansible.builtin.default(false)
-
 
 # Remember: It is possible to overwrite values, last occurrence wins.
 - name: "Config | Default | Comment out duplicates in main config file (if any) to ensure drop-in config precedence"
@@ -217,8 +207,7 @@
     - __sysctl_linux_config_file_stat['stat']['exists'] | ansible.builtin.default(false)
     - __sysctl_linux_parameters_comment | ansible.builtin.length > 0
   notify:
-    - "sysctl_linux: reload"
-
+    - "sysctl_linux_reload_kernel_parameters"
 
 # Counterpart to the comment-out above: a key the role used to manage (and thus
 # disabled in the main config file) but no longer manages must get its original
@@ -232,7 +221,7 @@
     path: "{{ __sysctl_linux_config_file_path }}"
     regexp: >-
       ^{{ __sysctl_linux_main_disabled_marker }}(?![\t ]*(?:{{ __sysctl_linux_main_managed_keys_pattern }})(?=\s*(?:=|\s|$)))(.*)$
-    replace: '\1'
+    replace: "\\1"
   vars:
     __sysctl_linux_main_managed_keys_pattern: >-
       {{
@@ -244,8 +233,7 @@
   when:
     - __sysctl_linux_config_file_stat['stat']['exists'] | ansible.builtin.default(false)
   notify:
-    - "sysctl_linux: reload"
-
+    - "sysctl_linux_reload_kernel_parameters"
 
 ### Boot-time loading of the kernel modules the selected profiles depend on
 #
@@ -260,12 +248,11 @@
 - name: "Config | Default | Read the managed modules-load drop-in file (if any)"
   ansible.builtin.slurp:
     src: "{{ __sysctl_linux_modules_load_dropin_file_path }}"
-  register: __sysctl_linux_modules_dropin_slurp
   failed_when:
     - __sysctl_linux_modules_dropin_slurp['msg'] is ansible.builtin.defined
     - "'file not found' not in (__sysctl_linux_modules_dropin_slurp['msg'] | ansible.builtin.lower)"
 
-
+  register: __sysctl_linux_modules_dropin_slurp
 - name: "Config | Default | Determine the modules to load at boot and the ownership of the drop-in file"
   ansible.builtin.set_fact:
     # only modules that actually loaded: persisting one the kernel does not
@@ -273,7 +260,7 @@
     # this host cannot deliver
     __sysctl_linux_modules_persist: >-
       {{
-        (__sysctl_linux_profile_modules | ansible.builtin.default({}, true) | ansible.builtin.list)
+        (__sysctl_linux_effective_profile_modules | ansible.builtin.default({}, true) | ansible.builtin.list)
         | ansible.builtin.reject('ansible.builtin.in', __sysctl_linux_modules_unavailable | ansible.builtin.default([]))
         | ansible.builtin.sort
         | ansible.builtin.list
@@ -306,7 +293,6 @@
   when:
     - (__sysctl_linux_modules_persist | ansible.builtin.length) > 0
 
-
 - name: "Config | Default | Ensure the managed modules-load drop-in file"
   ansible.builtin.copy:
     content: "{{ __sysctl_linux_modules_load_marker ~ '\n' ~ (__sysctl_linux_modules_persist | ansible.builtin.join('\n')) ~ '\n' }}"
@@ -316,7 +302,6 @@
     mode: "{{ __sysctl_linux_config_file_mode }}"
   when:
     - (__sysctl_linux_modules_persist | ansible.builtin.length) > 0
-
 
 # A foreign file at the fixed path is left alone here: with no modules to
 # register the role holds no claim on the path.

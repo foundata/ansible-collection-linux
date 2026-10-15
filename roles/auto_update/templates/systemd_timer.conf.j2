@@ -57,7 +57,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 {%-     set tpl_timer_ns.has_trigger = true -%}
 {%-   endif -%}
 {%- endfor -%}
-# {{ ansible_managed }}
+# {{ tpl_managed }}
 [Timer]
 {% if tpl_timer_ns.has_trigger %}
 OnCalendar=

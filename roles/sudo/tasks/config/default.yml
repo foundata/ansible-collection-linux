@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 # Order matters:
 #   1. validate rule definitions (fail fast on misconfiguration)
 #   2. build the per-grantee drop-in lists (one file per user/group)
@@ -12,7 +11,6 @@
 #   4. remove drop-ins for "absent" rules
 #   5. render (or remove) the global Defaults / extra_content drop-in
 #   6. optionally reap unmanaged drop-ins (authoritative /etc/sudoers.d)
-
 
 - name: "Config | Default | Ensure rule names are unique"
   ansible.builtin.assert:
@@ -22,7 +20,6 @@
         == (sudo_linux_rules | ansible.builtin.map(attribute='name') | ansible.builtin.unique | ansible.builtin.list | ansible.builtin.length)
     fail_msg: "sudo_linux_rules contains duplicate 'name' values; names must be unique."
     quiet: true
-
 
 - name: "Config | Default | Validate rule definitions"
   ansible.builtin.assert:
@@ -54,7 +51,6 @@
   loop_control:
     loop_var: "__sudo_linux_rule_item"
     label: "{{ __sudo_linux_rule_item['name'] | ansible.builtin.default('<unnamed>') }}"
-
 
 - name: "Config | Default | Build the per-grantee drop-in lists from sudo_linux_rules"
   ansible.builtin.set_fact:
@@ -158,7 +154,6 @@
     loop_var: "__sudo_linux_grantee_item"
     label: "{{ __sudo_linux_grantee_item['file'] }}"
 
-
 - name: "Config | Default | Remove drop-ins for sudo rules marked absent"
   community.general.sudoers:
     name: "{{ __sudo_linux_grantee_item['file'] }}"
@@ -169,7 +164,6 @@
     loop_var: "__sudo_linux_grantee_item"
     label: "{{ __sudo_linux_grantee_item['file'] }}"
 
-
 - name: "Config | Default | Render the global Defaults / extra_content drop-in"
   ansible.builtin.template:
     src: "sudoers_defaults.j2"
@@ -178,9 +172,12 @@
     group: "{{ __sudo_linux_dropin_file_group }}"
     mode: "{{ __sudo_linux_dropin_file_mode }}"
     validate: "{{ __sudo_linux_visudo_exec_path }} -cf %s"
+  vars:
+    tpl_managed: "{{ ansible_managed }}"
+    tpl_defaults: "{{ sudo_linux_defaults }}"
+    tpl_extra_content: "{{ sudo_linux_extra_content }}"
   when:
     - __sudo_linux_defaults_has_content | ansible.builtin.bool
-
 
 - name: "Config | Default | Remove the global Defaults / extra_content drop-in when empty"
   ansible.builtin.file:
@@ -188,7 +185,6 @@
     state: "absent"
   when:
     - not (__sudo_linux_defaults_has_content | ansible.builtin.bool)
-
 
 # Always-on cleanup of the role's own "99_managed_*" namespace: the role
 # authoritatively owns these files, so a renamed rule or a removed grantee must
@@ -205,7 +201,6 @@
     hidden: true
   register: __sudo_linux_managed_dropins
 
-
 - name: "Config | Default | Remove orphaned role-managed drop-in files"
   ansible.builtin.file:
     path: "{{ __sudo_linux_reap_item['path'] }}"
@@ -217,12 +212,10 @@
     loop_var: "__sudo_linux_reap_item"
     label: "{{ __sudo_linux_reap_item['path'] }}"
 
-
 - name: "Config | Default | Reap unmanaged drop-in files (authoritative /etc/sudoers.d)"
   when:
     - sudo_linux_delete_unmanaged | ansible.builtin.bool
   block:
-
     - name: "Config | Default | List existing drop-in files"
       ansible.builtin.find:
         paths:
@@ -230,7 +223,6 @@
         file_type: "file"
         hidden: true
       register: __sudo_linux_existing_dropins
-
 
     - name: "Config | Default | Remove unmanaged drop-in files"
       ansible.builtin.file:

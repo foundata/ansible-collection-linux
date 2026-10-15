@@ -15,7 +15,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Safety | Wipe preflight | Enumerate the device tree"
   ansible.builtin.command:
     argv:
@@ -32,12 +31,10 @@
   check_mode: false
   register: __disk_linux_wp_tree_result
 
-
 - name: "Safety | Wipe preflight | Inspect the sysfs holders of every tree member"
   ansible.builtin.find:
     paths: "/sys/class/block/{{ __disk_linux_wp_kname_item }}/holders"
     file_type: "any"
-  register: __disk_linux_wp_holders_result
   vars:
     __disk_linux_wp_knames: >-
       {%- set __ns = namespace(knames=[]) -%}
@@ -52,21 +49,20 @@
   loop_control:
     loop_var: "__disk_linux_wp_kname_item"
 
-
-# /etc/fstab is re-read here on purpose: the run may legitimately have
-# removed entries since the safety preflight (the absent flow removes its
-# own entry right before the wipe), and a stale copy would produce false
-# violations.
+  # /etc/fstab is re-read here on purpose: the run may legitimately have
+  # removed entries since the safety preflight (the absent flow removes its
+  # own entry right before the wipe), and a stale copy would produce false
+  # violations.
+  register: __disk_linux_wp_holders_result
 - name: "Safety | Wipe preflight | Read the current /etc/fstab"
   ansible.builtin.slurp:
     src: "/etc/fstab"
-  register: __disk_linux_wp_fstab_result
   failed_when:
     # tolerate a missing fstab (treated as empty below)
     - __disk_linux_wp_fstab_result['msg'] is ansible.builtin.defined
     - "'file not found' not in (__disk_linux_wp_fstab_result['msg'] | ansible.builtin.lower)"
 
-
+  register: __disk_linux_wp_fstab_result
 - name: "Safety | Wipe preflight | Record the activity violations of the candidate"
   ansible.builtin.set_fact:
     __disk_linux_wipe_violations: >-

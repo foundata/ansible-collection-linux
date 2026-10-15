@@ -9,7 +9,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Safety | Determine device existence"
   ansible.builtin.stat:
     path: "{{ __disk_linux_stat_device_item['device'] }}"
@@ -19,7 +18,6 @@
     loop_var: "__disk_linux_stat_device_item"
     label: "{{ __disk_linux_stat_device_item['device'] }}"
   register: __disk_linux_stat_result
-
 
 - name: "Safety | Build device existence map"
   ansible.builtin.set_fact:
@@ -55,7 +53,7 @@
     __disk_linux_missing_fail: >-
       {{
         __disk_linux_devices_effective
-        | ansible.builtin.rejectattr('device', 'in', __disk_linux_existing_devices)
+        | ansible.builtin.rejectattr('device', 'ansible.builtin.in', __disk_linux_existing_devices)
         | ansible.builtin.selectattr('on_missing', 'ansible.builtin.equalto', 'fail')
         | ansible.builtin.rejectattr('state', 'ansible.builtin.equalto', 'absent')
         | ansible.builtin.map(attribute='device')
@@ -63,7 +61,6 @@
       }}
   when:
     - (__disk_linux_devices_effective | ansible.builtin.length) > 0
-
 
 - name: "Safety | Query block device identity of all existing devices"
   ansible.builtin.command:
@@ -87,7 +84,6 @@
     loop_var: "__disk_linux_identity_device_item"
     label: "{{ __disk_linux_identity_device_item['device'] }}"
   register: __disk_linux_identity_result
-
 
 - name: "Safety | Build canonical block device identity map"
   ansible.builtin.set_fact:
@@ -139,12 +135,10 @@
   when:
     - (__disk_linux_blockdev | ansible.builtin.length) > 0
 
-
 - name: "Safety | Determine whether /etc/fstab exists"
   ansible.builtin.stat:
     path: "/etc/fstab"
   register: __disk_linux_fstab_stat_result
-
 
 - name: "Safety | Read /etc/fstab"
   ansible.builtin.slurp:
@@ -152,7 +146,6 @@
   when:
     - __disk_linux_fstab_stat_result['stat']['exists']
   register: __disk_linux_fstab_result
-
 
 - name: "Safety | Determine the sources backing critical system paths"
   ansible.builtin.command:
@@ -178,12 +171,10 @@
     loop_var: "__disk_linux_critical_mountpoint_item"
   register: __disk_linux_sysmount_result
 
-
 - name: "Safety | Determine active swap devices"
   ansible.builtin.slurp:
     src: "/proc/swaps"
   register: __disk_linux_swaps_result
-
 
 # Multi-device Btrfs filesystems report only ONE member as the mount source;
 # the other members are peers, not ancestors, so the inverse traversal below
@@ -194,7 +185,6 @@
   ansible.builtin.find:
     paths: "/sys/fs/btrfs/{{ __disk_linux_btrfs_uuid_item }}/devices"
     file_type: "any"
-  register: __disk_linux_btrfs_members_result
   vars:
     __disk_linux_btrfs_uuids: >-
       {%- set __ns = namespace(uuids=[]) -%}
@@ -212,9 +202,9 @@
   loop_control:
     loop_var: "__disk_linux_btrfs_uuid_item"
 
-
-# Fail closed: a critical Btrfs filesystem whose member enumeration yields
-# nothing would leave peer disks unprotected.
+  # Fail closed: a critical Btrfs filesystem whose member enumeration yields
+  # nothing would leave peer disks unprotected.
+  register: __disk_linux_btrfs_members_result
 - name: "Safety | Check every critical Btrfs filesystem enumerated its members"
   ansible.builtin.assert:
     that:
@@ -233,7 +223,6 @@
     - (__disk_linux_blockdev | ansible.builtin.length) > 0
     - (__disk_linux_btrfs_members_result['results'] | ansible.builtin.default([]) | ansible.builtin.length) > 0
 
-
 # Every critical source is resolved through the WHOLE storage stack to its
 # physical disks with an inverse lsblk (LUKS, LVM and MD RAID sit between a
 # mount source and its disks; a one-level parent lookup misses them). The
@@ -251,14 +240,6 @@
       - "--output"
       - "KNAME,TYPE,MAJ:MIN"
       - "{{ __disk_linux_critical_source_item }}"
-  changed_when:
-    - false
-  # evaluated below: an unresolvable critical source fails CLOSED
-  failed_when:
-    - false
-  # The probe is read-only; run it under "--check" too, otherwise it is
-  # skipped and the discovery dereferences its missing result.
-  check_mode: false
   vars:
     __disk_linux_system_sources: >-
       {%- set __ns = namespace(sources=[]) -%}
@@ -284,11 +265,18 @@
         | ansible.builtin.select('ansible.builtin.match', '^/dev/')
         | ansible.builtin.unique
       }}
+  changed_when:
+    - false
+  # evaluated below: an unresolvable critical source fails CLOSED
+  check_mode: false
+  failed_when:
+    - false
+  # The probe is read-only; run it under "--check" too, otherwise it is
+  # skipped and the discovery dereferences its missing result.
   loop: "{{ __disk_linux_system_sources }}"
   loop_control:
     loop_var: "__disk_linux_critical_source_item"
   register: __disk_linux_sysdisk_result
-
 
 # Fail closed: continuing with an incomplete protected set would let a
 # wipe reach a disk that actually backs the running system. The root
@@ -323,13 +311,12 @@
   when:
     - (__disk_linux_blockdev | ansible.builtin.length) > 0
 
-
 - name: "Safety | Reject disks backing the running system"
   ansible.builtin.assert:
     that:
       - >-
         (__disk_linux_blockdev | ansible.builtin.dict2items
-         | ansible.builtin.selectattr('value.majmin', 'in', __disk_linux_protected_majmin)
+         | ansible.builtin.selectattr('value.majmin', 'ansible.builtin.in', __disk_linux_protected_majmin)
          | ansible.builtin.length) == 0
     quiet: true
     fail_msg: >-

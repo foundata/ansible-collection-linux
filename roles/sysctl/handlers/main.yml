@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Handlers | Reload all kernel parameters (following precedence) (sysctl --system)"
   # Using command module because ansible.posix.sysctl only reloads individual
   # parameters, while "sysctl --system" reloads all configuration files in the
@@ -35,9 +34,9 @@
     - not __sysctl_linux_is_container # best effort in containers
   register: __sysctl_reload_result
   listen:
+    - "sysctl_linux_reload_kernel_parameters"
+    # Migration alias; remove in 2.0.0.
     - "sysctl_linux: reload"
-
-
 - name: "Handlers | Log failed sysctl reload attempt (due to read-only params in containerized systems)"
   ansible.builtin.debug:
     msg: >-
@@ -45,12 +44,14 @@
       stdout={{ (__sysctl_reload_result['stdout'] | ansible.builtin.default('') | ansible.builtin.trim) | ansible.builtin.regex_replace('\n+', ' | ') }}
       stderr={{ (__sysctl_reload_result['stderr'] | ansible.builtin.default('') | ansible.builtin.trim) | ansible.builtin.regex_replace('\n+', ' | ') }}
     verbosity: 3
-  changed_when:
-    - false # noqa: no-changed-when
   when:
     - sysctl_linux_reload | ansible.builtin.bool
     - __sysctl_linux_is_container
     - __sysctl_reload_result is ansible.builtin.defined
     - __sysctl_reload_result['rc'] != 0 # comparing rc; failure test masked in containers in the previous handle
+  changed_when:
+    - false # noqa: no-changed-when
   listen:
+    - "sysctl_linux_reload_kernel_parameters"
+    # Migration alias; remove in 2.0.0.
     - "sysctl_linux: reload"

@@ -9,7 +9,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Config | RedHat | Create dnf automatic configuration"
   ansible.builtin.template:
     src: "dnf_automatic.conf.j2"
@@ -17,3 +16,11 @@
     owner: "{{ __auto_update_linux_dnf_config_file_owner }}"
     group: "{{ __auto_update_linux_dnf_config_file_group }}"
     mode: "{{ __auto_update_linux_dnf_config_file_mode }}"
+  vars:
+    tpl_managed: "{{ ansible_managed }}"
+    tpl_apply: "{{ auto_update_linux_apply }}"
+    tpl_exclude: "{{ auto_update_linux_exclude }}"
+    tpl_extra_config: "{{ auto_update_linux_extra_config }}"
+    tpl_notify_email: "{{ auto_update_linux_notify_email }}"
+    tpl_reboot: "{{ auto_update_linux_reboot }}"
+    tpl_type: "{{ auto_update_linux_type }}"

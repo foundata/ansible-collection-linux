@@ -4,14 +4,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Config | Default | Manage systemd timer drop-in (schedule)"
   when:
     - auto_update_linux_service_state != 'unmanaged'
     - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
     - (__auto_update_linux_systemd_timer_unit_name | ansible.builtin.length) > 0
   block:
-
     - name: "Config | Default | Ensure systemd timer override directory exists"
       ansible.builtin.file:
         path: "{{ __auto_update_linux_systemd_timer_unit_dropin_dir_path }}"
@@ -20,7 +18,7 @@
         group: "{{ __auto_update_linux_systemd_timer_unit_dropin_dir_group }}"
         mode: "{{ __auto_update_linux_systemd_timer_unit_dropin_dir_mode }}"
       notify:
-        - "auto_update_linux: systemd daemon-reload"
+        - "auto_update_linux_reload_systemd_daemon"
 
     - name: "Config | Default | Create systemd timer drop-in config file"
       ansible.builtin.template:
@@ -32,9 +30,9 @@
       vars:
         # Pass (and/or adjust) variables needed for the template
         tpl_timer_settings: "{{ __auto_update_linux_effective_timer_settings }}"
+        tpl_managed: "{{ ansible_managed }}"
       notify:
-        - "auto_update_linux: systemd daemon-reload"
-
+        - "auto_update_linux_reload_systemd_daemon"
 
 - name: "Config | Default | Remove role-managed systemd timer drop-in when unmanaged"
   # override is removed to allow the vendor timer schedule takes over
@@ -46,8 +44,7 @@
     - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
     - (__auto_update_linux_systemd_timer_unit_name | ansible.builtin.length) > 0
   notify:
-    - "auto_update_linux: systemd daemon-reload"
-
+    - "auto_update_linux_reload_systemd_daemon"
 
 - name: "Config | Default | Warn about unsupported service manager for timer configuration"
   ansible.builtin.debug:
@@ -55,10 +52,10 @@
       Automatic update timer management is only supported with systemd as service manager.
       The current service manager '{{ ansible_facts['service_mgr'] }}' is not supported;
       the platform's  default scheduling mechanism remains unchanged.
+    verbosity: 0
   when:
     - auto_update_linux_service_state != 'unmanaged'
     - (ansible_facts['service_mgr'] | ansible.builtin.lower) != 'systemd'
-
 
 # Scheduled reboot (auto_update_linux_reboot == "scheduled"): role-managed
 # systemd units + helper script that reboot the host when needed, at a
@@ -70,7 +67,6 @@
     - auto_update_linux_reboot == 'scheduled'
     - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
   block:
-
     # The script mirrors the checks used by the foundata.linux.reboot role
     # (task "Init | Determine if reboot is required") and handles tool/OS
     # portability internally, so a single script covers all supported platforms.
@@ -82,7 +78,8 @@
         group: "{{ __auto_update_linux_reboot_script_group }}"
         mode: "{{ __auto_update_linux_reboot_script_mode }}"
 
-
+      vars:
+        tpl_managed: "{{ ansible_managed }}"
     - name: "Config | Default | Install scheduled reboot service unit"
       ansible.builtin.template:
         src: "auto-update-reboot.service.j2"
@@ -90,9 +87,11 @@
         owner: "{{ __auto_update_linux_reboot_unit_file_owner }}"
         group: "{{ __auto_update_linux_reboot_unit_file_group }}"
         mode: "{{ __auto_update_linux_reboot_unit_file_mode }}"
+      vars:
+        tpl_reboot_script_path: "{{ __auto_update_linux_reboot_script_path }}"
+        tpl_managed: "{{ ansible_managed }}"
       notify:
-        - "auto_update_linux: systemd daemon-reload"
-
+        - "auto_update_linux_reload_systemd_daemon"
 
     - name: "Config | Default | Install scheduled reboot timer unit"
       ansible.builtin.template:
@@ -104,30 +103,27 @@
       vars:
         # Pass (and/or adjust) variables needed for the template
         tpl_reboot_timer_settings: "{{ __auto_update_linux_effective_reboot_timer_settings }}"
+        tpl_managed: "{{ ansible_managed }}"
       notify:
-        - "auto_update_linux: systemd daemon-reload"
-
+        - "auto_update_linux_reload_systemd_daemon"
 
 - name: "Config | Default | Remove scheduled reboot timer resources (auto_update_linux_reboot is not scheduled)"
   when:
     - auto_update_linux_reboot != 'scheduled'
     - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
   block:
-
     - name: "Config | Default | Check whether the scheduled reboot timer unit exists"
       ansible.builtin.stat:
         path: "{{ __auto_update_linux_reboot_timer_unit_path }}"
       register: __auto_update_linux_reboot_timer_unit_stat
 
-
     - name: "Config | Default | Disable and stop the scheduled reboot timer (if present)"
       ansible.builtin.systemd_service:
         name: "{{ __auto_update_linux_reboot_timer_unit_name }}"
-        enabled: false
         state: "stopped"
+        enabled: false
       when:
         - __auto_update_linux_reboot_timer_unit_stat['stat']['exists'] | ansible.builtin.default(false)
-
 
     - name: "Config | Default | Remove scheduled reboot timer units and helper script"
       ansible.builtin.file:
@@ -141,4 +137,4 @@
         loop_var: "__auto_update_linux_reboot_timer_item"
         label: "{{ __auto_update_linux_reboot_timer_item }}"
       notify:
-        - "auto_update_linux: systemd daemon-reload"
+        - "auto_update_linux_reload_systemd_daemon"

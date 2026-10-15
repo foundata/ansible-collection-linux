@@ -1,0 +1,11 @@
+---
+minor_changes:
+  - >-
+    Add role-prefixed handler topics and use them for internal notifications.
+    Retain the previous topics as migration aliases until version 2.0.0.
+  - >-
+    Add the handler topic sysctl_linux_reload_kernel_parameters
+    as the replacement for "sysctl_linux: reload".
+  - >-
+    Add the handler topic auto_update_linux_reload_systemd_daemon
+    as the replacement for "auto_update_linux: systemd daemon-reload".

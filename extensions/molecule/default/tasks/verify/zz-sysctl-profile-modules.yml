@@ -1,3 +1,4 @@
+---
 # Regression test: profile kernel modules load best effort on EVERY platform.
 #
 # Background: the "container" profile depends on br_netfilter, which
@@ -35,12 +36,10 @@
     loop_var: "__testing_sysctl_module_item"
   register: __testing_sysctl_module_probe
 
-
 - name: "Molecule | Verify | sysctl modules | Set module availability facts"
   ansible.builtin.set_fact:
     __testing_sysctl_brnf_available: "{{ __testing_sysctl_module_probe['results'][0]['rc'] == 0 }}"
     __testing_sysctl_conntrack_available: "{{ __testing_sysctl_module_probe['results'][1]['rc'] == 0 }}"
-
 
 - name: "Molecule | Verify | sysctl modules | Show module availability"
   ansible.builtin.debug:
@@ -49,9 +48,10 @@
       nf_conntrack={{ __testing_sysctl_conntrack_available }}
 
 
-# Explicit empty sysctl_linux_parameters: converge-time set_fact variables
-# survive into verify and would otherwise leak into this run (include_role
-# vars beat set_fact).
+    # Explicit empty sysctl_linux_parameters: converge-time set_fact variables
+    # survive into verify and would otherwise leak into this run (include_role
+    # vars beat set_fact).
+    verbosity: 0
 - name: "Molecule | Verify | sysctl modules | Include the sysctl role with the container profile (best effort default)"
   ansible.builtin.include_role:
     name: "foundata.linux.sysctl"
@@ -61,17 +61,14 @@
     sysctl_linux_parameters: {}
     sysctl_linux_config_dropin_file_name: "zz-testing-modules.conf"
 
-
 - name: "Molecule | Verify | sysctl modules | Read the rendered drop-in"
   ansible.builtin.slurp:
     src: "/etc/sysctl.d/zz-testing-modules.conf"
   register: __testing_sysctl_modules_dropin
 
-
 - name: "Molecule | Verify | sysctl modules | Decode the rendered drop-in"
   ansible.builtin.set_fact:
     __testing_sysctl_modules_dropin_content: "{{ __testing_sysctl_modules_dropin['content'] | ansible.builtin.b64decode }}"
-
 
 - name: "Molecule | Verify | sysctl modules | Assert module-gated keys match the module availability"
   ansible.builtin.assert:
@@ -95,20 +92,18 @@
       {{ __testing_sysctl_modules_dropin_content }}
     success_msg: "Module-gated keys are present exactly where their module is loadable."
 
-
 - name: "Molecule | Verify | sysctl modules | Check the live bridge netfilter value (module loaded and applied)"
   ansible.builtin.command:
     argv:
       - "sysctl"
       - "-n"
       - "net.bridge.bridge-nf-call-iptables"
-  changed_when:
-    - false
-  register: __testing_sysctl_brnf_live
   when:
     - __testing_sysctl_brnf_available | ansible.builtin.bool
 
-
+  changed_when:
+    - false
+  register: __testing_sysctl_brnf_live
 - name: "Molecule | Verify | sysctl modules | Assert the live bridge netfilter value"
   ansible.builtin.assert:
     that:
@@ -118,12 +113,10 @@
   when:
     - __testing_sysctl_brnf_available | ansible.builtin.bool
 
-
 # sysctl_linux_modules_required: true must fail exactly on the platforms where
 # a profile module is unloadable, and change nothing on the others.
 - name: "Molecule | Verify | sysctl modules | Attempt a run with sysctl_linux_modules_required enabled"
   block:
-
     - name: "Molecule | Verify | sysctl modules | Include the sysctl role requiring the profile modules"
       ansible.builtin.include_role:
         name: "foundata.linux.sysctl"
@@ -139,11 +132,9 @@
         __testing_sysctl_required_failed: false
 
   rescue:
-
     - name: "Molecule | Verify | sysctl modules | Record that the required-modules run failed"
       ansible.builtin.set_fact:
         __testing_sysctl_required_failed: true
-
 
 - name: "Molecule | Verify | sysctl modules | Assert sysctl_linux_modules_required fails exactly on unloadable modules"
   ansible.builtin.assert:
@@ -159,7 +150,6 @@
       (br_netfilter={{ __testing_sysctl_brnf_available }},
       nf_conntrack={{ __testing_sysctl_conntrack_available }}).
     success_msg: "sysctl_linux_modules_required behaves correctly for this platform."
-
 
 # Synthetic negative: the role-internal module map is overridden with a
 # module that cannot exist. include_role vars are role params (precedence
@@ -177,16 +167,14 @@
       - "container"
     sysctl_linux_parameters: {}
     sysctl_linux_config_dropin_file_name: "zz-testing-modules.conf"
-    __sysctl_linux_profile_modules:
+    __sysctl_linux_effective_profile_modules:
       molecule_testing_nonexistent_module:
         - "net.bridge."
-
 
 - name: "Molecule | Verify | sysctl modules | Read the drop-in after the synthetic negative run"
   ansible.builtin.slurp:
     src: "/etc/sysctl.d/zz-testing-modules.conf"
   register: __testing_sysctl_neg_dropin
-
 
 - name: "Molecule | Verify | sysctl modules | Assert the gated keys were dropped and all others kept"
   ansible.builtin.assert:
@@ -205,10 +193,8 @@
       keys: {{ __testing_sysctl_neg_dropin['content'] | ansible.builtin.b64decode }}
     success_msg: "An unloadable module drops exactly the keys it gates; the run stays green."
 
-
 - name: "Molecule | Verify | sysctl modules | Attempt the synthetic negative with sysctl_linux_modules_required enabled"
   block:
-
     - name: "Molecule | Verify | sysctl modules | Include the sysctl role requiring the unloadable module"
       ansible.builtin.include_role:
         name: "foundata.linux.sysctl"
@@ -218,7 +204,7 @@
         sysctl_linux_parameters: {}
         sysctl_linux_config_dropin_file_name: "zz-testing-modules.conf"
         sysctl_linux_modules_required: true
-        __sysctl_linux_profile_modules:
+        __sysctl_linux_effective_profile_modules:
           molecule_testing_nonexistent_module:
             - "net.bridge."
 
@@ -227,11 +213,9 @@
         __testing_sysctl_required_neg_failed: false
 
   rescue:
-
     - name: "Molecule | Verify | sysctl modules | Record that the synthetic required-modules run failed"
       ansible.builtin.set_fact:
         __testing_sysctl_required_neg_failed: true
-
 
 - name: "Molecule | Verify | sysctl modules | Assert sysctl_linux_modules_required fails on the unloadable module"
   ansible.builtin.assert:
@@ -240,12 +224,10 @@
     fail_msg: "sysctl_linux_modules_required=true did not fail although the (synthetic) profile module is unloadable."
     success_msg: "sysctl_linux_modules_required=true fails as intended when a profile module cannot be loaded."
 
-
 - name: "Molecule | Verify | sysctl modules | Remove the test drop-in"
   ansible.builtin.file:
     path: "/etc/sysctl.d/zz-testing-modules.conf"
     state: "absent"
-
 
 ## Boot-time module registration (fixed role-owned file)
 #
@@ -261,7 +243,6 @@
   when:
     - __testing_sysctl_brnf_available | ansible.builtin.bool
   block:
-
     # Historical fixtures: files the RELEASED role versions created through
     # the modprobe persistency (one per module, no marker). Their ownership
     # is unknowable, so the role must never touch them.
@@ -271,7 +252,7 @@
         content: "{{ item }}\n"
         owner: "root"
         group: "root"
-        mode: "u=rw,g=r,o=r"
+        mode: "u=rw,g=r,o=r" # 0644
       loop:
         - "br_netfilter"
         - "nf_conntrack"
@@ -293,11 +274,11 @@
     - name: "Molecule | Verify | sysctl modules | Registration: get information about filename-derived paths"
       ansible.builtin.stat:
         path: "{{ item }}"
-      register: __testing_sysctl_modreg_paths
       loop:
         - "/etc/sysctl.d/zz-first.conf"
         - "/etc/modules-load.d/zz-first.conf"
 
+      register: __testing_sysctl_modreg_paths
     - name: "Molecule | Verify | sysctl modules | Registration: assert the fixed file carries marker and module"
       ansible.builtin.assert:
         that:
@@ -328,12 +309,12 @@
     - name: "Molecule | Verify | sysctl modules | Registration: get information after the filename change"
       ansible.builtin.stat:
         path: "{{ item }}"
-      register: __testing_sysctl_modreg_renamed
       loop:
         - "/etc/modules-load.d/zz-managed.conf"
         - "/etc/modules-load.d/zz-first.conf"
         - "/etc/modules-load.d/zz-second.conf"
 
+      register: __testing_sysctl_modreg_renamed
     - name: "Molecule | Verify | sysctl modules | Registration: assert the filename change orphans nothing"
       ansible.builtin.assert:
         that:
@@ -360,10 +341,10 @@
       ansible.builtin.command:
         argv:
           - "lsmod"
-      register: __testing_sysctl_modreg_lsmod
       changed_when:
         - false
 
+      register: __testing_sysctl_modreg_lsmod
     - name: "Molecule | Verify | sysctl modules | Registration: assert the registration went, the module stayed"
       ansible.builtin.assert:
         that:
@@ -414,11 +395,9 @@
         content: "some_admin_module\n"
         owner: "root"
         group: "root"
-        mode: "u=rw,g=r,o=r"
-
+        mode: "u=rw,g=r,o=r" # 0644
     - name: "Molecule | Verify | sysctl modules | Registration: apply the profile over the foreign file (must fail)"
       block:
-
         - name: "Molecule | Verify | sysctl modules | Registration: include the role over the foreign file"
           ansible.builtin.include_role:
             name: "foundata.linux.sysctl"
@@ -433,7 +412,6 @@
             msg: "The role overwrote an unmarked file at the fixed modules-load path."
 
       rescue:
-
         - name: "Molecule | Verify | sysctl modules | Registration: assert the collision was refused"
           ansible.builtin.assert:
             that:
@@ -447,7 +425,6 @@
 
     - name: "Molecule | Verify | sysctl modules | Registration: repeat the collision in check mode (must fail)"
       block:
-
         - name: "Molecule | Verify | sysctl modules | Registration: include the role in check mode over the foreign file"
           ansible.builtin.include_role:
             name: "foundata.linux.sysctl"
@@ -464,7 +441,6 @@
             msg: "Check mode did not report the ownership collision."
 
       rescue:
-
         - name: "Molecule | Verify | sysctl modules | Registration: assert the check mode collision"
           ansible.builtin.assert:
             that:
@@ -501,11 +477,11 @@
     - name: "Molecule | Verify | sysctl modules | Registration: read the historical per-module files"
       ansible.builtin.slurp:
         src: "/etc/modules-load.d/{{ item }}.conf"
-      register: __testing_sysctl_modreg_legacy
       loop:
         - "br_netfilter"
         - "nf_conntrack"
 
+      register: __testing_sysctl_modreg_legacy
     - name: "Molecule | Verify | sysctl modules | Registration: assert the historical files stayed untouched"
       ansible.builtin.assert:
         that:
@@ -517,7 +493,6 @@
         label: "{{ item['item'] }}"
 
   always:
-
     - name: "Molecule | Verify | sysctl modules | Registration: remove the fixtures again"
       ansible.builtin.file:
         path: "{{ item }}"
@@ -530,11 +505,11 @@
         - "/etc/sysctl.d/zz-second.conf"
         - "/etc/sysctl.d/zz-third.conf"
 
-
 - name: "Molecule | Verify | sysctl modules | Registration: report a skipped check"
   ansible.builtin.debug:
     msg: >-
       The running kernel cannot load br_netfilter here, so the boot
       registration reconciliation cannot be observed on this platform.
+    verbosity: 0
   when:
     - not (__testing_sysctl_brnf_available | ansible.builtin.bool)

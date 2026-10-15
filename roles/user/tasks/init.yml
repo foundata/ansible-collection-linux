@@ -4,12 +4,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Init | Include role meta data"
   ansible.builtin.include_vars:
     file: "../meta/main.yml"
     name: "__user_linux_meta"
-
 
 - name: "Init | Check Ansible version requirement and fail if unmet"
   ansible.builtin.fail:
@@ -41,12 +39,9 @@
       or distribution facts are missing.
     verbosity: 1
   when:
-    - ansible_facts['os_family'] is not ansible.builtin.defined or
-      ansible_facts['distribution'] is not ansible.builtin.defined or
-      ansible_facts['distribution_version'] is not ansible.builtin.defined or
-      ansible_facts['distribution_major_version'] is not ansible.builtin.defined or
+    - ansible_facts['os_family'] is not ansible.builtin.defined or ansible_facts['distribution'] is not ansible.builtin.defined or
+      ansible_facts['distribution_version'] is not ansible.builtin.defined or ansible_facts['distribution_major_version'] is not ansible.builtin.defined or
       ((__user_linux_supported_platforms | ansible.builtin.length) == 0)
-
 
 - name: "Init | Warn when platform is unsupported"
   ansible.builtin.fail:
@@ -72,7 +67,6 @@
     - (__user_linux_supported_platforms | ansible.builtin.length) > 0
     - (__user_linux_matched_versions | ansible.builtin.length) == 0
   ignore_errors: true # noqa: ignore-errors
-
 
 - name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
   ansible.builtin.set_fact:
@@ -138,7 +132,6 @@
   loop_control:
     loop_var: "__user_linux_varsfile_item"
 
-
 ## user specific
 
 - name: "Init | Assert account names in user_linux_accounts are unique"
@@ -150,7 +143,6 @@
   vars:
     __user_linux_account_names: "{{ user_linux_accounts | ansible.builtin.map(attribute='name') | ansible.builtin.list }}"
 
-
 - name: "Init | Assert group names in user_linux_groups are unique"
   ansible.builtin.assert:
     that:
@@ -159,7 +151,6 @@
     success_msg: "All group names in user_linux_groups are unique."
   vars:
     __user_linux_group_names: "{{ user_linux_groups | ansible.builtin.map(attribute='name') | ansible.builtin.list }}"
-
 
 - name: "Init | Reject plaintext passwords (effective password.hash must be empty or a crypt hash)"
   ansible.builtin.assert:
@@ -181,7 +172,6 @@
     loop_var: "__user_linux_pw_item"
     label: "{{ __user_linux_pw_item['name'] }}"
 
-
 - name: "Init | Assert user_linux_uid_min and user_linux_uid_max are empty or non-negative integers"
   ansible.builtin.assert:
     that:
@@ -202,15 +192,14 @@
   when:
     - user_linux_accounts_delete_unmanaged | ansible.builtin.bool
 
-
 - name: "Init | Read login.defs (only when reaping; tolerate a missing file)"
   ansible.builtin.slurp:
     src: "{{ __user_linux_login_defs_path }}"
   when:
     - user_linux_accounts_delete_unmanaged | ansible.builtin.bool
-  failed_when: false
+  failed_when:
+    - false
   register: "__user_linux_login_defs_raw"
-
 
 - name: "Init | Derive effective UID_MIN/UID_MAX (public override, else login.defs, else fallback)"
   ansible.builtin.set_fact:
@@ -235,7 +224,6 @@
       }}
   when:
     - user_linux_accounts_delete_unmanaged | ansible.builtin.bool
-
 
 - name: "Init | Assert the effective UID range is sane (UID_MIN <= UID_MAX)"
   ansible.builtin.assert:

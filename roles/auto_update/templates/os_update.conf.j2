@@ -10,10 +10,10 @@
 SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 SPDX-License-Identifier: GPL-3.0-or-later
 -#}
-# {{ ansible_managed }}
-UPDATE_CMD="{{ 'security' if auto_update_linux_type == 'security' else 'auto' }}"
-REBOOT_CMD="{{ 'auto' if auto_update_linux_reboot == 'immediate' else 'none' }}"
-{% set extra = auto_update_linux_extra_config['os-update'] | ansible.builtin.default({}) %}
+# {{ tpl_managed }}
+UPDATE_CMD="{{ 'security' if tpl_type == 'security' else 'auto' }}"
+REBOOT_CMD="{{ 'auto' if tpl_reboot == 'immediate' else 'none' }}"
+{% set extra = tpl_extra_config['os-update'] | ansible.builtin.default({}) %}
 {% for key, value in extra.items() %}
 {{ key }}="{{ value }}"
 {% endfor %}

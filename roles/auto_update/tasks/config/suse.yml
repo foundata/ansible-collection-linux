@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Config | SUSE | Notice: options not supported by os-update are ignored"
   ansible.builtin.debug:
     msg: >-
@@ -18,11 +17,10 @@
           if (auto_update_linux_notify_email | ansible.builtin.length) > 0 else []))
         | ansible.builtin.join(', ')
       }}
+    verbosity: 0
   when:
-    - (auto_update_linux_apply != 'install') or
-      ((auto_update_linux_exclude | ansible.builtin.length) > 0) or
-      ((auto_update_linux_notify_email | ansible.builtin.length) > 0)
-
+    - (auto_update_linux_apply != 'install') or ((auto_update_linux_exclude | ansible.builtin.length) > 0) or ((auto_update_linux_notify_email |
+      ansible.builtin.length) > 0)
 
 - name: "Config | SUSE | Create os-update configuration"
   ansible.builtin.template:
@@ -31,3 +29,8 @@
     owner: "{{ __auto_update_linux_osupdate_config_file_owner }}"
     group: "{{ __auto_update_linux_osupdate_config_file_group }}"
     mode: "{{ __auto_update_linux_osupdate_config_file_mode }}"
+  vars:
+    tpl_managed: "{{ ansible_managed }}"
+    tpl_extra_config: "{{ auto_update_linux_extra_config }}"
+    tpl_reboot: "{{ auto_update_linux_reboot }}"
+    tpl_type: "{{ auto_update_linux_type }}"

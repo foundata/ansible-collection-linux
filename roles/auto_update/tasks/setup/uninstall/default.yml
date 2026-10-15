@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Setup | Uninstall | Remove managed systemd timer drop-in"
   ansible.builtin.file:
     path: "{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}"
@@ -12,8 +11,7 @@
   when:
     - (__auto_update_linux_systemd_timer_unit_name | ansible.builtin.length) > 0
   notify:
-    - "auto_update_linux: systemd daemon-reload"
-
+    - "auto_update_linux_reload_systemd_daemon"
 
 # Scheduled reboot timer resources (only present when auto_update_linux_reboot
 # was "scheduled"). Disable the timer before removing its unit files to avoid
@@ -23,16 +21,14 @@
     path: "{{ __auto_update_linux_reboot_timer_unit_path }}"
   register: __auto_update_linux_reboot_timer_unit_stat
 
-
 - name: "Setup | Uninstall | Disable and stop the scheduled reboot timer (if present)"
   ansible.builtin.systemd_service:
     name: "{{ __auto_update_linux_reboot_timer_unit_name }}"
-    enabled: false
     state: "stopped"
+    enabled: false
   when:
     - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
     - __auto_update_linux_reboot_timer_unit_stat['stat']['exists'] | ansible.builtin.default(false)
-
 
 - name: "Setup | Uninstall | Remove scheduled reboot timer units and helper script"
   ansible.builtin.file:
@@ -46,8 +42,7 @@
     loop_var: "__auto_update_linux_reboot_timer_item"
     label: "{{ __auto_update_linux_reboot_timer_item }}"
   notify:
-    - "auto_update_linux: systemd daemon-reload"
-
+    - "auto_update_linux_reload_systemd_daemon"
 
 # The dnf automatic.conf and os-update.conf files are owned by their respective
 # packages and are removed together with the package below.

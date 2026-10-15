@@ -1,5 +1,5 @@
 # Load a single sysctl profile and merge it into the accumulator variables
-# __sysctl_linux_profile_parameters and __sysctl_linux_profile_modules.
+# __sysctl_linux_profile_parameters and __sysctl_linux_effective_profile_modules.
 #
 # This file gets included once per entry of sysctl_linux_profile by
 # tasks/init.yml. Profiles are stacked in list order: later profiles win on
@@ -19,7 +19,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Init | Load profile variables into a namespace"
   ansible.builtin.include_vars:
     # The profile file is loaded into a namespaced variable (not directly into
@@ -27,7 +26,6 @@
     # it instead of overwriting the previous profile.
     file: "{{ role_path }}/vars/profiles/{{ __sysctl_linux_profile_item }}.yml"
     name: "__sysctl_linux_profile_current"
-
 
 # Note (eager evaluation): combining the loaded dict here renders any auto-
 # calculated Jinja values it contains (e.g. those using ansible_facts['memtotal_mb'])
@@ -41,9 +39,9 @@
         | ansible.builtin.combine(__sysctl_linux_profile_current['__sysctl_linux_profile_parameters']
                                   | ansible.builtin.default({}))
       }}
-    __sysctl_linux_profile_modules: >-
+    __sysctl_linux_effective_profile_modules: >-
       {{
-        (__sysctl_linux_profile_modules | ansible.builtin.default({}))
+        (__sysctl_linux_effective_profile_modules | ansible.builtin.default({}))
         | ansible.builtin.combine(__sysctl_linux_profile_current['__sysctl_linux_profile_modules']
                                   | ansible.builtin.default({}))
       }}

@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 # Order matters:
 #   1. groups present -> primary/supplementary groups must exist before accounts
 #   2. accounts present/update
@@ -13,7 +12,6 @@
 #   5. reap unmanaged accounts (UID range only; never root, never Ansible's
 #      connection user or system accounts)
 #   6. groups absent   -> last, so no still-present account references them
-
 
 - name: "Config | Default | Create or update groups"
   ansible.builtin.group:
@@ -37,7 +35,6 @@
   loop_control:
     loop_var: "__user_linux_group_item"
     label: "{{ __user_linux_group_item['name'] }}"
-
 
 - name: "Config | Default | Create or update accounts"
   ansible.builtin.user:
@@ -99,7 +96,6 @@
     label: "{{ __user_linux_account_item['name'] }}"
   no_log: true # an account's password hash must not be leaked into the task output
 
-
 - name: "Config | Default | Set authorized_keys for present accounts"
   ansible.posix.authorized_key:
     user: "{{ __user_linux_account_item_effective['name'] }}"
@@ -145,7 +141,6 @@
     loop_var: "__user_linux_account_item"
     label: "{{ __user_linux_account_item['name'] }}"
 
-
 - name: "Config | Default | Remove individual authorized_keys"
   ansible.posix.authorized_key:
     user: "{{ __user_linux_sshkey_item[0]['name'] }}"
@@ -177,7 +172,6 @@
     loop_var: "__user_linux_sshkey_item"
     label: "{{ __user_linux_sshkey_item[0]['name'] }}"
 
-
 - name: "Config | Default | Remove accounts including their data (home directory and mail spool)"
   ansible.builtin.user:
     name: "{{ __user_linux_account_item_effective['name'] }}"
@@ -201,12 +195,10 @@
     loop_var: "__user_linux_account_item"
     label: "{{ __user_linux_account_item['name'] }}"
 
-
 - name: "Config | Default | Delete / reap unmanaged user accounts"
   when:
     - user_linux_accounts_delete_unmanaged | ansible.builtin.bool
   block:
-
     - name: "Config | Default | Gather local passwd database"
       ansible.builtin.getent:
         database: "passwd"
@@ -216,7 +208,6 @@
         # UIDs fall in the reap range would become deletion candidates (and
         # "userdel" would fail or half-run against them).
         service: "files"
-
 
     # The connection/login user must never be reaped, otherwise a run with
     # user_linux_accounts_delete_unmanaged could delete the account currently in
@@ -235,16 +226,15 @@
     # every case; "check_mode: false" keeps the protection effective during a
     # "--check" run.
     - name: "Config | Default | Determine the Ansible connection user (unprivileged)"
+      become: false
       ansible.builtin.command:
         argv:
           - "id"
           - "-un"
-      become: false
       changed_when:
         - false
       check_mode: false
       register: __user_linux_reap_connection_user_raw
-
 
     - name: "Config | Default | Remove unmanaged accounts within the UID range (never: root, system accounts or the Ansible connection's user)"
       ansible.builtin.user:
@@ -276,7 +266,6 @@
       loop: "{{ __user_linux_reap_candidates }}"
       loop_control:
         loop_var: "__user_linux_reap_item"
-
 
 - name: "Config | Default | Remove groups"
   ansible.builtin.group:

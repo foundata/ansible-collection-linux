@@ -4,12 +4,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Init | Include role meta data"
   ansible.builtin.include_vars:
     file: "../meta/main.yml"
     name: "__disk_linux_meta"
-
 
 - name: "Init | Check Ansible version requirement and fail if unmet"
   ansible.builtin.fail:
@@ -41,12 +39,9 @@
       or distribution facts are missing.
     verbosity: 1
   when:
-    - ansible_facts['os_family'] is not ansible.builtin.defined or
-      ansible_facts['distribution'] is not ansible.builtin.defined or
-      ansible_facts['distribution_version'] is not ansible.builtin.defined or
-      ansible_facts['distribution_major_version'] is not ansible.builtin.defined or
+    - ansible_facts['os_family'] is not ansible.builtin.defined or ansible_facts['distribution'] is not ansible.builtin.defined or
+      ansible_facts['distribution_version'] is not ansible.builtin.defined or ansible_facts['distribution_major_version'] is not ansible.builtin.defined or
       ((__disk_linux_supported_platforms | ansible.builtin.length) == 0)
-
 
 - name: "Init | Warn when platform is unsupported"
   ansible.builtin.fail:
@@ -72,7 +67,6 @@
     - (__disk_linux_supported_platforms | ansible.builtin.length) > 0
     - (__disk_linux_matched_versions | ansible.builtin.length) == 0
   ignore_errors: true # noqa: ignore-errors
-
 
 - name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
   ansible.builtin.set_fact:
@@ -138,7 +132,6 @@
   loop_control:
     loop_var: "__disk_linux_varsfile_item"
 
-
 ### foundata.linux.disk specific
 
 - name: "Init | Assert cross-item invariants of disk_linux_devices"
@@ -160,7 +153,6 @@
   when:
     - (__disk_linux_devices_effective | ansible.builtin.length) > 0
 
-
 - name: "Init | Assert per-item invariants of disk_linux_devices"
   ansible.builtin.assert:
     that:
@@ -180,7 +172,6 @@
     loop_var: "__disk_linux_invariant_item"
     label: "{{ __disk_linux_invariant_item['path'] }}"
 
-
 - name: "Init | Fail on structurally contradictory parent/child states"
   ansible.builtin.assert:
     that:
@@ -199,5 +190,6 @@
       effective state is "present" (wipe is only honored together with
       state "absent"; see on_mismatch "wipe" for single-run repurposing):
       {{ __disk_linux_wipe_ignored | ansible.builtin.join(', ') }}
+    verbosity: 0
   when:
     - (__disk_linux_wipe_ignored | ansible.builtin.length) > 0

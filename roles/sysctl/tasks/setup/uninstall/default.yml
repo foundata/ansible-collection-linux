@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-
 - name: "Setup | Uninstall | Remove packages"
   ansible.builtin.package:
     name: "{{ __sysctl_linux_packages_uninstall }}"
@@ -12,7 +11,6 @@
   when:
     - __sysctl_linux_packages_uninstall is ansible.builtin.defined
     - (__sysctl_linux_packages_uninstall | ansible.builtin.length) > 0
-
 
 - name: "Setup | Uninstall | Remove managed drop-in sysctl config file(s) (if any)"
   ansible.builtin.file:
@@ -25,8 +23,7 @@
   loop_control:
     loop_var: "__sysctl_linux_dropin_path_item"
   notify:
-    - "sysctl_linux: reload"
-
+    - "sysctl_linux_reload_kernel_parameters"
 
 # Boot-time module loading the role configured has to go as well, otherwise a
 # reboot still loads what a removed profile asked for. The modules stay loaded
@@ -37,12 +34,11 @@
 - name: "Setup | Uninstall | Read the managed modules-load drop-in file (if any)"
   ansible.builtin.slurp:
     src: "{{ __sysctl_linux_modules_load_dropin_file_path }}"
-  register: __sysctl_linux_uninstall_modules_slurp
   failed_when:
     - __sysctl_linux_uninstall_modules_slurp['msg'] is ansible.builtin.defined
     - "'file not found' not in (__sysctl_linux_uninstall_modules_slurp['msg'] | ansible.builtin.lower)"
 
-
+  register: __sysctl_linux_uninstall_modules_slurp
 - name: "Setup | Uninstall | Determine the ownership of the modules-load drop-in file"
   ansible.builtin.set_fact:
     __sysctl_linux_uninstall_modules_exists: >-
@@ -62,7 +58,6 @@
   when:
     - __sysctl_linux_uninstall_modules_owned | ansible.builtin.bool
 
-
 - name: "Setup | Uninstall | Notice about a foreign file at the managed modules-load path"
   ansible.builtin.debug:
     msg: >-
@@ -71,16 +66,15 @@
       ('{{ __sysctl_linux_modules_load_marker }}' as its first line); it may
       belong to the administrator or other software and is preserved. Review
       and remove it manually if it is obsolete.
+    verbosity: 0
   when:
     - __sysctl_linux_uninstall_modules_exists | ansible.builtin.bool
     - not (__sysctl_linux_uninstall_modules_owned | ansible.builtin.bool)
-
 
 - name: "Setup | Uninstall | Check if the main sysctl config file exists"
   ansible.builtin.stat:
     path: "{{ __sysctl_linux_config_file_path }}"
   register: __sysctl_linux_uninstall_main_stat
-
 
 # When state is "present" the config phase comments out duplicate keys in the
 # main config file (prefixing them with __sysctl_linux_main_disabled_marker) so
@@ -91,8 +85,8 @@
   ansible.builtin.replace:
     path: "{{ __sysctl_linux_config_file_path }}"
     regexp: "^{{ __sysctl_linux_main_disabled_marker }}(.*)$"
-    replace: '\1'
+    replace: "\\1"
   when:
     - __sysctl_linux_uninstall_main_stat['stat']['exists'] | ansible.builtin.default(false)
   notify:
-    - "sysctl_linux: reload"
+    - "sysctl_linux_reload_kernel_parameters"

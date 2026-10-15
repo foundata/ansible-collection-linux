@@ -8,6 +8,6 @@
 SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 SPDX-License-Identifier: GPL-3.0-or-later
 -#}
-# {{ ansible_managed }}
+# {{ tpl_managed }}
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "{{ tpl_unattended_upgrade | ansible.builtin.default('1') }}";
