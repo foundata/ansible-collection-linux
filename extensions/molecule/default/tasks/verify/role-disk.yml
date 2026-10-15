@@ -1,3 +1,4 @@
+---
 # Check collection role "disk" outcomes.
 #
 # SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
@@ -8,7 +9,6 @@
     name: "foundata.linux.disk"
     tasks_from: "init"
     public: true
-
 
 - name: "Molecule | Verify | disk | Set disk_linux_* and __testing_* parameters as facts from __testing_state"
   ansible.builtin.set_fact:
@@ -38,7 +38,6 @@
     - "/srv/molecule_data1"
     - "/srv/molecule_data2"
   register: __testing_disk_findmnt_result
-
 
 - name: "Molecule | Verify | disk | Assert the filesystems are mounted as declared"
   ansible.builtin.assert:
@@ -81,7 +80,6 @@
     - "/dev/disk/by-id/virtio-molecule-data2"
   register: __testing_disk_lsblk_result
 
-
 - name: "Molecule | Verify | disk | Assert the on-disk layout matches the declaration"
   ansible.builtin.assert:
     that:
@@ -111,7 +109,6 @@
   ansible.builtin.slurp:
     src: "/etc/fstab"
   register: __testing_disk_fstab_result
-
 
 - name: "Molecule | Verify | disk | Assert the /etc/fstab entries (UUID source, fields, no leftovers)"
   ansible.builtin.assert:
@@ -153,7 +150,6 @@
   changed_when:
     - false
 
-
 - name: "Molecule | Verify | disk | Determine the state of the migrated content and the marker"
   ansible.builtin.stat:
     path: "{{ item }}"
@@ -164,7 +160,6 @@
     - "/srv/molecule_data0/.ansible-disk-migration-in-progress"
     - "/srv/molecule_missing"
   register: __testing_disk_stat_result
-
 
 - name: "Molecule | Verify | disk | Assert the migration outcome"
   ansible.builtin.assert:
@@ -178,12 +173,10 @@
     fail_msg: "The on_nonempty copy migration did not produce the expected content."
     success_msg: "The seeded content was migrated onto the new filesystem, no marker was left behind."
 
-
 - name: "Molecule | Verify | disk | Determine the device of the parent filesystem"
   ansible.builtin.stat:
     path: "/srv"
   register: __testing_disk_root_stat_result
-
 
 - name: "Molecule | Verify | disk | Assert the migrated content is not shadowed on the parent filesystem"
   ansible.builtin.assert:
@@ -194,14 +187,12 @@
     fail_msg: "The migrated content does not reside on the mounted filesystem."
     success_msg: "The migrated content resides on the mounted filesystem, not on the parent."
 
-
 ## Copy migration onto the fresh ext4 filesystem
 
 - name: "Molecule | Verify | disk | Read the migrated ext4 content"
   ansible.builtin.slurp:
     src: "/srv/molecule_data1/seeded-ext4.txt"
   register: __testing_disk_ext4_migrated
-
 
 - name: "Molecule | Verify | disk | Query the ext4 mount"
   ansible.builtin.command:
@@ -215,7 +206,6 @@
     - false
   register: __testing_disk_ext4_mount
 
-
 - name: "Molecule | Verify | disk | Assert the ext4 migration succeeded despite lost+found"
   ansible.builtin.assert:
     that:
@@ -227,7 +217,6 @@
       it as foreign data).
     success_msg: "The copy migration onto the fresh ext4 filesystem succeeded."
 
-
 ## Busy-tree protection of on_mismatch "wipe"
 
 # The mounted, role-managed data0 disk deliberately gets a CONTRADICTING
@@ -236,7 +225,6 @@
 # disk's tree is mounted - before anything was changed.
 - name: "Molecule | Verify | disk | Busy wipe: attempt a mismatch wipe of a mounted disk"
   block:
-
     - name: "Molecule | Verify | disk | Busy wipe: include the role with a contradicting declaration"
       ansible.builtin.include_role:
         name: "foundata.linux.disk"
@@ -254,11 +242,9 @@
         __testing_disk_busywipe_rejected: false
 
   rescue:
-
     - name: "Molecule | Verify | disk | Busy wipe: record that the wipe was rejected"
       ansible.builtin.set_fact:
         __testing_disk_busywipe_rejected: true
-
 
 - name: "Molecule | Verify | disk | Busy wipe: check the filesystem survived"
   ansible.builtin.command:
@@ -272,7 +258,6 @@
     - false
   register: __testing_disk_busywipe_fstype
 
-
 - name: "Molecule | Verify | disk | Busy wipe: assert the mounted tree was protected"
   ansible.builtin.assert:
     that:
@@ -283,7 +268,6 @@
       {{ __testing_disk_busywipe_rejected }}, filesystem now:
       {{ __testing_disk_busywipe_fstype['stdout'] }}).
     success_msg: "A mismatch wipe on a mounted device tree is refused before mutation."
-
 
 ## Multi-device Btrfs system-disk protection (loop devices)
 
@@ -311,11 +295,10 @@
       printf '%s %s\n' "$L0" "$L1"
   args:
     executable: "/bin/bash"
-  register: __testing_disk_btrfs_setup
   changed_when:
     - true
 
-
+  register: __testing_disk_btrfs_setup
 - name: "Molecule | Verify | disk | Btrfs: determine whether the fixture could be created"
   ansible.builtin.set_fact:
     __testing_disk_btrfs_available: >-
@@ -327,16 +310,15 @@
     msg: >-
       This platform cannot create a Btrfs filesystem, so the multi-device
       member protection cannot be exercised here.
+    verbosity: 0
   when:
     - not (__testing_disk_btrfs_available | ansible.builtin.bool)
-
 
 - name: "Molecule | Verify | disk | Btrfs: set the loop device facts"
   ansible.builtin.set_fact:
     __testing_disk_btrfs_loops: "{{ __testing_disk_btrfs_setup['stdout_lines'][-1].split() }}"
   when:
     - __testing_disk_btrfs_available | ansible.builtin.bool
-
 
 # Declaring EITHER member has to be rejected: the second member is a peer of
 # the mount source, not an ancestor (regression: only the source's ancestors
@@ -346,7 +328,6 @@
     __testing_attempt_results: []
   when:
     - __testing_disk_btrfs_available | ansible.builtin.bool
-
 
 - name: "Molecule | Verify | disk | Btrfs: attempt to manage each member of the critical filesystem"
   ansible.builtin.include_tasks:
@@ -358,13 +339,12 @@
       - device: "{{ __testing_disk_btrfs_member }}"
         mount:
           path: "/srv/molecule-btrfs-member"
-  loop: "{{ __testing_disk_btrfs_loops }}"
-  loop_control:
-    loop_var: "__testing_disk_btrfs_member"
   when:
     - __testing_disk_btrfs_available | ansible.builtin.bool
 
-
+  loop: "{{ __testing_disk_btrfs_loops }}"
+  loop_control:
+    loop_var: "__testing_disk_btrfs_member"
 - name: "Molecule | Verify | disk | Btrfs: assert both members are protected"
   ansible.builtin.assert:
     that:
@@ -376,7 +356,6 @@
   when:
     - __testing_disk_btrfs_available | ansible.builtin.bool
 
-
 - name: "Molecule | Verify | disk | Btrfs: tear the loop filesystem down again"
   ansible.builtin.shell:
     cmd: |
@@ -386,14 +365,13 @@
       rm -rf /var/tmp/molecule-loops /mnt/molecule-btrfs
   args:
     executable: "/bin/bash"
-  changed_when:
-    - true
   when:
     - __testing_disk_btrfs_available | ansible.builtin.bool
 
-
 ## Atomic wipe refusal on an active unmounted stack (loop device + LUKS)
 
+  changed_when:
+    - true
 - name: "Molecule | Verify | disk | LUKS: build a two-partition loop disk with an open unmounted mapping"
   ansible.builtin.shell:
     cmd: |
@@ -417,16 +395,14 @@
       echo "$L"
   args:
     executable: "/bin/bash"
-  register: __testing_disk_luks_setup
   changed_when:
     - true
 
-
+  register: __testing_disk_luks_setup
 - name: "Molecule | Verify | disk | LUKS: set the fixture facts"
   ansible.builtin.set_fact:
     __testing_disk_luks_loop: "{{ __testing_disk_luks_setup['stdout_lines'][-1] }}"
     __testing_disk_luks_p1_uuid: "{{ __testing_disk_luks_setup['stdout_lines'][-2] }}"
-
 
 # The mismatch wipe and the absent wipe must both refuse the disk while the
 # unmounted LUKS mapping holds partition 2, and partition 1's signature has
@@ -456,7 +432,6 @@
     loop_var: "__testing_disk_luks_declaration"
     label: "{{ __testing_disk_luks_declaration['state'] | ansible.builtin.default('present') }}"
 
-
 - name: "Molecule | Verify | disk | LUKS: read partition 1's signature after the refusals"
   ansible.builtin.command:
     argv:
@@ -466,11 +441,10 @@
       - "--output"
       - "value"
       - "{{ __testing_disk_luks_loop }}p1"
-  register: __testing_disk_luks_p1_after
   changed_when:
     - false
 
-
+  register: __testing_disk_luks_p1_after
 - name: "Molecule | Verify | disk | LUKS: assert both wipes were refused atomically"
   ansible.builtin.assert:
     that:
@@ -484,7 +458,6 @@
       {{ __testing_disk_luks_p1_after['stdout'] }}).
     success_msg: "Both wipe paths refuse the held disk before touching any signature."
 
-
 - name: "Molecule | Verify | disk | LUKS: close the mapping"
   ansible.builtin.command:
     argv:
@@ -493,7 +466,6 @@
       - "molecule-luks-hold"
   changed_when:
     - true
-
 
 - name: "Molecule | Verify | disk | LUKS: repeat the mismatch wipe on the now-inactive disk"
   ansible.builtin.include_role:
@@ -505,7 +477,6 @@
         mount:
           path: "/srv/molecule-luks-test"
 
-
 - name: "Molecule | Verify | disk | LUKS: assert the inactive disk was repurposed"
   ansible.builtin.command:
     argv:
@@ -514,13 +485,12 @@
       - "--output"
       - "SOURCE"
       - "/srv/molecule-luks-test"
-  register: __testing_disk_luks_mounted
   changed_when:
     - false
   failed_when:
     - __testing_disk_luks_loop not in __testing_disk_luks_mounted['stdout']
 
-
+  register: __testing_disk_luks_mounted
 - name: "Molecule | Verify | disk | LUKS: tear the fixture down again"
   ansible.builtin.include_role:
     name: "foundata.linux.disk"
@@ -530,7 +500,6 @@
         state: "absent"
         mount:
           path: "/srv/molecule-luks-test"
-
 
 - name: "Molecule | Verify | disk | LUKS: release the loop device"
   ansible.builtin.shell:
@@ -543,7 +512,6 @@
     executable: "/bin/bash"
   changed_when:
     - true
-
 
 ## Migration staging path safety
 #
@@ -576,16 +544,14 @@
       echo "$ML"
   args:
     executable: "/bin/bash"
-  register: __testing_disk_staging_setup
   changed_when:
     - true
 
-
+  register: __testing_disk_staging_setup
 - name: "Molecule | Verify | disk | Staging: pick up the loop device names"
   ansible.builtin.set_fact:
     __testing_disk_staging_foreign_loop: "{{ __testing_disk_staging_setup['stdout_lines'][-2] }}"
     __testing_disk_staging_migration_loop: "{{ __testing_disk_staging_setup['stdout_lines'][-1] }}"
-
 
 - name: "Molecule | Verify | disk | Staging: run a copy migration"
   ansible.builtin.include_role:
@@ -597,7 +563,6 @@
           path: "/srv/molecule-stage-test"
           on_nonempty: "copy"
 
-
 - name: "Molecule | Verify | disk | Staging: query the migrated mount and the foreign mount"
   ansible.builtin.command:
     argv:
@@ -606,23 +571,21 @@
       - "--output"
       - "SOURCE"
       - "{{ item }}"
-  register: __testing_disk_staging_mounts
   changed_when:
     - false
   loop:
     - "/srv/molecule-stage-test"
     - "/mnt/.disk-migration"
 
-
+  register: __testing_disk_staging_mounts
 - name: "Molecule | Verify | disk | Staging: get information about the migrated and the foreign content"
   ansible.builtin.stat:
     path: "{{ item }}"
-  register: __testing_disk_staging_files
   loop:
     - "/srv/molecule-stage-test/seeded.txt"
     - "/mnt/.disk-migration/canary.txt"
 
-
+  register: __testing_disk_staging_files
 - name: "Molecule | Verify | disk | Staging: assert the migration worked and the foreign mount survived"
   ansible.builtin.assert:
     that:
@@ -650,7 +613,6 @@
         mount:
           path: "/srv/molecule-stage-test"
 
-
 - name: "Molecule | Verify | disk | Staging: release the fixtures"
   ansible.builtin.shell:
     cmd: |
@@ -667,7 +629,6 @@
     executable: "/bin/bash"
   changed_when:
     - true
-
 
 ## Interrupted copy migration recovery
 #
@@ -692,15 +653,13 @@
       echo "$IL"
   args:
     executable: "/bin/bash"
-  register: __testing_disk_interrupt_setup
   changed_when:
     - true
 
-
+  register: __testing_disk_interrupt_setup
 - name: "Molecule | Verify | disk | Interrupted copy: pick up the loop device name"
   ansible.builtin.set_fact:
     __testing_disk_interrupt_loop: "{{ __testing_disk_interrupt_setup['stdout_lines'][-1] }}"
-
 
 - name: "Molecule | Verify | disk | Interrupted copy: provision the filesystem (empty source)"
   ansible.builtin.include_role:
@@ -711,14 +670,13 @@
         mount:
           path: "/srv/molecule-interrupt-test"
 
-
 - name: "Molecule | Verify | disk | Interrupted copy: fabricate the remains of an aborted copy"
   ansible.builtin.copy:
     dest: "{{ item['dest'] }}"
     content: "{{ item['content'] }}"
     owner: "root"
     group: "root"
-    mode: "u=rw,g=,o="
+    mode: "u=rw,g=,o=" # 0600
   loop:
     - dest: "/srv/molecule-interrupt-test/.ansible-disk-migration-in-progress"
       content: ""
@@ -726,7 +684,6 @@
       content: "partial copy remains\n"
   loop_control:
     label: "{{ item['dest'] }}"
-
 
 - name: "Molecule | Verify | disk | Interrupted copy: unmount again (declared absent by its own device)"
   ansible.builtin.include_role:
@@ -738,16 +695,13 @@
         mount:
           path: "/srv/molecule-interrupt-test"
 
-
 - name: "Molecule | Verify | disk | Interrupted copy: seed the source directory"
   ansible.builtin.copy:
     dest: "/srv/molecule-interrupt-test/seeded.txt"
     content: "real source content\n"
     owner: "root"
     group: "root"
-    mode: "u=rw,g=r,o=r"
-
-
+    mode: "u=rw,g=r,o=r" # 0644
 - name: "Molecule | Verify | disk | Interrupted copy: retry the migration"
   ansible.builtin.include_role:
     name: "foundata.linux.disk"
@@ -758,17 +712,15 @@
           path: "/srv/molecule-interrupt-test"
           on_nonempty: "copy"
 
-
 - name: "Molecule | Verify | disk | Interrupted copy: get information about the outcome"
   ansible.builtin.stat:
     path: "{{ item }}"
-  register: __testing_disk_interrupt_files
   loop:
     - "/srv/molecule-interrupt-test/seeded.txt"
     - "/srv/molecule-interrupt-test/partial.txt"
     - "/srv/molecule-interrupt-test/.ansible-disk-migration-in-progress"
 
-
+  register: __testing_disk_interrupt_files
 - name: "Molecule | Verify | disk | Interrupted copy: assert the retry recovered"
   ansible.builtin.assert:
     that:
@@ -796,7 +748,6 @@
         mount:
           path: "/srv/molecule-interrupt-test"
 
-
 - name: "Molecule | Verify | disk | Interrupted copy: release the fixtures"
   ansible.builtin.shell:
     cmd: |
@@ -809,7 +760,6 @@
     executable: "/bin/bash"
   changed_when:
     - true
-
 
 ## Absent-state device identity
 #
@@ -841,16 +791,14 @@
       echo "$SL"
   args:
     executable: "/bin/bash"
-  register: __testing_disk_absentid_setup
   changed_when:
     - true
 
-
+  register: __testing_disk_absentid_setup
 - name: "Molecule | Verify | disk | Absent identity: pick up the loop device names"
   ansible.builtin.set_fact:
     __testing_disk_absentid_replacement: "{{ __testing_disk_absentid_setup['stdout_lines'][-2] }}"
     __testing_disk_absentid_stale: "{{ __testing_disk_absentid_setup['stdout_lines'][-1] }}"
-
 
 - name: "Molecule | Verify | disk | Absent identity: query the fixture devices"
   ansible.builtin.command:
@@ -860,14 +808,13 @@
       - "--output"
       - "NAME,TYPE,PTTYPE,FSTYPE"
       - "{{ item }}"
-  register: __testing_disk_absentid_blank
   changed_when:
     - false
   loop:
     - "{{ __testing_disk_absentid_replacement }}"
     - "{{ __testing_disk_absentid_stale }}"
 
-
+  register: __testing_disk_absentid_blank
 - name: "Molecule | Verify | disk | Absent identity: assert the fixture devices are blank"
   ansible.builtin.assert:
     that:
@@ -881,7 +828,6 @@
   loop_control:
     label: "{{ item['item'] }}"
 
-
 - name: "Molecule | Verify | disk | Absent identity: provision the replacement at the mountpoint"
   ansible.builtin.include_role:
     name: "foundata.linux.disk"
@@ -891,10 +837,8 @@
         mount:
           path: "/srv/molecule-absentid-test"
 
-
 - name: "Molecule | Verify | disk | Absent identity: declare the stale disk absent (must fail)"
   block:
-
     - name: "Molecule | Verify | disk | Absent identity: run the role with the stale absent declaration"
       ansible.builtin.include_role:
         name: "foundata.linux.disk"
@@ -910,7 +854,6 @@
         msg: "An absent declaration for a different device tore down the replacement's mount."
 
   rescue:
-
     - name: "Molecule | Verify | disk | Absent identity: assert the failure is the identity refusal"
       ansible.builtin.assert:
         that:
@@ -922,11 +865,9 @@
           {{ ansible_failed_result['msg'] | ansible.builtin.default('(no message)') }}
         success_msg: "The stale absent declaration was refused by the device identity check."
 
-
 - name: "Molecule | Verify | disk | Absent identity: query the replacement mount and fstab entry"
   ansible.builtin.command:
     argv: "{{ item }}"
-  register: __testing_disk_absentid_state
   changed_when:
     - false
   loop:
@@ -944,7 +885,7 @@
       - "--mountpoint"
       - "/srv/molecule-absentid-test"
 
-
+  register: __testing_disk_absentid_state
 - name: "Molecule | Verify | disk | Absent identity: assert the replacement survived untouched"
   ansible.builtin.assert:
     that:
@@ -955,7 +896,6 @@
       {{ __testing_disk_absentid_state['results'][0]['stdout'] }}, fstab:
       {{ __testing_disk_absentid_state['results'][1]['stdout'] }}).
     success_msg: "The replacement's mount and /etc/fstab entry survived untouched."
-
 
 # The correctly-addressed cleanup must still work, detached remains
 # included: the replacement is declared absent by ITS device.
@@ -969,7 +909,6 @@
         mount:
           path: "/srv/molecule-absentid-test"
 
-
 - name: "Molecule | Verify | disk | Absent identity: assert the correctly-addressed cleanup worked"
   ansible.builtin.command:
     argv:
@@ -979,16 +918,15 @@
       - "SOURCE"
       - "--mountpoint"
       - "/srv/molecule-absentid-test"
-  register: __testing_disk_absentid_gone
   changed_when:
     - false
   failed_when:
     - __testing_disk_absentid_gone['rc'] != 1
 
-
-# A replacement is not always another block device: tmpfs (or NFS/overlay)
-# sources make lsblk fail, which previously classified them as removable
-# stale remains instead of foreign.
+  # A replacement is not always another block device: tmpfs (or NFS/overlay)
+  # sources make lsblk fail, which previously classified them as removable
+  # stale remains instead of foreign.
+  register: __testing_disk_absentid_gone
 - name: "Molecule | Verify | disk | Absent identity: mount a tmpfs replacement at the mountpoint"
   ansible.builtin.command:
     argv:
@@ -1000,10 +938,8 @@
   changed_when:
     - true
 
-
 - name: "Molecule | Verify | disk | Absent identity: declare the stale disk absent over tmpfs (must fail)"
   block:
-
     - name: "Molecule | Verify | disk | Absent identity: run the role against the tmpfs-backed mountpoint"
       ansible.builtin.include_role:
         name: "foundata.linux.disk"
@@ -1019,7 +955,6 @@
         msg: "An absent declaration unmounted a tmpfs replacement it cannot prove ownership of."
 
   rescue:
-
     - name: "Molecule | Verify | disk | Absent identity: assert the tmpfs refusal"
       ansible.builtin.assert:
         that:
@@ -1031,7 +966,6 @@
           {{ ansible_failed_result['msg'] | ansible.builtin.default('(no message)') }}
         success_msg: "An unresolvable active source (tmpfs) is refused as foreign."
 
-
 - name: "Molecule | Verify | disk | Absent identity: assert the tmpfs mount survived"
   ansible.builtin.command:
     argv:
@@ -1041,13 +975,12 @@
       - "FSTYPE"
       - "--mountpoint"
       - "/srv/molecule-absentid-test"
-  register: __testing_disk_absentid_tmpfs
   changed_when:
     - false
   failed_when:
     - "'tmpfs' not in __testing_disk_absentid_tmpfs['stdout']"
 
-
+  register: __testing_disk_absentid_tmpfs
 - name: "Molecule | Verify | disk | Absent identity: unmount the tmpfs replacement again"
   ansible.builtin.command:
     argv:
@@ -1055,7 +988,6 @@
       - "/srv/molecule-absentid-test"
   changed_when:
     - true
-
 
 # A non-block /etc/fstab row (tmpfs, NFS) at the declared mountpoint was
 # never written by this role and must survive an absent declaration.
@@ -1065,10 +997,8 @@
     line: "tmpfs /srv/molecule-absentid-test tmpfs defaults 0 0"
     state: "present"
 
-
 - name: "Molecule | Verify | disk | Absent identity: declare the stale disk absent over the foreign row (must fail)"
   block:
-
     - name: "Molecule | Verify | disk | Absent identity: run the role against the foreign fstab row"
       ansible.builtin.include_role:
         name: "foundata.linux.disk"
@@ -1084,7 +1014,6 @@
         msg: "An absent declaration removed a non-block /etc/fstab row it does not own."
 
   rescue:
-
     - name: "Molecule | Verify | disk | Absent identity: assert the foreign-row refusal"
       ansible.builtin.assert:
         that:
@@ -1096,25 +1025,22 @@
           {{ ansible_failed_result['msg'] | ansible.builtin.default('(no message)') }}
         success_msg: "A non-block fstab row at the mountpoint is refused as foreign."
 
-
 - name: "Molecule | Verify | disk | Absent identity: assert the foreign fstab row survived, then remove it"
   ansible.builtin.lineinfile:
     path: "/etc/fstab"
     line: "tmpfs /srv/molecule-absentid-test tmpfs defaults 0 0"
     state: "absent"
-  register: __testing_disk_absentid_foreignrow
   failed_when:
     - not (__testing_disk_absentid_foreignrow['changed'] | ansible.builtin.bool)
 
-
-# The documented detached-disk contract: a dead tag at the declared
-# mountpoint is authoritative and removable without further proof.
+  # The documented detached-disk contract: a dead tag at the declared
+  # mountpoint is authoritative and removable without further proof.
+  register: __testing_disk_absentid_foreignrow
 - name: "Molecule | Verify | disk | Absent identity: plant a stale unresolvable fstab row"
   ansible.builtin.lineinfile:
     path: "/etc/fstab"
     line: "UUID=deadbeef-dead-dead-dead-deaddeadbeef /srv/molecule-absentid-test xfs defaults 0 2"
     state: "present"
-
 
 - name: "Molecule | Verify | disk | Absent identity: declare the stale disk absent over the dead row (must succeed)"
   ansible.builtin.include_role:
@@ -1126,7 +1052,6 @@
         mount:
           path: "/srv/molecule-absentid-test"
 
-
 - name: "Molecule | Verify | disk | Absent identity: assert the dead row was removed"
   ansible.builtin.command:
     argv:
@@ -1134,13 +1059,12 @@
       - "-c"
       - "deadbeef-dead-dead-dead-deaddeadbeef"
       - "/etc/fstab"
-  register: __testing_disk_absentid_deadrow
   changed_when:
     - false
   failed_when:
     - __testing_disk_absentid_deadrow['rc'] != 1
 
-
+  register: __testing_disk_absentid_deadrow
 - name: "Molecule | Verify | disk | Absent identity: release the fixtures"
   ansible.builtin.shell:
     cmd: |
@@ -1156,7 +1080,6 @@
   changed_when:
     - true
 
-
 ## Check mode on the deployed state
 #
 # A --check run must succeed as a dry run (regression: the read-only
@@ -1169,19 +1092,16 @@
     path: "/etc/fstab"
   register: __testing_disk_checkmode_fstab_before
 
-
 - name: "Molecule | Verify | disk | Run the role in check mode on the deployed state"
   ansible.builtin.include_role:
     name: "foundata.linux.disk"
     apply:
       check_mode: true
 
-
 - name: "Molecule | Verify | disk | Check mode: get information about /etc/fstab (after)"
   ansible.builtin.stat:
     path: "/etc/fstab"
   register: __testing_disk_checkmode_fstab_after
-
 
 - name: "Molecule | Verify | disk | Check mode: assert nothing was changed"
   ansible.builtin.assert:

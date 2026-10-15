@@ -1,3 +1,4 @@
+---
 # Execute the collection role "auto_update" against all driver-created instances.
 #
 # SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
@@ -34,7 +35,6 @@
         RandomizedDelaySec: "45m"
       auto_update_linux_exclude:
         - "vim"
-
 
 - name: "Molecule | Converge | Set auto_update_linux_* parameters as facts from __testing_state"
   ansible.builtin.set_fact:

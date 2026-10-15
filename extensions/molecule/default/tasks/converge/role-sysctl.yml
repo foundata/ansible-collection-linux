@@ -1,3 +1,4 @@
+---
 # Execute the collection role "sysctl" against all driver-created instances.
 #
 # The molecule instances are virtual machines, so the role applies the values
@@ -30,7 +31,6 @@
         "net.ipv4.tcp_timestamps": 1
         "net.core.somaxconn": 12288
       sysctl_linux_config_dropin_file_name: "zz-custom-dropin.conf"
-
 
 - name: "Molecule | Converge | Set sysctl_linux_* parameters as facts from __testing_state"
   ansible.builtin.set_fact:

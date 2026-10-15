@@ -1,8 +1,8 @@
+---
 # Execute the collection role "user" against all driver-created instances.
 #
 # SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
-
 
 - name: "Molecule | Converge | user | Store user_linux_* role parameters in __testing_state"
   ansible.builtin.include_tasks:
@@ -62,7 +62,6 @@
       # accounts shipped in the instance images are never touched. UID_MAX is
       # left to /etc/login.defs to also exercise that derivation path.
       user_linux_uid_min: 4000
-
 
 - name: "Molecule | Converge | user | Set user_linux_* parameters as facts from __testing_state"
   ansible.builtin.set_fact:

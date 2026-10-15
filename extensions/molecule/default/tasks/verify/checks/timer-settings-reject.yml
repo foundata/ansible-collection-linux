@@ -1,3 +1,4 @@
+---
 # Included in a loop from role-auto_update.yml, once per __testing_reject_case
 # ({varname, label, settings}). Applies invalid timer settings, runs the role's
 # init and expects it to fail in the timer settings validation. The previous
@@ -10,15 +11,12 @@
   ansible.builtin.set_fact:
     __testing_reject_saved: "{{ lookup('ansible.builtin.vars', __testing_reject_case['varname'], default={}) }}"
 
-
 - name: "Molecule | Verify | Timer reject | apply the invalid settings: {{ __testing_reject_case['label'] }}"
   ansible.builtin.set_fact:
     "{{ __testing_reject_case['varname'] }}": "{{ __testing_reject_case['settings'] }}"
 
-
 - name: "Molecule | Verify | Timer reject | run init and expect rejection: {{ __testing_reject_case['label'] }}"
   block:
-
     - name: "Molecule | Verify | Timer reject | include the role's init: {{ __testing_reject_case['label'] }}"
       ansible.builtin.include_role:
         name: "foundata.linux.auto_update"
@@ -31,7 +29,6 @@
           '{{ __testing_reject_case['varname'] }}' were accepted by the role's init.
 
   rescue:
-
     - name: "Molecule | Verify | Timer reject | assert init failed in the timer validation: {{ __testing_reject_case['label'] }}"
       ansible.builtin.assert:
         that:
@@ -46,7 +43,6 @@
           ('{{ ansible_failed_task['name'] | ansible.builtin.default('') }}').
 
   always:
-
     - name: "Molecule | Verify | Timer reject | restore the saved settings: {{ __testing_reject_case['label'] }}"
       ansible.builtin.set_fact:
         "{{ __testing_reject_case['varname'] }}": "{{ __testing_reject_saved }}"

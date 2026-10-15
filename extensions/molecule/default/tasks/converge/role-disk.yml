@@ -1,10 +1,10 @@
+---
 # Execute the collection role "disk" against all driver-created instances.
 # The libvirt platforms attach two blank extra disks (see molecule.yml,
 # "extra_disks"), addressable as /dev/disk/by-id/virtio-molecule-data0/1.
 #
 # SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
-
 
 # Seeded BEFORE the first role run while the mountpoint is still a plain
 # directory on the root filesystem: exercises the on_nonempty "copy"
@@ -22,7 +22,6 @@
     # the ext4 destination: covers the copy migration onto a fresh ext4
     # filesystem (mkfs-created lost+found must not abort it)
     - "/srv/molecule_data1"
-
 
 - name: "Molecule | Converge | disk | Seed files below the future mountpoint"
   ansible.builtin.copy:
@@ -45,7 +44,6 @@
   loop_control:
     label: "{{ item['dest'] }}"
 
-
 # --- Mismatch fixture -------------------------------------------------------
 # A foreign signature directly on the whole disk (no partition table) is the
 # simplest mismatch class, and mkswap is available everywhere (util-linux
@@ -64,7 +62,6 @@
   changed_when:
     - false
   register: __testing_disk_data2_lsblk_result
-
 
 - name: "Molecule | Converge | disk | Derive the third disk's state"
   ansible.builtin.set_fact:
@@ -90,14 +87,12 @@
   changed_when:
     - true
 
-
 # Runs BEFORE the disk_linux_* facts are set below: include_role vars (task
 # vars) would lose against already-set facts otherwise.
 - name: "Molecule | Converge | disk | Negative check: on_mismatch fail must refuse the foreign disk"
   when:
     - (__testing_disk_data2_blank | ansible.builtin.bool) or (__testing_disk_data2_swap | ansible.builtin.bool)
   block:
-
     - name: "Molecule | Converge | disk | Run the role against the foreign disk (must fail)"
       ansible.builtin.include_role:
         name: "foundata.linux.disk"
@@ -107,13 +102,11 @@
             mount:
               path: "/srv/molecule_data2"
 
-
     - name: "Molecule | Converge | disk | Fail because the role accepted the foreign disk"
       ansible.builtin.fail:
         msg: "The role accepted a disk with a foreign signature although on_mismatch is fail."
 
   rescue:
-
     - name: "Molecule | Converge | disk | Assert the failure is the expected mismatch refusal"
       ansible.builtin.assert:
         that:
@@ -122,7 +115,6 @@
           The role failed for an unexpected reason:
           {{ ansible_failed_result['msg'] | ansible.builtin.default('(no message)') }}
         success_msg: "The role refused the foreign disk with the expected mismatch message."
-
 
 - name: "Molecule | Converge | disk | Store disk_linux_* role parameters in __testing_state"
   ansible.builtin.include_tasks:
@@ -165,7 +157,6 @@
           on_missing: "skip"
           mount:
             path: "/srv/molecule_missing"
-
 
 - name: "Molecule | Converge | disk | Set disk_linux_* parameters as facts from __testing_state"
   ansible.builtin.set_fact:

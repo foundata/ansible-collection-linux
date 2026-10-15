@@ -1,9 +1,9 @@
+---
 # Tasks for the Molecule prepare stage: Add resources needed for later steps
 # (e.g. verify) on all driver-created instances.
 #
 # SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
-
 
 # Bring the instance to the current package level BEFORE any role runs: the
 # auto_update role enables unattended-upgrades during converge and the
@@ -13,18 +13,16 @@
 # second run, failing the idempotence stage.
 - name: "Molecule | Prepare | Upgrade all packages (deterministic state for the idempotence stage)"
   ansible.builtin.apt:
-    upgrade: "dist"
     update_cache: true
+    upgrade: "dist"
   when:
     - (ansible_facts['os_family'] | ansible.builtin.lower) == 'debian'
-
 
 - name: "Molecule | Verify | Initialize the foundata.linux.sysctl role (without actually running it; get and expose variables)"
   ansible.builtin.include_role:
     name: "foundata.linux.sysctl"
     tasks_from: "init"
     public: true
-
 
 - name: "Molecule | Prepare | Add custom values to sysctl main config file (to test automatic commenting later)"
   ansible.posix.sysctl:
@@ -42,7 +40,6 @@
       "net.ipv4.tcp_fin_timeout": "99" # Managed by the web profile only (not in sysctl_linux_parameters); must be commented out
   loop: "{{ __testing_sysctl_values_to_comment | ansible.builtin.dict2items }}"
 
-
 # Simulate a leftover from an earlier run: a line the role previously disabled
 # (carries the marker) for a key it does NOT manage in the converge stage. The
 # present run must restore it (strip the marker) since the key is now unmanaged.
@@ -51,7 +48,6 @@
     path: "{{ __sysctl_linux_config_file_path }}"
     line: "{{ __sysctl_linux_main_disabled_marker }}net.ipv4.tcp_keepalive_time = 7200"
     state: "present"
-
 
 - name: "Molecule | Prepare | sysctl | Ensure the drop-in directory exists before seeding"
   # /etc/sysctl.d is created by the role, but the seed below runs first and some
@@ -62,7 +58,6 @@
     owner: "root"
     group: "root"
     mode: "u=rwx,g=rx,o=rx" # 0755
-
 
 - name: "Molecule | Prepare | sysctl | Seed drop-in lines exercising the existing-parameter parser"
   # Two hand-written lines in the role-managed drop-in:
@@ -80,7 +75,6 @@
     group: "root"
     mode: "u=rw,g=r,o=r" # 0644
 
-
 - name: "Molecule | Prepare | sysctl | Seed a stale drop-in with the legacy default name"
   # Simulates a deployment of an earlier role version, whose default drop-in
   # name was 90-managed.conf ("90-" lost against distribution files like
@@ -91,7 +85,6 @@
     owner: "root"
     group: "root"
     mode: "u=rw,g=r,o=r" # 0644
-
 
 - name: "Molecule | Prepare | sysctl | Install the extra kernel modules package (Enterprise Linux 10)"
   # br_netfilter (needed by the container profile checks in the verify stage)
@@ -106,7 +99,6 @@
     - (ansible_facts['os_family'] | ansible.builtin.lower) == 'redhat'
     - (ansible_facts['distribution'] | ansible.builtin.lower) != 'fedora'
     - ansible_facts['distribution_major_version'] == '10'
-
 
 ## Fixtures for the foundata.linux.user role tests.
 #
@@ -128,19 +120,16 @@
     group: "root"
     mode: "u=r,g=r,o=" # 0440
 
-
 - name: "Molecule | Prepare | user | Create a group the role will remove (state: absent)"
   ansible.builtin.group:
     name: "molecule_legacy_absent"
     state: "present"
-
 
 - name: "Molecule | Prepare | user | Create an account the role will remove (state: absent)"
   ansible.builtin.user:
     name: "molecule_obsolete"
     shell: "/bin/bash"
     state: "present"
-
 
 - name: "Molecule | Prepare | user | Create an unmanaged in-range account the role should reap"
   ansible.builtin.user:
@@ -149,7 +138,6 @@
     shell: "/bin/bash"
     state: "present"
 
-
 - name: "Molecule | Prepare | user | Create an unmanaged in-range account that is excluded from reaping"
   ansible.builtin.user:
     name: "molecule_keepme"
@@ -157,20 +145,17 @@
     shell: "/bin/bash"
     state: "present"
 
-
 - name: "Molecule | Prepare | user | Create an account with a stray authorized_key (to test exclusive purge)"
   ansible.builtin.user:
     name: "molecule_keyuser"
     shell: "/bin/bash"
     state: "present"
 
-
 - name: "Molecule | Prepare | user | Add a stray authorized_key that the role must purge"
   ansible.posix.authorized_key:
     user: "molecule_keyuser"
     key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILmFhCG3dipt7baMWEJOo9chtWBt+rpTsltkYcnd4jcu molecule_stray@example.com"
     state: "present"
-
 
 # Counterpart to molecule_keyuser: that account runs with
 # ssh_authorized_keys_delete_unmanaged set to true (exclusive purge), this one
@@ -182,7 +167,6 @@
     name: "molecule_keyabsent"
     shell: "/bin/bash"
     state: "present"
-
 
 - name: "Molecule | Prepare | user | Add the authorized_keys the role must remove and preserve"
   ansible.posix.authorized_key:

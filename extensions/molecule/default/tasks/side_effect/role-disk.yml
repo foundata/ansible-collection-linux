@@ -1,3 +1,4 @@
+---
 # Exercise the "grow" reconciliation of the collection role "disk": enlarge
 # the first extra disk on the hypervisor side (virtio-blk propagates the new
 # capacity to the running guest), re-run the role and assert partition and
@@ -5,7 +6,6 @@
 #
 # SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
-
 
 - name: "Molecule | Side effect | disk | Grow the first extra disk image on the hypervisor"
   delegate_to: "localhost"
@@ -20,7 +20,6 @@
       - "3G"
   changed_when:
     - true
-
 
 - name: "Molecule | Side effect | disk | Wait until the guest sees the grown disk"
   ansible.builtin.command:
@@ -42,7 +41,6 @@
       > 2147483648
   register: __testing_disk_growsize_result
 
-
 - name: "Molecule | Side effect | disk | Set disk_linux_* parameters as facts from __testing_state"
   ansible.builtin.set_fact:
     "{{ item['key'] }}": "{{ item['value'] }}"
@@ -59,7 +57,6 @@
   ansible.builtin.include_role:
     name: "foundata.linux.disk"
 
-
 - name: "Molecule | Side effect | disk | Query the size of the grown filesystem"
   ansible.builtin.command:
     argv:
@@ -73,7 +70,6 @@
   changed_when:
     - false
   register: __testing_disk_grownfs_result
-
 
 - name: "Molecule | Side effect | disk | Assert the filesystem was grown online"
   ansible.builtin.assert:

@@ -1,3 +1,4 @@
+---
 # Check collection role "auto_update" outcomes.
 #
 # SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
@@ -21,14 +22,12 @@
     tasks_from: "init"
     public: true
 
-
 ## systemd timer drop-in
 
 - name: "Molecule | Verify | Check if the systemd timer drop-in file exists"
   ansible.builtin.stat:
     path: "{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}"
   register: __testing_timer_dropin
-
 
 - name: "Molecule | Verify | Assert the systemd timer drop-in file exists"
   ansible.builtin.assert:
@@ -37,12 +36,10 @@
     fail_msg: "The systemd timer drop-in '{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}' does not exist."
     success_msg: "The systemd timer drop-in '{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}' exists."
 
-
 - name: "Molecule | Verify | Read the systemd timer drop-in file content"
   ansible.builtin.slurp:
     src: "{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}"
   register: __testing_timer_dropin_content
-
 
 - name: "Molecule | Verify | Assert the timer drop-in contains the configured schedule"
   ansible.builtin.assert:
@@ -57,15 +54,12 @@
   loop_control:
     loop_var: "__testing_needle"
 
-
 # The repeatable time-trigger directives share one list in systemd, so the
 # drop-in must carry
 # exactly ONE empty reset line: a second one would wipe the triggers rendered
 # before it. The two configured OnCalendar values must therefore appear as two
 # assignments after that single reset.
 - name: "Molecule | Verify | Assert the timer drop-in carries exactly one trigger reset"
-  vars:
-    __testing_timer_dropin_decoded: "{{ __testing_timer_dropin_content['content'] | ansible.builtin.b64decode }}"
   ansible.builtin.assert:
     that:
       - >-
@@ -83,26 +77,26 @@
       configured OnCalendar expressions.
 
 
+  vars:
+    __testing_timer_dropin_decoded: "{{ __testing_timer_dropin_content['content'] | ansible.builtin.b64decode }}"
 - name: "Molecule | Verify | Get enablement state of the automatic update timer"
   ansible.builtin.command:
     argv:
       - "systemctl"
       - "is-enabled"
       - "{{ __auto_update_linux_systemd_timer_unit_name }}"
-  register: __testing_timer_enabled
   changed_when:
     - false
   failed_when:
     - false
 
-
+  register: __testing_timer_enabled
 - name: "Molecule | Verify | Assert the automatic update timer is enabled"
   ansible.builtin.assert:
     that:
       - "'enabled' in __testing_timer_enabled['stdout']"
     fail_msg: "The timer '{{ __auto_update_linux_systemd_timer_unit_name }}' is not enabled (is-enabled returned '{{ __testing_timer_enabled['stdout'] }}')."
     success_msg: "The timer '{{ __auto_update_linux_systemd_timer_unit_name }}' is enabled."
-
 
 # The drop-in must REPLACE the vendor timer's schedule, not add to it. OnCalendar
 # is a list-typed systemd directive, so a drop-in that does not reset it first
@@ -119,11 +113,10 @@
       - "--property=TimersMonotonic"
       - "--property=OnClockChange"
       - "{{ __auto_update_linux_systemd_timer_unit_name }}"
-  register: __testing_timer_calendar
   changed_when:
     - false
 
-
+  register: __testing_timer_calendar
 - name: "Molecule | Verify | Assert the drop-in replaces the vendor schedule instead of accumulating"
   ansible.builtin.assert:
     that:
@@ -149,17 +142,19 @@
 - name: "Molecule | Verify | unattended-upgrades | Read the managed configuration file"
   ansible.builtin.slurp:
     src: "{{ __auto_update_linux_apt_config_file_path }}"
-  register: __testing_apt_config
   when:
     - __auto_update_linux_backend == 'unattended-upgrades'
 
-
+  register: __testing_apt_config
 - name: "Molecule | Verify | unattended-upgrades | Assert the configuration contains the expected settings"
   ansible.builtin.assert:
     that:
       - "__testing_needle in (__testing_apt_config['content'] | ansible.builtin.b64decode)"
     fail_msg: "Expected '{{ __testing_needle }}' not found in '{{ __auto_update_linux_apt_config_file_path }}'."
     success_msg: "Found '{{ __testing_needle }}' in '{{ __auto_update_linux_apt_config_file_path }}'."
+  when:
+    - __auto_update_linux_backend == 'unattended-upgrades'
+
   loop:
     - "Unattended-Upgrade::Origins-Pattern"
     # reboot == scheduled forces the backend-native reboot off
@@ -168,13 +163,7 @@
     - '"vim"'
   loop_control:
     loop_var: "__testing_needle"
-  when:
-    - __auto_update_linux_backend == 'unattended-upgrades'
-
-
 - name: "Molecule | Verify | unattended-upgrades | Assert a security Origins-Pattern entry is well-formed"
-  vars:
-    __testing_uu_content: "{{ __testing_apt_config['content'] | ansible.builtin.b64decode }}"
   ansible.builtin.assert:
     that:
       # A key=value security origin whose codename/archive ends in "-security"
@@ -182,29 +171,34 @@
       # "-security" suffix (never matches the security archive), and Ubuntu using
       # the "origin:archive" colon shorthand (Allowed-Origins syntax, which
       # raises "not enough values to unpack" inside Origins-Pattern).
-      - '__testing_uu_content is regex("(codename|archive)=[^,\"]*-security")'
+      - '__testing_uu_content is ansible.builtin.regex("(codename|archive)=[^,\"]*-security")'
     fail_msg: "No well-formed '-security' Origins-Pattern entry in '{{ __auto_update_linux_apt_config_file_path }}'."
     success_msg: "The unattended-upgrades config has a well-formed security Origins-Pattern entry."
+  vars:
+    __testing_uu_content: "{{ __testing_apt_config['content'] | ansible.builtin.b64decode }}"
   when:
     - __auto_update_linux_backend == 'unattended-upgrades'
-
 
 ## Backend configuration: dnf / dnf5 automatic (RHEL/Fedora)
 
 - name: "Molecule | Verify | dnf-automatic | Read the managed configuration file"
   ansible.builtin.slurp:
     src: "{{ __auto_update_linux_dnf_config_file_path }}"
-  register: __testing_dnf_config
   when:
     - __auto_update_linux_backend == 'dnf-automatic'
 
-
+  register: __testing_dnf_config
 - name: "Molecule | Verify | dnf-automatic | Assert the configuration contains the expected settings"
   ansible.builtin.assert:
     that:
       - "__testing_needle in (__testing_dnf_config['content'] | ansible.builtin.b64decode)"
     fail_msg: "Expected '{{ __testing_needle }}' not found in '{{ __auto_update_linux_dnf_config_file_path }}'."
     success_msg: "Found '{{ __testing_needle }}' in '{{ __auto_update_linux_dnf_config_file_path }}'."
+  when:
+    - __auto_update_linux_backend == 'dnf-automatic'
+
+## Backend configuration: os-update (openSUSE Leap)
+
   loop:
     - "upgrade_type = security"
     - "download_updates = yes"
@@ -214,43 +208,34 @@
     - "exclude = vim"
   loop_control:
     loop_var: "__testing_needle"
-  when:
-    - __auto_update_linux_backend == 'dnf-automatic'
-
-
-## Backend configuration: os-update (openSUSE Leap)
-
 - name: "Molecule | Verify | os-update | Read the managed configuration file"
   ansible.builtin.slurp:
     src: "{{ __auto_update_linux_osupdate_config_file_path }}"
-  register: __testing_osupdate_config
   when:
     - __auto_update_linux_backend == 'os-update'
 
-
+  register: __testing_osupdate_config
 - name: "Molecule | Verify | os-update | Assert the configuration contains the expected settings"
   ansible.builtin.assert:
     that:
       - "__testing_needle in (__testing_osupdate_config['content'] | ansible.builtin.b64decode)"
     fail_msg: "Expected '{{ __testing_needle }}' not found in '{{ __auto_update_linux_osupdate_config_file_path }}'."
     success_msg: "Found '{{ __testing_needle }}' in '{{ __auto_update_linux_osupdate_config_file_path }}'."
+  when:
+    - __auto_update_linux_backend == 'os-update'
+
+## Scheduled reboot timer (auto_update_linux_reboot == "scheduled")
+
   loop:
     - 'UPDATE_CMD="security"'
     # reboot == scheduled forces the backend-native reboot off
     - 'REBOOT_CMD="none"'
   loop_control:
     loop_var: "__testing_needle"
-  when:
-    - __auto_update_linux_backend == 'os-update'
-
-
-## Scheduled reboot timer (auto_update_linux_reboot == "scheduled")
-
 - name: "Molecule | Verify | Stat the reboot-if-needed helper script"
   ansible.builtin.stat:
     path: "{{ __auto_update_linux_reboot_script_path }}"
   register: __testing_reboot_script
-
 
 - name: "Molecule | Verify | Assert the reboot-if-needed script exists and is executable (0755)"
   ansible.builtin.assert:
@@ -259,7 +244,6 @@
       - __testing_reboot_script['stat']['mode'] == '0755'
     fail_msg: "The reboot helper '{{ __auto_update_linux_reboot_script_path }}' is missing or not mode 0755."
     success_msg: "The reboot helper '{{ __auto_update_linux_reboot_script_path }}' exists and is mode 0755."
-
 
 - name: "Molecule | Verify | Stat the scheduled reboot service and timer units"
   ansible.builtin.stat:
@@ -272,7 +256,6 @@
     label: "{{ __testing_unit_path }}"
   register: __testing_reboot_units
 
-
 - name: "Molecule | Verify | Assert the scheduled reboot units exist"
   ansible.builtin.assert:
     that:
@@ -284,12 +267,10 @@
     loop_var: "__testing_unit_stat"
     label: "{{ __testing_unit_stat['__testing_unit_path'] }}"
 
-
 - name: "Molecule | Verify | Read the scheduled reboot timer unit content"
   ansible.builtin.slurp:
     src: "{{ __auto_update_linux_reboot_timer_unit_path }}"
   register: __testing_reboot_timer_content
-
 
 - name: "Molecule | Verify | Assert the reboot timer unit contains the configured schedule"
   ansible.builtin.assert:
@@ -305,27 +286,24 @@
   loop_control:
     loop_var: "__testing_needle"
 
-
 - name: "Molecule | Verify | Get enablement state of the scheduled reboot timer"
   ansible.builtin.command:
     argv:
       - "systemctl"
       - "is-enabled"
       - "{{ __auto_update_linux_reboot_timer_unit_name }}"
-  register: __testing_reboot_timer_enabled
   changed_when:
     - false
   failed_when:
     - false
 
-
+  register: __testing_reboot_timer_enabled
 - name: "Molecule | Verify | Assert the scheduled reboot timer is enabled"
   ansible.builtin.assert:
     that:
       - "'enabled' in __testing_reboot_timer_enabled['stdout']"
     fail_msg: "The reboot timer '{{ __auto_update_linux_reboot_timer_unit_name }}' is not enabled (got '{{ __testing_reboot_timer_enabled['stdout'] }}')."
     success_msg: "The reboot timer '{{ __auto_update_linux_reboot_timer_unit_name }}' is enabled."
-
 
 # The role owns this unit completely, so there is no vendor schedule to
 # accumulate with and no reset is needed. The parsed schedule is still worth
@@ -340,11 +318,10 @@
       - "show"
       - "--property=TimersCalendar"
       - "{{ __auto_update_linux_reboot_timer_unit_name }}"
-  register: __testing_reboot_timer_calendar
   changed_when:
     - false
 
-
+  register: __testing_reboot_timer_calendar
 - name: "Molecule | Verify | Assert the scheduled reboot timer runs on the configured schedule"
   ansible.builtin.assert:
     that:
@@ -375,7 +352,6 @@
 
 - name: "Molecule | Verify | Validate effective timer settings merge (init-only)"
   block:
-
     - name: "Molecule | Verify | Set custom timer settings for the merge check"
       ansible.builtin.set_fact:
         auto_update_linux_timer_settings:
@@ -391,7 +367,6 @@
         tasks_from: "init"
         public: true
 
-
     - name: "Molecule | Verify | Assert effective timer settings merged correctly"
       ansible.builtin.assert:
         that:
@@ -402,7 +377,6 @@
         fail_msg: "__auto_update_linux_effective_timer_settings did not merge defaults and user values as expected."
         success_msg: "__auto_update_linux_effective_timer_settings merged defaults and user values correctly."
 
-
     - name: "Molecule | Verify | Assert effective reboot timer settings merged correctly"
       ansible.builtin.assert:
         that:
@@ -412,7 +386,6 @@
           - __auto_update_linux_effective_reboot_timer_settings['BazDirective'] == "qux"
         fail_msg: "__auto_update_linux_effective_reboot_timer_settings did not merge defaults and user values as expected."
         success_msg: "__auto_update_linux_effective_reboot_timer_settings merged defaults and user values correctly."
-
 
 ## Timer settings validation (init-only)
 #
@@ -472,7 +445,6 @@
   loop_control:
     label: "{{ item['label'] }}"
 
-
 - name: "Molecule | Verify | Timer settings: apply an empty-list removal with a monotonic trigger"
   ansible.builtin.set_fact:
     __testing_timer_settings_saved: "{{ auto_update_linux_timer_settings | ansible.builtin.default({}) }}"
@@ -480,12 +452,10 @@
       OnCalendar: []
       OnBootSec: "10min"
 
-
 - name: "Molecule | Verify | Timer settings: include the role's init (must accept the removal)"
   ansible.builtin.include_role:
     name: "foundata.linux.auto_update"
     tasks_from: "init"
-
 
 - name: "Molecule | Verify | Timer settings: assert the removal reached the effective settings"
   ansible.builtin.assert:
@@ -504,7 +474,6 @@
   ansible.builtin.set_fact:
     auto_update_linux_timer_settings: "{{ __testing_timer_settings_saved }}"
 
-
 - name: "Molecule | Verify | Timer settings: apply an event-only configuration"
   ansible.builtin.set_fact:
     __testing_timer_settings_saved: "{{ auto_update_linux_timer_settings | ansible.builtin.default({}) }}"
@@ -512,12 +481,10 @@
       OnCalendar: []
       OnClockChange: true
 
-
 - name: "Molecule | Verify | Timer settings: include the role's init (must accept the event-only timer)"
   ansible.builtin.include_role:
     name: "foundata.linux.auto_update"
     tasks_from: "init"
-
 
 - name: "Molecule | Verify | Timer settings: assert the event-only configuration reached the effective settings"
   ansible.builtin.assert:
@@ -536,7 +503,6 @@
   ansible.builtin.set_fact:
     auto_update_linux_timer_settings: "{{ __testing_timer_settings_saved }}"
 
-
 ## Timer settings: event-only timer applied to the system (integration)
 #
 # The init-only positive case above proves acceptance, but not the rendered
@@ -553,25 +519,19 @@
       OnCalendar: []
       OnClockChange: true
 
-
 - name: "Molecule | Verify | Timer settings | event-only integration: apply the role"
   ansible.builtin.include_role:
     name: "foundata.linux.auto_update"
 
-
 - name: "Molecule | Verify | Timer settings | event-only integration: run pending handlers (daemon-reload)"
-  ansible.builtin.meta: flush_handlers
-
+  ansible.builtin.meta: "flush_handlers"
 
 - name: "Molecule | Verify | Timer settings | event-only integration: read the rendered drop-in"
   ansible.builtin.slurp:
     src: "{{ __auto_update_linux_systemd_timer_unit_dropin_file_path }}"
   register: __testing_timer_eventonly_dropin
 
-
 - name: "Molecule | Verify | Timer settings | event-only integration: assert the rendered drop-in"
-  vars:
-    __testing_timer_eventonly_decoded: "{{ __testing_timer_eventonly_dropin['content'] | ansible.builtin.b64decode }}"
   ansible.builtin.assert:
     that:
       # exactly the single shared reset, no calendar or monotonic assignment
@@ -581,7 +541,7 @@
       - >-
         (__testing_timer_eventonly_decoded
          | ansible.builtin.regex_findall('(?m)^On\w+=.+$')
-         | ansible.builtin.reject('match', '^OnClockChange=')
+         | ansible.builtin.reject('ansible.builtin.match', '^OnClockChange=')
          | ansible.builtin.list | ansible.builtin.length) == 0
       - "'OnClockChange=true' in __testing_timer_eventonly_decoded"
     fail_msg: >-
@@ -589,7 +549,8 @@
       event trigger, nothing else. Actual content: {{ __testing_timer_eventonly_decoded }}
     success_msg: "The event-only drop-in carries the single reset and the event trigger."
 
-
+  vars:
+    __testing_timer_eventonly_decoded: "{{ __testing_timer_eventonly_dropin['content'] | ansible.builtin.b64decode }}"
 - name: "Molecule | Verify | Timer settings | event-only integration: get the parsed unit properties"
   ansible.builtin.command:
     argv:
@@ -599,11 +560,10 @@
       - "--property=TimersMonotonic"
       - "--property=OnClockChange"
       - "{{ __auto_update_linux_systemd_timer_unit_name }}"
-  register: __testing_timer_eventonly_props
   changed_when:
     - false
 
-
+  register: __testing_timer_eventonly_props
 - name: "Molecule | Verify | Timer settings | event-only integration: assert the effective unit state"
   ansible.builtin.assert:
     that:
@@ -619,20 +579,16 @@
       lists, active OnClockChange). Got: {{ __testing_timer_eventonly_props['stdout'] }}
     success_msg: "The event-only timer is effective: empty trigger lists, OnClockChange active."
 
-
 - name: "Molecule | Verify | Timer settings | event-only integration: restore the saved settings"
   ansible.builtin.set_fact:
     auto_update_linux_timer_settings: "{{ __testing_timer_settings_saved }}"
-
 
 - name: "Molecule | Verify | Timer settings | event-only integration: re-apply the role with the restored settings"
   ansible.builtin.include_role:
     name: "foundata.linux.auto_update"
 
-
 - name: "Molecule | Verify | Timer settings | event-only integration: run pending handlers again"
-  ansible.builtin.meta: flush_handlers
-
+  ansible.builtin.meta: "flush_handlers"
 
 ## Timer settings: triggerless settings accepted while the timer is unmanaged
 #
@@ -659,7 +615,6 @@
     name: "foundata.linux.auto_update"
     tasks_from: "init"
 
-
 - name: "Molecule | Verify | Timer settings | unmanaged: assert the triggerless settings were in effect"
   ansible.builtin.assert:
     that:
@@ -678,7 +633,6 @@
     auto_update_linux_service_state: "{{ __testing_timer_state_saved }}"
     auto_update_linux_reboot: "{{ __testing_timer_reboot_saved }}"
     auto_update_linux_reboot_timer_settings: "{{ __testing_timer_reboot_settings_saved }}"
-
 
 ## Timer settings: triggerless settings accepted on a non-systemd service manager
 #
@@ -709,7 +663,6 @@
   vars:
     ansible_facts: "{{ __testing_facts_override }}"
 
-
 - name: "Molecule | Verify | Timer settings | non-systemd: assert the triggerless settings were in effect for both timers"
   ansible.builtin.assert:
     that:
@@ -729,7 +682,6 @@
     auto_update_linux_timer_settings: "{{ __testing_timer_settings_saved }}"
     auto_update_linux_reboot_timer_settings: "{{ __testing_timer_reboot_settings_saved }}"
 
-
 ## Kernel release comparison in the reboot helper (prefix collision)
 #
 # The installed helper mirrors the reboot role's checks, so it carries the
@@ -744,9 +696,7 @@
     state: "directory"
     owner: "root"
     group: "root"
-    mode: "u=rwx,g=rx,o=rx"
-
-
+    mode: "u=rwx,g=rx,o=rx" # 0755
 - name: "Molecule | Verify | auto_update | Kernel prefix: create the shutdown shim"
   ansible.builtin.copy:
     dest: "/var/tmp/molecule-reboot-shim/{{ item }}"
@@ -756,11 +706,10 @@
       exit 0
     owner: "root"
     group: "root"
-    mode: "u=rwx,g=rx,o=rx"
+    mode: "u=rwx,g=rx,o=rx" # 0755
   loop:
     - "shutdown"
     - "logger"
-
 
 - name: "Molecule | Verify | auto_update | Kernel prefix: run the helper without a decoy (baseline)"
   ansible.builtin.command:
@@ -773,16 +722,14 @@
     - false
   register: __testing_autoupdate_helper_baseline_run
 
-
 - name: "Molecule | Verify | auto_update | Kernel prefix: read the recorded calls (baseline)"
   ansible.builtin.slurp:
     src: "/var/tmp/molecule-reboot-shim/calls.log"
-  register: __testing_autoupdate_helper_baseline_calls
   failed_when:
     - __testing_autoupdate_helper_baseline_calls['msg'] is ansible.builtin.defined
     - "'file not found' not in (__testing_autoupdate_helper_baseline_calls['msg'] | ansible.builtin.lower)"
 
-
+  register: __testing_autoupdate_helper_baseline_calls
 - name: "Molecule | Verify | auto_update | Kernel prefix: save the baseline"
   ansible.builtin.set_fact:
     __testing_autoupdate_helper_baseline: >-
@@ -796,16 +743,13 @@
   when:
     - not (__testing_autoupdate_helper_baseline | ansible.builtin.bool)
   block:
-
     - name: "Molecule | Verify | auto_update | Kernel prefix: place a prefix-colliding decoy kernel"
       ansible.builtin.file:
         path: "/boot/vmlinuz-{{ ansible_facts['kernel'] }}0"
         state: "touch"
         owner: "root"
         group: "root"
-        mode: "u=rw,g=r,o=r"
-
-
+        mode: "u=rw,g=r,o=r" # 0644
     - name: "Molecule | Verify | auto_update | Kernel prefix: run the helper with the decoy in place"
       ansible.builtin.command:
         argv:
@@ -816,16 +760,14 @@
       changed_when:
         - false
 
-
     - name: "Molecule | Verify | auto_update | Kernel prefix: read the recorded calls"
       ansible.builtin.slurp:
         src: "/var/tmp/molecule-reboot-shim/calls.log"
-      register: __testing_autoupdate_helper_calls
       failed_when:
         - __testing_autoupdate_helper_calls['msg'] is ansible.builtin.defined
         - "'file not found' not in (__testing_autoupdate_helper_calls['msg'] | ansible.builtin.lower)"
 
-
+      register: __testing_autoupdate_helper_calls
     - name: "Molecule | Verify | auto_update | Kernel prefix: assert the helper scheduled the reboot"
       ansible.builtin.assert:
         that:
@@ -840,12 +782,10 @@
         success_msg: "The helper schedules a reboot for a prefix-colliding newer kernel."
 
   always:
-
     - name: "Molecule | Verify | auto_update | Kernel prefix: remove the decoy kernel again"
       ansible.builtin.file:
         path: "/boot/vmlinuz-{{ ansible_facts['kernel'] }}0"
         state: "absent"
-
 
 # The helper's zypper branch: exit code 102 (ZYPPER_EXIT_INF_REBOOT_NEEDED)
 # must schedule the reboot, any other non-zero exit is an error and must NOT.
@@ -856,7 +796,6 @@
   when:
     - not (__testing_autoupdate_helper_baseline | ansible.builtin.bool)
   block:
-
     - name: "Molecule | Verify | auto_update | Zypper stub: create the stub returning 102 (reboot needed)"
       ansible.builtin.copy:
         dest: "/var/tmp/molecule-reboot-shim/zypper"
@@ -865,18 +804,14 @@
           exit 102
         owner: "root"
         group: "root"
-        mode: "u=rwx,g=rx,o=rx"
-
-
+        mode: "u=rwx,g=rx,o=rx" # 0755
     - name: "Molecule | Verify | auto_update | Zypper stub: clear the recorded calls"
       ansible.builtin.copy:
         dest: "/var/tmp/molecule-reboot-shim/calls.log"
         content: ""
         owner: "root"
         group: "root"
-        mode: "u=rw,g=r,o=r"
-
-
+        mode: "u=rw,g=r,o=r" # 0644
     - name: "Molecule | Verify | auto_update | Zypper stub: run the helper against exit code 102"
       ansible.builtin.command:
         argv:
@@ -887,12 +822,10 @@
       changed_when:
         - false
 
-
     - name: "Molecule | Verify | auto_update | Zypper stub: read the recorded calls (102)"
       ansible.builtin.slurp:
         src: "/var/tmp/molecule-reboot-shim/calls.log"
       register: __testing_autoupdate_zypper_calls_102
-
 
     - name: "Molecule | Verify | auto_update | Zypper stub: assert 102 schedules the reboot"
       ansible.builtin.assert:
@@ -904,7 +837,6 @@
           The helper ignored zypper exit code 102
           (ZYPPER_EXIT_INF_REBOOT_NEEDED) and did not schedule a reboot.
         success_msg: "zypper needs-rebooting exit code 102 schedules the reboot."
-
 
     # The VM is live: the auto-update timer converge enabled (or another
     # background job) can create a GENUINE reboot condition between two
@@ -920,18 +852,14 @@
           exit 0
         owner: "root"
         group: "root"
-        mode: "u=rwx,g=rx,o=rx"
-
-
+        mode: "u=rwx,g=rx,o=rx" # 0755
     - name: "Molecule | Verify | auto_update | Zypper stub: clear the recorded calls (control)"
       ansible.builtin.copy:
         dest: "/var/tmp/molecule-reboot-shim/calls.log"
         content: ""
         owner: "root"
         group: "root"
-        mode: "u=rw,g=r,o=r"
-
-
+        mode: "u=rw,g=r,o=r" # 0644
     - name: "Molecule | Verify | auto_update | Zypper stub: run the helper with the neutral stub"
       ansible.builtin.command:
         argv:
@@ -942,12 +870,10 @@
       changed_when:
         - false
 
-
     - name: "Molecule | Verify | auto_update | Zypper stub: read the recorded calls (control)"
       ansible.builtin.slurp:
         src: "/var/tmp/molecule-reboot-shim/calls.log"
       register: __testing_autoupdate_zypper_calls_ctl
-
 
     - name: "Molecule | Verify | auto_update | Zypper stub: replace the stub with one returning 1 (error)"
       ansible.builtin.copy:
@@ -957,18 +883,14 @@
           exit 1
         owner: "root"
         group: "root"
-        mode: "u=rwx,g=rx,o=rx"
-
-
+        mode: "u=rwx,g=rx,o=rx" # 0755
     - name: "Molecule | Verify | auto_update | Zypper stub: clear the recorded calls again"
       ansible.builtin.copy:
         dest: "/var/tmp/molecule-reboot-shim/calls.log"
         content: ""
         owner: "root"
         group: "root"
-        mode: "u=rw,g=r,o=r"
-
-
+        mode: "u=rw,g=r,o=r" # 0644
     - name: "Molecule | Verify | auto_update | Zypper stub: run the helper against the error exit"
       ansible.builtin.command:
         argv:
@@ -979,12 +901,10 @@
       changed_when:
         - false
 
-
     - name: "Molecule | Verify | auto_update | Zypper stub: read the recorded calls (error)"
       ansible.builtin.slurp:
         src: "/var/tmp/molecule-reboot-shim/calls.log"
       register: __testing_autoupdate_zypper_calls_err
-
 
     - name: "Molecule | Verify | auto_update | Zypper stub: assert the error exit itself does not schedule a reboot"
       ansible.builtin.assert:
@@ -1006,25 +926,23 @@
           {{ __testing_autoupdate_zypper_calls_err['content'] | ansible.builtin.b64decode }}
         success_msg: "A zypper error exit never schedules a reboot by itself."
 
-
     - name: "Molecule | Verify | auto_update | Zypper stub: report a degraded check"
       ansible.builtin.debug:
         msg: >-
           A genuine reboot condition appeared on the host during the stub
           checks (the neutral control run scheduled a reboot); the negative
           case could only be verified differentially.
+        verbosity: 0
       when:
         - >-
           'shutdown' in
           (__testing_autoupdate_zypper_calls_ctl['content'] | ansible.builtin.b64decode)
 
   always:
-
     - name: "Molecule | Verify | auto_update | Zypper stub: remove the stub again"
       ansible.builtin.file:
         path: "/var/tmp/molecule-reboot-shim/zypper"
         state: "absent"
-
 
 - name: "Molecule | Verify | auto_update | Kernel prefix: remove the shim"
   ansible.builtin.file:

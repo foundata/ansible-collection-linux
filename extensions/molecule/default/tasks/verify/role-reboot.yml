@@ -1,3 +1,4 @@
+---
 # Check collection role "reboot" outcomes.
 #
 # SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
@@ -6,7 +7,6 @@
 - name: "Molecule | Verify | Initialize the foundata.linux.reboot role (without actually running it; get and expose variables)"
   ansible.builtin.include_role:
     name: "foundata.linux.reboot"
-
 
 - name: "Molecule | Verify | Assert reboot result fact is ansible.builtin.defined"
   ansible.builtin.assert:
@@ -32,7 +32,6 @@
       elapsed={{ reboot_linux_result['elapsed'] }}): rebooted must be boolean and elapsed numeric.
     success_msg: "reboot_linux_result types are correct (rebooted is boolean, elapsed is numeric)."
 
-
 ## Kernel release comparison (prefix collision)
 #
 # Regression: the running release was matched as a SUBSTRING of the newest
@@ -47,11 +46,9 @@
     tasks_from: "init"
     public: true
 
-
 - name: "Molecule | Verify | reboot | Kernel prefix: save the baseline"
   ansible.builtin.set_fact:
     __testing_reboot_kernel_baseline: "{{ __reboot_linux_required | ansible.builtin.bool }}"
-
 
 - name: "Molecule | Verify | reboot | Kernel prefix: place a prefix-colliding decoy kernel"
   ansible.builtin.file:
@@ -59,10 +56,9 @@
     state: "touch"
     owner: "root"
     group: "root"
-    mode: "u=rw,g=r,o=r"
+    mode: "u=rw,g=r,o=r" # 0644
   when:
     - not (__testing_reboot_kernel_baseline | ansible.builtin.bool)
-
 
 - name: "Molecule | Verify | reboot | Kernel prefix: run the role's init with the decoy in place"
   ansible.builtin.include_role:
@@ -71,7 +67,6 @@
     public: true
   when:
     - not (__testing_reboot_kernel_baseline | ansible.builtin.bool)
-
 
 - name: "Molecule | Verify | reboot | Kernel prefix: assert the newer kernel was detected"
   ansible.builtin.assert:
@@ -85,29 +80,26 @@
   when:
     - not (__testing_reboot_kernel_baseline | ansible.builtin.bool)
 
-
 - name: "Molecule | Verify | reboot | Kernel prefix: report a skipped check"
   ansible.builtin.debug:
     msg: >-
       A reboot is already required on this instance for other reasons, so the
       kernel comparison cannot be isolated; the prefix collision check is
       skipped here.
+    verbosity: 0
   when:
     - __testing_reboot_kernel_baseline | ansible.builtin.bool
-
 
 - name: "Molecule | Verify | reboot | Kernel prefix: remove the decoy kernel again"
   ansible.builtin.file:
     path: "/boot/vmlinuz-{{ ansible_facts['kernel'] }}0"
     state: "absent"
 
-
 - name: "Molecule | Verify | reboot | Kernel prefix: run the role's init again (must be back to the baseline)"
   ansible.builtin.include_role:
     name: "foundata.linux.reboot"
     tasks_from: "init"
     public: true
-
 
 - name: "Molecule | Verify | reboot | Kernel prefix: assert the decoy removal restored the baseline"
   ansible.builtin.assert:

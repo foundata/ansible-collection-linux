@@ -1,3 +1,4 @@
+---
 # Check collection role "sudo" outcomes.
 #
 # SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
@@ -8,7 +9,6 @@
     name: "foundata.linux.sudo"
     tasks_from: "init"
     public: true
-
 
 - name: "Molecule | Verify | sudo | Set sudo_linux_* and __testing_* parameters as facts from __testing_state"
   ansible.builtin.set_fact:
@@ -48,7 +48,6 @@
 - name: "Molecule | Verify | sudo | Stat the managed drop-in files (one per grantee plus the global Defaults file)"
   ansible.builtin.stat:
     path: "{{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_basename }}"
-  register: __testing_sudo_dropins
   loop: >-
     {{
       (__testing_sudo_grantees | ansible.builtin.map(attribute='file') | ansible.builtin.list)
@@ -57,7 +56,7 @@
   loop_control:
     loop_var: "__sudo_linux_dropin_basename"
 
-
+  register: __testing_sudo_dropins
 - name: "Molecule | Verify | sudo | Assert every managed drop-in exists with root:root ownership and mode 0440"
   ansible.builtin.assert:
     that:
@@ -72,7 +71,6 @@
     loop_var: "__sudo_linux_dropin_stat"
     label: "{{ __sudo_linux_dropin_stat['__sudo_linux_dropin_basename'] }}"
 
-
 - name: "Molecule | Verify | sudo | Read the drop-in of the grantee with a dotted name"
   ansible.builtin.slurp:
     src: >-
@@ -82,14 +80,7 @@
       }}
   register: __testing_sudo_dotted
 
-
 - name: "Molecule | Verify | sudo | Assert the dotted grantee is filename-safe yet grants the real name"
-  vars:
-    __testing_sudo_dotted_file: >-
-      {{
-        __testing_sudo_grantees | ansible.builtin.selectattr('rule', 'ansible.builtin.match', '^molecule_dotted$')
-        | ansible.builtin.map(attribute='file') | ansible.builtin.first
-      }}
   ansible.builtin.assert:
     that:
       # The filename is sudo-safe: the dot is gone, replaced in the readable stem.
@@ -100,7 +91,12 @@
     fail_msg: "The dotted grantee drop-in is not sanitized correctly or does not grant the real name."
     success_msg: "The dotted grantee has a sudo-safe filename '{{ __testing_sudo_dotted_file }}' and grants 'molecule.dotuser'."
 
-
+  vars:
+    __testing_sudo_dotted_file: >-
+      {{
+        __testing_sudo_grantees | ansible.builtin.selectattr('rule', 'ansible.builtin.match', '^molecule_dotted$')
+        | ansible.builtin.map(attribute='file') | ansible.builtin.first
+      }}
 - name: "Molecule | Verify | sudo | Read the drop-in of the rule that relies on rule_defaults for commands"
   ansible.builtin.slurp:
     src: >-
@@ -110,14 +106,12 @@
       }}
   register: __testing_sudo_defaultcmd
 
-
 - name: "Molecule | Verify | sudo | Assert a command supplied via rule_defaults was rendered"
   ansible.builtin.assert:
     that:
       - "'/usr/bin/uptime' in (__testing_sudo_defaultcmd['content'] | ansible.builtin.b64decode)"
     fail_msg: "The rule relying on rule_defaults for 'commands' did not render the default command."
     success_msg: "A 'commands' value supplied via sudo_linux_rule_defaults was validated and rendered."
-
 
 - name: "Molecule | Verify | sudo | Stat the drop-in of the 'absent' rule"
   ansible.builtin.stat:
@@ -127,7 +121,6 @@
       }}
   register: __testing_sudo_absent
 
-
 - name: "Molecule | Verify | sudo | Assert the 'absent' rule has no drop-in"
   ansible.builtin.assert:
     that:
@@ -135,12 +128,10 @@
     fail_msg: "The drop-in for the 'absent' rule still exists."
     success_msg: "The 'absent' rule has no drop-in, as expected."
 
-
 - name: "Molecule | Verify | sudo | Stat the seeded orphan role-managed drop-in"
   ansible.builtin.stat:
     path: "{{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_prefix }}molecule_orphan-user-ghost-deadbeef"
   register: __testing_sudo_orphan
-
 
 - name: "Molecule | Verify | sudo | Assert the orphaned role-managed drop-in was cleaned up"
   ansible.builtin.assert:
@@ -149,16 +140,12 @@
     fail_msg: "The orphaned '99_managed_*' drop-in was not removed; namespace cleanup did not run."
     success_msg: "The orphaned '99_managed_*' drop-in was removed by the namespace cleanup."
 
-
 - name: "Molecule | Verify | sudo | Read the global Defaults / extra_content drop-in"
   ansible.builtin.slurp:
     src: "{{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_prefix }}defaults"
   register: __testing_sudo_defaults
 
-
 - name: "Molecule | Verify | sudo | Assert the global Defaults and extra_content were rendered"
-  vars:
-    __testing_sudo_defaults_content: "{{ __testing_sudo_defaults['content'] | ansible.builtin.b64decode }}"
   ansible.builtin.assert:
     that:
       - "'Defaults env_reset' in __testing_sudo_defaults_content"
@@ -168,11 +155,13 @@
     fail_msg: "The global Defaults drop-in does not contain the expected directives."
     success_msg: "The global Defaults drop-in contains the expected directives and extra_content."
 
-
+  vars:
+    __testing_sudo_defaults_content: "{{ __testing_sudo_defaults['content'] | ansible.builtin.b64decode }}"
 - name: "Molecule | Verify | sudo | Validate every managed drop-in with visudo -cf (non-zero rc fails the task)"
   ansible.builtin.command:
     cmd: "{{ __sudo_linux_visudo_exec_path }} -cf {{ __sudo_linux_dropin_dir }}/{{ __sudo_linux_dropin_basename }}"
-  changed_when: false
+  changed_when:
+    - false
   loop: >-
     {{
       (__testing_sudo_grantees | ansible.builtin.map(attribute='file') | ansible.builtin.list)

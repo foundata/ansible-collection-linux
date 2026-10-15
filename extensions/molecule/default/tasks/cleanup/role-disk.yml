@@ -1,3 +1,4 @@
+---
 # Exercise the teardown path of the collection role "disk" at the end of the
 # test run: per-item state "absent" plus wipe returns the extra disks to
 # blank. The cleanup stage also runs before create and after failures; the
@@ -8,18 +9,15 @@
 # SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-
 - name: "Molecule | Cleanup | disk | Probe instance reachability"
   ansible.builtin.ping:
   ignore_unreachable: true
   register: __testing_disk_cleanup_ping_result
 
-
 - name: "Molecule | Cleanup | disk | Tear down the managed disks on the reachable instance"
   when:
     - not (__testing_disk_cleanup_ping_result['unreachable'] | ansible.builtin.default(false))
   block:
-
     - name: "Molecule | Cleanup | disk | Set the teardown parameters as facts"
       ansible.builtin.set_fact:
         disk_linux_device_defaults: {}
@@ -43,11 +41,9 @@
             mount:
               path: "/srv/molecule_data2"
 
-
     - name: "Molecule | Cleanup | disk | Include the foundata.linux.disk role (absent plus wipe)"
       ansible.builtin.include_role:
         name: "foundata.linux.disk"
-
 
     - name: "Molecule | Cleanup | disk | Query the disks for remaining signatures"
       ansible.builtin.command:
@@ -63,12 +59,10 @@
         - 2
       register: __testing_disk_wiped_result
 
-
     - name: "Molecule | Cleanup | disk | Read /etc/fstab after the teardown"
       ansible.builtin.slurp:
         src: "/etc/fstab"
       register: __testing_disk_cleanup_fstab_result
-
 
     - name: "Molecule | Cleanup | disk | Assert the disks are blank and de-registered"
       ansible.builtin.assert:
