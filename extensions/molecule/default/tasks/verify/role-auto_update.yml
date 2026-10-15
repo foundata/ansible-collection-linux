@@ -764,7 +764,9 @@
 
 - name: "Molecule | Verify | auto_update | Kernel prefix: run the helper without a decoy (baseline)"
   ansible.builtin.command:
-    argv: ["/bin/sh", "{{ __auto_update_linux_reboot_script_path }}"]
+    argv:
+      - "/bin/sh"
+      - "{{ __auto_update_linux_reboot_script_path }}"
   environment:
     PATH: "/var/tmp/molecule-reboot-shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   changed_when:
@@ -806,7 +808,9 @@
 
     - name: "Molecule | Verify | auto_update | Kernel prefix: run the helper with the decoy in place"
       ansible.builtin.command:
-        argv: ["/bin/sh", "{{ __auto_update_linux_reboot_script_path }}"]
+        argv:
+          - "/bin/sh"
+          - "{{ __auto_update_linux_reboot_script_path }}"
       environment:
         PATH: "/var/tmp/molecule-reboot-shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
       changed_when:
@@ -875,7 +879,9 @@
 
     - name: "Molecule | Verify | auto_update | Zypper stub: run the helper against exit code 102"
       ansible.builtin.command:
-        argv: ["/bin/sh", "{{ __auto_update_linux_reboot_script_path }}"]
+        argv:
+          - "/bin/sh"
+          - "{{ __auto_update_linux_reboot_script_path }}"
       environment:
         PATH: "/var/tmp/molecule-reboot-shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
       changed_when:
@@ -928,7 +934,9 @@
 
     - name: "Molecule | Verify | auto_update | Zypper stub: run the helper with the neutral stub"
       ansible.builtin.command:
-        argv: ["/bin/sh", "{{ __auto_update_linux_reboot_script_path }}"]
+        argv:
+          - "/bin/sh"
+          - "{{ __auto_update_linux_reboot_script_path }}"
       environment:
         PATH: "/var/tmp/molecule-reboot-shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
       changed_when:
@@ -963,7 +971,9 @@
 
     - name: "Molecule | Verify | auto_update | Zypper stub: run the helper against the error exit"
       ansible.builtin.command:
-        argv: ["/bin/sh", "{{ __auto_update_linux_reboot_script_path }}"]
+        argv:
+          - "/bin/sh"
+          - "{{ __auto_update_linux_reboot_script_path }}"
       environment:
         PATH: "/var/tmp/molecule-reboot-shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
       changed_when:

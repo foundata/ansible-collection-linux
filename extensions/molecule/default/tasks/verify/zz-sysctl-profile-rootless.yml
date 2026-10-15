@@ -9,7 +9,8 @@
   ansible.builtin.include_role:
     name: "foundata.linux.sysctl"
   vars:
-    sysctl_linux_profile: ["container-rootless"]
+    sysctl_linux_profile:
+      - "container-rootless"
     sysctl_linux_parameters: {}
     sysctl_linux_config_dropin_file_name: "zz-testing-rootless.conf"
 
@@ -45,7 +46,10 @@
 
 - name: "Molecule | Verify | sysctl rootless | Assert a live per-UID quota value"
   ansible.builtin.command:
-    argv: ["sysctl", "-n", "fs.inotify.max_user_instances"]
+    argv:
+      - "sysctl"
+      - "-n"
+      - "fs.inotify.max_user_instances"
   changed_when:
     - false
   register: __testing_sysctl_rootless_live

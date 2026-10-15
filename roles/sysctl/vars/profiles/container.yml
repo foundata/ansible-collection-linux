@@ -35,8 +35,10 @@
 # cannot be loaded, the keys under its prefixes are skipped with a notice
 # (see sysctl_linux_modules_required).
 __sysctl_linux_profile_modules:
-  nf_conntrack: ["net.netfilter."]
-  br_netfilter: ["net.bridge."]
+  nf_conntrack:
+    - "net.netfilter."
+  br_netfilter:
+    - "net.bridge."
 
 
 __sysctl_linux_profile_parameters:

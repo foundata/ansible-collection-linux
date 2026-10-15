@@ -205,7 +205,12 @@
 
 - name: "Molecule | Verify | disk | Query the ext4 mount"
   ansible.builtin.command:
-    argv: ["findmnt", "--noheadings", "--output", "FSTYPE", "/srv/molecule_data1"]
+    argv:
+      - "findmnt"
+      - "--noheadings"
+      - "--output"
+      - "FSTYPE"
+      - "/srv/molecule_data1"
   changed_when:
     - false
   register: __testing_disk_ext4_mount
@@ -257,7 +262,12 @@
 
 - name: "Molecule | Verify | disk | Busy wipe: check the filesystem survived"
   ansible.builtin.command:
-    argv: ["findmnt", "--noheadings", "--output", "FSTYPE", "/srv/molecule_data0"]
+    argv:
+      - "findmnt"
+      - "--noheadings"
+      - "--output"
+      - "FSTYPE"
+      - "/srv/molecule_data0"
   changed_when:
     - false
   register: __testing_disk_busywipe_fstype
@@ -449,7 +459,13 @@
 
 - name: "Molecule | Verify | disk | LUKS: read partition 1's signature after the refusals"
   ansible.builtin.command:
-    argv: ["blkid", "--match-tag", "UUID", "--output", "value", "{{ __testing_disk_luks_loop }}p1"]
+    argv:
+      - "blkid"
+      - "--match-tag"
+      - "UUID"
+      - "--output"
+      - "value"
+      - "{{ __testing_disk_luks_loop }}p1"
   register: __testing_disk_luks_p1_after
   changed_when:
     - false
@@ -471,7 +487,10 @@
 
 - name: "Molecule | Verify | disk | LUKS: close the mapping"
   ansible.builtin.command:
-    argv: ["cryptsetup", "close", "molecule-luks-hold"]
+    argv:
+      - "cryptsetup"
+      - "close"
+      - "molecule-luks-hold"
   changed_when:
     - true
 
@@ -489,7 +508,12 @@
 
 - name: "Molecule | Verify | disk | LUKS: assert the inactive disk was repurposed"
   ansible.builtin.command:
-    argv: ["findmnt", "--noheadings", "--output", "SOURCE", "/srv/molecule-luks-test"]
+    argv:
+      - "findmnt"
+      - "--noheadings"
+      - "--output"
+      - "SOURCE"
+      - "/srv/molecule-luks-test"
   register: __testing_disk_luks_mounted
   changed_when:
     - false
@@ -576,7 +600,12 @@
 
 - name: "Molecule | Verify | disk | Staging: query the migrated mount and the foreign mount"
   ansible.builtin.command:
-    argv: ["findmnt", "--noheadings", "--output", "SOURCE", "{{ item }}"]
+    argv:
+      - "findmnt"
+      - "--noheadings"
+      - "--output"
+      - "SOURCE"
+      - "{{ item }}"
   register: __testing_disk_staging_mounts
   changed_when:
     - false
@@ -825,7 +854,12 @@
 
 - name: "Molecule | Verify | disk | Absent identity: query the fixture devices"
   ansible.builtin.command:
-    argv: ["lsblk", "--noheadings", "--output", "NAME,TYPE,PTTYPE,FSTYPE", "{{ item }}"]
+    argv:
+      - "lsblk"
+      - "--noheadings"
+      - "--output"
+      - "NAME,TYPE,PTTYPE,FSTYPE"
+      - "{{ item }}"
   register: __testing_disk_absentid_blank
   changed_when:
     - false
@@ -896,8 +930,19 @@
   changed_when:
     - false
   loop:
-    - ["findmnt", "--noheadings", "--output", "SOURCE", "--mountpoint", "/srv/molecule-absentid-test"]
-    - ["findmnt", "--fstab", "--noheadings", "--output", "SOURCE", "--mountpoint", "/srv/molecule-absentid-test"]
+    - - "findmnt"
+      - "--noheadings"
+      - "--output"
+      - "SOURCE"
+      - "--mountpoint"
+      - "/srv/molecule-absentid-test"
+    - - "findmnt"
+      - "--fstab"
+      - "--noheadings"
+      - "--output"
+      - "SOURCE"
+      - "--mountpoint"
+      - "/srv/molecule-absentid-test"
 
 
 - name: "Molecule | Verify | disk | Absent identity: assert the replacement survived untouched"
@@ -927,7 +972,13 @@
 
 - name: "Molecule | Verify | disk | Absent identity: assert the correctly-addressed cleanup worked"
   ansible.builtin.command:
-    argv: ["findmnt", "--noheadings", "--output", "SOURCE", "--mountpoint", "/srv/molecule-absentid-test"]
+    argv:
+      - "findmnt"
+      - "--noheadings"
+      - "--output"
+      - "SOURCE"
+      - "--mountpoint"
+      - "/srv/molecule-absentid-test"
   register: __testing_disk_absentid_gone
   changed_when:
     - false
@@ -940,7 +991,12 @@
 # stale remains instead of foreign.
 - name: "Molecule | Verify | disk | Absent identity: mount a tmpfs replacement at the mountpoint"
   ansible.builtin.command:
-    argv: ["mount", "-t", "tmpfs", "tmpfs", "/srv/molecule-absentid-test"]
+    argv:
+      - "mount"
+      - "-t"
+      - "tmpfs"
+      - "tmpfs"
+      - "/srv/molecule-absentid-test"
   changed_when:
     - true
 
@@ -978,7 +1034,13 @@
 
 - name: "Molecule | Verify | disk | Absent identity: assert the tmpfs mount survived"
   ansible.builtin.command:
-    argv: ["findmnt", "--noheadings", "--output", "FSTYPE", "--mountpoint", "/srv/molecule-absentid-test"]
+    argv:
+      - "findmnt"
+      - "--noheadings"
+      - "--output"
+      - "FSTYPE"
+      - "--mountpoint"
+      - "/srv/molecule-absentid-test"
   register: __testing_disk_absentid_tmpfs
   changed_when:
     - false
@@ -988,7 +1050,9 @@
 
 - name: "Molecule | Verify | disk | Absent identity: unmount the tmpfs replacement again"
   ansible.builtin.command:
-    argv: ["umount", "/srv/molecule-absentid-test"]
+    argv:
+      - "umount"
+      - "/srv/molecule-absentid-test"
   changed_when:
     - true
 
@@ -1065,7 +1129,11 @@
 
 - name: "Molecule | Verify | disk | Absent identity: assert the dead row was removed"
   ansible.builtin.command:
-    argv: ["grep", "-c", "deadbeef-dead-dead-dead-deaddeadbeef", "/etc/fstab"]
+    argv:
+      - "grep"
+      - "-c"
+      - "deadbeef-dead-dead-dead-deaddeadbeef"
+      - "/etc/fstab"
   register: __testing_disk_absentid_deadrow
   changed_when:
     - false

@@ -20,7 +20,10 @@
 
 - name: "Molecule | Verify | sysctl modules | Probe which profile kernel modules the running kernel can resolve"
   ansible.builtin.command:
-    argv: ["modprobe", "-n", "{{ __testing_sysctl_module_item }}"]
+    argv:
+      - "modprobe"
+      - "-n"
+      - "{{ __testing_sysctl_module_item }}"
   changed_when:
     - false
   failed_when:
@@ -53,7 +56,8 @@
   ansible.builtin.include_role:
     name: "foundata.linux.sysctl"
   vars:
-    sysctl_linux_profile: ["container"]
+    sysctl_linux_profile:
+      - "container"
     sysctl_linux_parameters: {}
     sysctl_linux_config_dropin_file_name: "zz-testing-modules.conf"
 
@@ -94,7 +98,10 @@
 
 - name: "Molecule | Verify | sysctl modules | Check the live bridge netfilter value (module loaded and applied)"
   ansible.builtin.command:
-    argv: ["sysctl", "-n", "net.bridge.bridge-nf-call-iptables"]
+    argv:
+      - "sysctl"
+      - "-n"
+      - "net.bridge.bridge-nf-call-iptables"
   changed_when:
     - false
   register: __testing_sysctl_brnf_live
@@ -121,7 +128,8 @@
       ansible.builtin.include_role:
         name: "foundata.linux.sysctl"
       vars:
-        sysctl_linux_profile: ["container"]
+        sysctl_linux_profile:
+          - "container"
         sysctl_linux_parameters: {}
         sysctl_linux_config_dropin_file_name: "zz-testing-modules.conf"
         sysctl_linux_modules_required: true
@@ -165,11 +173,13 @@
   ansible.builtin.include_role:
     name: "foundata.linux.sysctl"
   vars:
-    sysctl_linux_profile: ["container"]
+    sysctl_linux_profile:
+      - "container"
     sysctl_linux_parameters: {}
     sysctl_linux_config_dropin_file_name: "zz-testing-modules.conf"
     __sysctl_linux_profile_modules:
-      molecule_testing_nonexistent_module: ["net.bridge."]
+      molecule_testing_nonexistent_module:
+        - "net.bridge."
 
 
 - name: "Molecule | Verify | sysctl modules | Read the drop-in after the synthetic negative run"
@@ -203,12 +213,14 @@
       ansible.builtin.include_role:
         name: "foundata.linux.sysctl"
       vars:
-        sysctl_linux_profile: ["container"]
+        sysctl_linux_profile:
+          - "container"
         sysctl_linux_parameters: {}
         sysctl_linux_config_dropin_file_name: "zz-testing-modules.conf"
         sysctl_linux_modules_required: true
         __sysctl_linux_profile_modules:
-          molecule_testing_nonexistent_module: ["net.bridge."]
+          molecule_testing_nonexistent_module:
+            - "net.bridge."
 
     - name: "Molecule | Verify | sysctl modules | Record that the synthetic required-modules run succeeded"
       ansible.builtin.set_fact:
@@ -268,7 +280,8 @@
       ansible.builtin.include_role:
         name: "foundata.linux.sysctl"
       vars:
-        sysctl_linux_profile: ["container"]
+        sysctl_linux_profile:
+          - "container"
         sysctl_linux_parameters: {}
         sysctl_linux_config_dropin_file_name: "zz-first.conf"
 
@@ -307,7 +320,8 @@
       ansible.builtin.include_role:
         name: "foundata.linux.sysctl"
       vars:
-        sysctl_linux_profile: ["container"]
+        sysctl_linux_profile:
+          - "container"
         sysctl_linux_parameters: {}
         sysctl_linux_config_dropin_file_name: "zz-second.conf"
 
@@ -344,7 +358,8 @@
 
     - name: "Molecule | Verify | sysctl modules | Registration: query the running module"
       ansible.builtin.command:
-        argv: ["lsmod"]
+        argv:
+          - "lsmod"
       register: __testing_sysctl_modreg_lsmod
       changed_when:
         - false
@@ -365,7 +380,8 @@
       ansible.builtin.include_role:
         name: "foundata.linux.sysctl"
       vars:
-        sysctl_linux_profile: ["container"]
+        sysctl_linux_profile:
+          - "container"
         sysctl_linux_parameters: {}
         sysctl_linux_config_dropin_file_name: "zz-second.conf"
 
@@ -407,7 +423,8 @@
           ansible.builtin.include_role:
             name: "foundata.linux.sysctl"
           vars:
-            sysctl_linux_profile: ["container"]
+            sysctl_linux_profile:
+              - "container"
             sysctl_linux_parameters: {}
             sysctl_linux_config_dropin_file_name: "zz-second.conf"
 
@@ -437,7 +454,8 @@
             apply:
               check_mode: true
           vars:
-            sysctl_linux_profile: ["container"]
+            sysctl_linux_profile:
+              - "container"
             sysctl_linux_parameters: {}
             sysctl_linux_config_dropin_file_name: "zz-second.conf"
 

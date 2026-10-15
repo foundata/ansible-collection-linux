@@ -29,7 +29,8 @@
 # cannot be loaded, the keys under its prefixes are skipped with a notice
 # (see sysctl_linux_modules_required).
 __sysctl_linux_profile_modules:
-  nf_conntrack: ["net.netfilter."]
+  nf_conntrack:
+    - "net.netfilter."
 
 
 __sysctl_linux_profile_parameters:

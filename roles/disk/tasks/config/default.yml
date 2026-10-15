@@ -21,7 +21,8 @@
 # is skipped exactly when this run is a check-mode run.
 - name: "Config | Default | Detect check mode (canary)"
   ansible.builtin.command:
-    argv: ["true"]
+    argv:
+      - "true"
   register: __disk_linux_checkmode_canary
   changed_when:
     - false
