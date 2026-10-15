@@ -238,25 +238,27 @@ There are also tags that are generally not intended to be called directly but ar
 
 Main entry point for the foundata.linux.user role
 
+Manage local user accounts and their configuration.
+
 The following variables can be configured for this role:
 
-| Variable | Type | Required | Default | Description (abstract) |
-|----------|------|----------|---------|------------------------|
-| `user_linux_account_defaults` | `dict` | No | `{}` | Default values applied to every entry in `user_linux_accounts` that does not set the corresponding key itself. This avoids repeating common settings (login shell, umask, ...) on each account.<br><br>The keys mirror the per-account keys of the same […](#variable-user_linux_account_defaults) |
-| `user_linux_accounts` | `list` | No | `[]` | List of local user accounts to manage. Each entry describes one account as a dictionary; `name` is mandatory, all other keys are optional and fall back to `user_linux_account_defaults` (where noted) or to the underlying platform defaults (when […](#variable-user_linux_accounts) |
-| `user_linux_group_defaults` | `dict` | No | `{}` | Default values applied to every entry in `user_linux_groups` that does not set the corresponding key itself. The keys mirror the per-group keys of the same name (see `user_linux_groups`); any value provided here is overridden by an explicit value on […](#variable-user_linux_group_defaults) |
-| `user_linux_groups` | `list` | No | `[]` | List of local groups to manage. Each entry describes one group as a dictionary; `name` is mandatory, all other keys are optional.<br><br>Groups are created before the accounts in `user_linux_accounts` (so they can be referenced as primary or […](#variable-user_linux_groups) |
-| `user_linux_accounts_delete_unmanaged` | `bool` | No | `false` | If `true`, local user accounts that are not listed in `user_linux_accounts` are removed (together with their data). Only regular accounts are considered: an account is a candidate for removal only if its UID is within the `UID_MIN`..`UID_MAX` range […](#variable-user_linux_accounts_delete_unmanaged) |
-| `user_linux_accounts_delete_unmanaged_exclude` | `list` | No | `[]` | List of account names that must never be removed by `user_linux_accounts_delete_unmanaged`, even if they are not declared in `user_linux_accounts` and fall within the regular UID range. Useful for break-glass or automation accounts.<br><br>`root` and […](#variable-user_linux_accounts_delete_unmanaged_exclude) |
-| `user_linux_uid_min` | `raw` | No | `""` | Lower bound (inclusive) of the UID range that `user_linux_accounts_delete_unmanaged` considers to be regular user accounts. An empty string (the default) means the value is read from `UID_MIN` in `/etc/login.defs` (falling back to `1000` if it cannot […](#variable-user_linux_uid_min) |
-| `user_linux_uid_max` | `raw` | No | `""` | Upper bound (inclusive) of the UID range that `user_linux_accounts_delete_unmanaged` considers to be regular user accounts. An empty string (the default) means the value is read from `UID_MAX` in `/etc/login.defs` (falling back to `60000` if it […](#variable-user_linux_uid_max) |
+|                    Variable                    |  Type  | Required | Default | Description (abstract) |
+| ---------------------------------------------- | ------ | -------- | ------- | ---------------------- |
+| `user_linux_account_defaults`                  | `dict` | No       | `{}`    | Default values applied to every entry in `user_linux_accounts` that does not set the corresponding key itself. This avoids repeating common settings (login shell, umask, ...) on each account.<br><br>The keys mirror the per-account keys of the same […](#variable-user_linux_account_defaults) |
+| `user_linux_accounts`                          | `list` | No       | `[]`    | List of local user accounts to manage. Each entry describes one account as a dictionary; `name` is mandatory, all other keys are optional and fall back to `user_linux_account_defaults` (where noted) or to the underlying platform defaults (when […](#variable-user_linux_accounts) |
+| `user_linux_group_defaults`                    | `dict` | No       | `{}`    | Default values applied to every entry in `user_linux_groups` that does not set the corresponding key itself. The keys mirror the per-group keys of the same name (see `user_linux_groups`); any value provided here is overridden by an explicit value on […](#variable-user_linux_group_defaults) |
+| `user_linux_groups`                            | `list` | No       | `[]`    | List of local groups to manage. Each entry describes one group as a dictionary; `name` is mandatory, all other keys are optional.<br><br>Groups are created before the accounts in `user_linux_accounts` (so they can be referenced as primary or […](#variable-user_linux_groups) |
+| `user_linux_accounts_delete_unmanaged`         | `bool` | No       | `false` | If `true`, local user accounts that are not listed in `user_linux_accounts` are removed (together with their data). Only regular accounts are considered: an account is a candidate for removal only if its UID is within the `UID_MIN`..`UID_MAX` range […](#variable-user_linux_accounts_delete_unmanaged) |
+| `user_linux_accounts_delete_unmanaged_exclude` | `list` | No       | `[]`    | List of account names that must never be removed by `user_linux_accounts_delete_unmanaged`, even if they are not declared in `user_linux_accounts` and fall within the regular UID range. Useful for break-glass or automation accounts.<br><br>`root` and […](#variable-user_linux_accounts_delete_unmanaged_exclude) |
+| `user_linux_uid_min`                           | `raw`  | No       | `""`    | Lower bound (inclusive) of the UID range that `user_linux_accounts_delete_unmanaged` considers to be regular user accounts. An empty string (the default) means the value is read from `UID_MIN` in `/etc/login.defs` (falling back to `1000` if it cannot […](#variable-user_linux_uid_min) |
+| `user_linux_uid_max`                           | `raw`  | No       | `""`    | Upper bound (inclusive) of the UID range that `user_linux_accounts_delete_unmanaged` considers to be regular user accounts. An empty string (the default) means the value is read from `UID_MAX` in `/etc/login.defs` (falling back to `60000` if it […](#variable-user_linux_uid_max) |
 
 ### `user_linux_account_defaults`<a id="variable-user_linux_account_defaults"></a>
 
 [*⇑ Back to ToC ⇑*](#toc)
 
 Default values applied to every entry in `user_linux_accounts` that does not
-set the corresponding key itself. This avoids repeating common  settings
+set the corresponding key itself. This avoids repeating common settings
 (login shell, umask, ...) on each account.
 
 The keys mirror the per-account keys of the same name (see
@@ -311,6 +313,7 @@ something like `password['lock']: true` and a non-interactive `shell` like
 `/usr/sbin/nologin`).
 
 Example:
+
 ```yaml
 user_linux_accounts:
   - name: "ahaerter"
@@ -624,6 +627,7 @@ empty or unset `ssh_authorized_keys` is left untouched, so omitting the
 key list never wipes an existing `authorized_keys`.
 
 Example:
+
 ```yaml
 ssh_authorized_keys:
   - key: "ssh-ed25519 AAAAC3Nz... u1337@foundata.com"
@@ -645,7 +649,9 @@ A single SSH public key, in the usual `authorized_keys` form
 - **Type**: `str`
 - **Required**: Yes
 
-##### `user_linux_accounts['ssh_authorized_keys']['options']`<a id="variable-user_linux_accounts-sub-ssh_authorized_keys-sub-options"></a>
+<a id="variable-user_linux_accounts-sub-ssh_authorized_keys-sub-options"></a>
+
+##### `user_linux_accounts['ssh_authorized_keys']['options']`
 
 [*⇑ Back to ToC ⇑*](#toc)
 
@@ -657,7 +663,9 @@ restricting how it may be used (for example `from="10.0.0.0/8"`,
 - **Type**: `str`
 - **Required**: No
 
-##### `user_linux_accounts['ssh_authorized_keys']['state']`<a id="variable-user_linux_accounts-sub-ssh_authorized_keys-sub-state"></a>
+<a id="variable-user_linux_accounts-sub-ssh_authorized_keys-sub-state"></a>
+
+##### `user_linux_accounts['ssh_authorized_keys']['state']`
 
 [*⇑ Back to ToC ⇑*](#toc)
 
@@ -671,7 +679,9 @@ keys are removed regardless).
 - **Choices**: `present`, `absent`
 
 
-#### `user_linux_accounts['ssh_authorized_keys_delete_unmanaged']`<a id="variable-user_linux_accounts-sub-ssh_authorized_keys_delete_unmanaged"></a>
+<a id="variable-user_linux_accounts-sub-ssh_authorized_keys_delete_unmanaged"></a>
+
+#### `user_linux_accounts['ssh_authorized_keys_delete_unmanaged']`
 
 [*⇑ Back to ToC ⇑*](#toc)
 
@@ -730,6 +740,7 @@ automatically by the platform if no other user still uses it. You only
 need to list groups here that you want to manage explicitly.
 
 Example:
+
 ```yaml
 user_linux_groups:
   - name: "webops"
@@ -857,7 +868,6 @@ fails on malformed values instead of silently misinterpreting them.
 - **Type**: `raw`
 - **Required**: No
 - **Default**: `""`
-
 
 
 

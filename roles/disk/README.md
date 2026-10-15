@@ -173,14 +173,16 @@ There are also tags that are generally not intended to be called directly but ar
 
 Main entry point for the foundata.linux.disk role
 
+Manage disks, partitions, filesystems, and mount points.
+
 The following variables can be configured for this role:
 
-| Variable | Type | Required | Default | Description (abstract) |
-|----------|------|----------|---------|------------------------|
-| `disk_linux_state` | `str` | No | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-disk_linux_state) |
-| `disk_linux_autoupgrade` | `bool` | No | `false` | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one).<br><br>Note: The role installs only the tools the declared devices actually […](#variable-disk_linux_autoupgrade) |
-| `disk_linux_device_defaults` | `dict` | No | `{}` | Default values applied to every entry in `disk_linux_devices` that does not set the corresponding key itself. This avoids repeating common settings (filesystem, mount options, ...) on each device.<br><br>The keys mirror the per-device keys of the […](#variable-disk_linux_device_defaults) |
-| `disk_linux_devices` | `list` | No | `[]` | List of dedicated data disks to manage. Each entry describes one whole block device that is taken from raw disk to mounted filesystem: a single partition spanning the disk (kept spanning after disk enlargement, see `grow`), a filesystem on that […](#variable-disk_linux_devices) |
+|           Variable           |  Type  | Required |   Default   | Description (abstract) |
+| ---------------------------- | ------ | -------- | ----------- | ---------------------- |
+| `disk_linux_state`           | `str`  | No       | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-disk_linux_state) |
+| `disk_linux_autoupgrade`     | `bool` | No       | `false`     | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one).<br><br>Note: The role installs only the tools the declared devices actually […](#variable-disk_linux_autoupgrade) |
+| `disk_linux_device_defaults` | `dict` | No       | `{}`        | Default values applied to every entry in `disk_linux_devices` that does not set the corresponding key itself. This avoids repeating common settings (filesystem, mount options, ...) on each device.<br><br>The keys mirror the per-device keys of the […](#variable-disk_linux_device_defaults) |
+| `disk_linux_devices`         | `list` | No       | `[]`        | List of dedicated data disks to manage. Each entry describes one whole block device that is taken from raw disk to mounted filesystem: a single partition spanning the disk (kept spanning after disk enlargement, see `grow`), a filesystem on that […](#variable-disk_linux_devices) |
 
 ### `disk_linux_state`<a id="variable-disk_linux_state"></a>
 
@@ -366,7 +368,9 @@ Default for the per-device key of the same name; see
 - **Required**: No
 - **Choices**: `xfs`, `ext4`
 
-##### `disk_linux_device_defaults['filesystem']['mkfs_options']`<a id="variable-disk_linux_device_defaults-sub-filesystem-sub-mkfs_options"></a>
+<a id="variable-disk_linux_device_defaults-sub-filesystem-sub-mkfs_options"></a>
+
+##### `disk_linux_device_defaults['filesystem']['mkfs_options']`
 
 [*⇑ Back to ToC ⇑*](#toc)
 
@@ -419,7 +423,9 @@ Default for the per-device key of the same name; see
 - **Required**: No
 - **Choices**: `0`, `2`
 
-##### `disk_linux_device_defaults['mount']['on_nonempty']`<a id="variable-disk_linux_device_defaults-sub-mount-sub-on_nonempty"></a>
+<a id="variable-disk_linux_device_defaults-sub-mount-sub-on_nonempty"></a>
+
+##### `disk_linux_device_defaults['mount']['on_nonempty']`
 
 [*⇑ Back to ToC ⇑*](#toc)
 
@@ -430,7 +436,9 @@ Default for the per-device key of the same name; see
 - **Required**: No
 - **Choices**: `fail`, `copy`, `hide`
 
-##### `disk_linux_device_defaults['mount']['selinux_relabel']`<a id="variable-disk_linux_device_defaults-sub-mount-sub-selinux_relabel"></a>
+<a id="variable-disk_linux_device_defaults-sub-mount-sub-selinux_relabel"></a>
+
+##### `disk_linux_device_defaults['mount']['selinux_relabel']`
 
 [*⇑ Back to ToC ⇑*](#toc)
 
@@ -440,7 +448,6 @@ Default for the per-device key of the same name; see
 - **Type**: `str`
 - **Required**: No
 - **Choices**: `never`, `created`, `first_mount`
-
 
 
 
@@ -498,6 +505,7 @@ are all treated as errors that need a human decision - the role never
 resolves them by unmounting or replacing anything automatically.
 
 Example:
+
 ```yaml
 disk_linux_devices:
   - device: "/dev/disk/by-id/virtio-home0"
@@ -925,8 +933,6 @@ Falls back to
 - **Type**: `str`
 - **Required**: No
 - **Choices**: `never`, `created`, `first_mount`
-
-
 
 
 

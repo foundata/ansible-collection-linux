@@ -13,6 +13,8 @@ argument_specs:
   # foundata.linux/roles/run/tasks/main.yml entry point
   main:
     short_description: "Main entry point for the foundata.linux.sysctl role"
+    description: |
+      Configure kernel parameters through sysctl settings and profiles.
     options:
 
       sysctl_linux_state:

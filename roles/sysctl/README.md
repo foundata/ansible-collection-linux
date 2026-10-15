@@ -130,19 +130,21 @@ There are also tags that are generally not intended to be called directly but ar
 
 Main entry point for the foundata.linux.sysctl role
 
+Configure kernel parameters through sysctl settings and profiles.
+
 The following variables can be configured for this role:
 
-| Variable | Type | Required | Default | Description (abstract) |
-|----------|------|----------|---------|------------------------|
-| `sysctl_linux_state` | `str` | No | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-sysctl_linux_state) |
-| `sysctl_linux_autoupgrade` | `bool` | No | `false` | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
-| `sysctl_linux_profile` | `list` | No | `[]` | Selects one or more predefined sets of kernel parameters ("profiles") optimized for specific workloads.<br><br>Profiles are applied in the given order and, for a parameter set by more than one profile, the later profile wins. The required kernel […](#variable-sysctl_linux_profile) |
-| `sysctl_linux_parameters` | `dict` | No | `{}` | Dictionary of kernel parameters to manage via sysctl. Keys are parameter names (e.g., `net.ipv4.ip_forward`), values are the desired settings.<br><br>The drop-in configuration file is fully declarative: any parameter in the file that is not present […](#variable-sysctl_linux_parameters) |
-| `sysctl_linux_reload` | `bool` | No | `true` | If set to `true`, triggers `sysctl --system` after configuration changes to reload all sysctl configuration files following the proper precedence order. This ensures all drop-in files and possibly existing other sysctl configuration files not managed […](#variable-sysctl_linux_reload) |
-| `sysctl_linux_verify` | `bool` | No | `true` | If set to `true`, verifies the parameter value using the sysctl command and actively sets it in the running kernel using `sysctl -w` if the current value differs from the desired one.<br><br>When `false`, only writes the parameter to the […](#variable-sysctl_linux_verify) |
-| `sysctl_linux_ignore_unknown_key_errors` | `bool` | No | `false` | If set to `true`, ignores errors caused by unknown or unsupported kernel parameter keys. This is useful in container environments where certain parameters may not exist or be accessible.<br><br>Generally not recommended for bare-metal or VM […](#variable-sysctl_linux_ignore_unknown_key_errors) |
-| `sysctl_linux_modules_required` | `bool` | No | `false` | Kernel modules required by the selected profiles are loaded best effort by default: when a module cannot be loaded (e.g. containers, cloud images whose running kernel lacks optional module packages like `kernel-modules-extra`, custom kernels), the […](#variable-sysctl_linux_modules_required) |
-| `sysctl_linux_config_dropin_file_name` | `str` | No | `"zz-managed.conf"` | Filename of the drop-in configuration file to be placed in `/etc/sysctl.d/`. Defaults to `zz-managed.conf`. `sysctl --system` and `systemd-sysctl` apply all `sysctl.d` files sorted by filename, later files overriding earlier ones, and distributions […](#variable-sysctl_linux_config_dropin_file_name) |
+|                 Variable                 |  Type  | Required |       Default       | Description (abstract) |
+| ---------------------------------------- | ------ | -------- | ------------------- | ---------------------- |
+| `sysctl_linux_state`                     | `str`  | No       | `"present"`         | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-sysctl_linux_state) |
+| `sysctl_linux_autoupgrade`               | `bool` | No       | `false`             | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
+| `sysctl_linux_profile`                   | `list` | No       | `[]`                | Selects one or more predefined sets of kernel parameters ("profiles") optimized for specific workloads.<br><br>Profiles are applied in the given order and, for a parameter set by more than one profile, the later profile wins. The required kernel […](#variable-sysctl_linux_profile) |
+| `sysctl_linux_parameters`                | `dict` | No       | `{}`                | Dictionary of kernel parameters to manage via sysctl. Keys are parameter names (e.g., `net.ipv4.ip_forward`), values are the desired settings.<br><br>The drop-in configuration file is fully declarative: any parameter in the file that is not present […](#variable-sysctl_linux_parameters) |
+| `sysctl_linux_reload`                    | `bool` | No       | `true`              | If set to `true`, triggers `sysctl --system` after configuration changes to reload all sysctl configuration files following the proper precedence order. This ensures all drop-in files and possibly existing other sysctl configuration files not managed […](#variable-sysctl_linux_reload) |
+| `sysctl_linux_verify`                    | `bool` | No       | `true`              | If set to `true`, verifies the parameter value using the sysctl command and actively sets it in the running kernel using `sysctl -w` if the current value differs from the desired one.<br><br>When `false`, only writes the parameter to the […](#variable-sysctl_linux_verify) |
+| `sysctl_linux_ignore_unknown_key_errors` | `bool` | No       | `false`             | If set to `true`, ignores errors caused by unknown or unsupported kernel parameter keys. This is useful in container environments where certain parameters may not exist or be accessible.<br><br>Generally not recommended for bare-metal or VM […](#variable-sysctl_linux_ignore_unknown_key_errors) |
+| `sysctl_linux_modules_required`          | `bool` | No       | `false`             | Kernel modules required by the selected profiles are loaded best effort by default: when a module cannot be loaded (e.g. containers, cloud images whose running kernel lacks optional module packages like `kernel-modules-extra`, custom kernels), the […](#variable-sysctl_linux_modules_required) |
+| `sysctl_linux_config_dropin_file_name`   | `str`  | No       | `"zz-managed.conf"` | Filename of the drop-in configuration file to be placed in `/etc/sysctl.d/`. Defaults to `zz-managed.conf`. `sysctl --system` and `systemd-sysctl` apply all `sysctl.d` files sorted by filename, later files overriding earlier ones, and distributions […](#variable-sysctl_linux_config_dropin_file_name) |
 
 ### `sysctl_linux_state`<a id="variable-sysctl_linux_state"></a>
 
@@ -213,22 +215,22 @@ profile changes. An empty list (the
 default) applies no profile; and only explicit `sysctl_linux_parameters`
 are set then.
 
-A single profile is a one-element list, e.g. `["web"]`. Profiles can be
-stacked, e.g. `["hardening-default", "web", "hardening-extra"]` to add a workload
-profile on to the hardening baseline and kernel hardening on top of the
-workload profile.
+A single profile is a one-element list, e.g. `["web"]`. Profiles can be stacked,
+e.g. `["hardening-default", "web", "hardening-extra"]` to add a workload profile
+on to the hardening baseline and kernel hardening on top of the workload
+profile.
 
 The workload profiles (`web`, `postgresql`, `mysql`, `redis`, `elasticsearch`,
 `file`, `virtualization`, `container`, `container-rootless`,
-`router`/`router_v4only`/`router_v6only`)
-tune for performance and reliability. Security hardening lives in separate, stackable
-profiles: `hardening-default` (shared safe network/kernel/filesystem defaults) and
-`hardening-extra` (stricter kernel hardening).
+`router`/`router_v4only`/`router_v6only`) tune for performance and reliability.
+Security hardening lives in separate, stackable profiles: `hardening-default`
+(shared safe network/kernel/filesystem defaults) and `hardening-extra` (stricter
+kernel hardening).
 
 Stack them with a workload profile, e.g. `["hardening-default", "web"]` or
-`["hardening-default", "web", "hardening-extra"]`. Some values are auto-calculated
-from system resources (RAM). Use `sysctl_linux_parameters` to override any
-profile value; it takes precedence over every profile.
+`["hardening-default", "web", "hardening-extra"]`. Some values are
+auto-calculated from system resources (RAM). Use `sysctl_linux_parameters` to
+override any profile value; it takes precedence over every profile.
 
 Available base profiles (alphabetical order):
 
@@ -237,8 +239,9 @@ Available base profiles (alphabetical order):
   `["hardening-default", "web"]`). The workload profiles target performance
   and do not include these keys. See
   [`hardening-default.md`](./vars/profiles/hardening-default.md) for details.
-- `hardening-extra`: Conservative kernel-level security hardening, meant to be **stacked** on a
-  workload profile (e.g. `["hardening-default", "web", "hardening-extra"]`). See
+- `hardening-extra`: Conservative kernel-level security hardening, meant to be
+  **stacked** on a workload profile (e.g.
+  `["hardening-default", "web", "hardening-extra"]`). See
   [`hardening-extra.md`](./vars/profiles/hardening-extra.md) for details.
 
 Available workload profiles (alphabetical order):
@@ -273,7 +276,7 @@ Available workload profiles (alphabetical order):
   [`router.md`](./vars/profiles/router.md) for details.
 - `router_v4only`: Like `router` but enables IPv4 forwarding only and
   explicitly disables IPv6 forwarding. See
-  [`router_v4only.md`](./vars/profiles/router_v4only.md)  for details.
+  [`router_v4only.md`](./vars/profiles/router_v4only.md) for details.
 - `router_v6only`: Like `router` but enables IPv6 forwarding only and
   explicitly disables IPv4 forwarding. See
   [`router_v6only.md`](./vars/profiles/router_v6only.md) for details.
@@ -294,7 +297,9 @@ a reboot (or a manual `sysctl -w` / `modprobe -r`).
 - **Type**: `list`
 - **Required**: No
 - **Default**: `[]`
-- **Choices**: `web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`, `virtualization`, `container`, `container-rootless`, `router`, `router_v4only`, `router_v6only`, `hardening-default`, `hardening-extra`
+- **Choices**: `web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`,
+  `virtualization`, `container`, `container-rootless`, `router`,
+  `router_v4only`, `router_v6only`, `hardening-default`, `hardening-extra`
 - **List Elements**: `str`
 
 
@@ -457,7 +462,6 @@ initialization otherwise.
 - **Type**: `str`
 - **Required**: No
 - **Default**: `"zz-managed.conf"`
-
 
 
 

@@ -13,6 +13,8 @@ argument_specs:
   # foundata.linux/roles/auto_update/tasks/main.yml entry point
   main:
     short_description: "Main entry point for the foundata.linux.auto_update role"
+    description: |
+      Configure automatic operating-system package updates.
     options:
 
       auto_update_linux_state:

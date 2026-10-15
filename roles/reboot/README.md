@@ -95,18 +95,20 @@ There are also tags that are generally not intended to be called directly but ar
 
 Main entry point for the foundata.linux.reboot role
 
+Manage operating-system reboots and wait for hosts to return.
+
 The following variables can be configured for this role:
 
-| Variable | Type | Required | Default | Description (abstract) |
-|----------|------|----------|---------|------------------------|
-| `reboot_linux_state` | `str` | No | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-reboot_linux_state) |
-| `reboot_linux_autoupgrade` | `bool` | No | `false` | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
-| `reboot_linux_boot_time_cmd` | `str` | No | `"cat '/proc/sys/kernel/random/boot_id'"` | Command to run that returns a unique string indicating the last time the system was booted.<br><br>Setting this to a command that has different output each time it is run will cause the task to fail. |
-| `reboot_linux_connect_timeout` | `int` | No | `0` | Maximum seconds to wait for a successful connection to the managed hosts before trying again.<br><br>If set to 0, the default setting for the underlying connection plugin is used. |
-| `reboot_linux_msg` | `str` | No | `"Reboot initiated by Ansible (foundata.linux.reboot)"` | Message to display to users before reboot. |
-| `reboot_linux_post_delay` | `int` | No | `0` | Seconds to wait after the reboot command was successful before attempting to validate the system rebooted successfully.<br><br>This is useful if you want wait for something to settle despite your connection already working. |
-| `reboot_linux_timeout` | `int` | No | `300` | Maximum seconds to wait for machine to reboot and respond to a test command.<br><br>This timeout is evaluated separately for both reboot verification and test command success so the maximum execution time for the module is twice this amount. |
-| `reboot_linux_test_cmd` | `str` | No | `"id"` | Command to run on the rebooted host and expect success from to determine the machine is ready for further tasks. |
+|            Variable            |  Type  | Required |                         Default                         | Description (abstract) |
+| ------------------------------ | ------ | -------- | ------------------------------------------------------- | ---------------------- |
+| `reboot_linux_state`           | `str`  | No       | `"present"`                                             | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-reboot_linux_state) |
+| `reboot_linux_autoupgrade`     | `bool` | No       | `false`                                                 | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
+| `reboot_linux_boot_time_cmd`   | `str`  | No       | `"cat '/proc/sys/kernel/random/boot_id'"`               | Command to run that returns a unique string indicating the last time the system was booted.<br><br>Setting this to a command that has different output each time it is run will cause the task to fail. |
+| `reboot_linux_connect_timeout` | `int`  | No       | `0`                                                     | Maximum seconds to wait for a successful connection to the managed hosts before trying again.<br><br>If set to 0, the default setting for the underlying connection plugin is used. |
+| `reboot_linux_msg`             | `str`  | No       | `"Reboot initiated by Ansible (foundata.linux.reboot)"` | Message to display to users before reboot. |
+| `reboot_linux_post_delay`      | `int`  | No       | `0`                                                     | Seconds to wait after the reboot command was successful before attempting to validate the system rebooted successfully.<br><br>This is useful if you want wait for something to settle despite your connection already working. |
+| `reboot_linux_timeout`         | `int`  | No       | `300`                                                   | Maximum seconds to wait for machine to reboot and respond to a test command.<br><br>This timeout is evaluated separately for both reboot verification and test command success so the maximum execution time for the module is twice this amount. |
+| `reboot_linux_test_cmd`        | `str`  | No       | `"id"`                                                  | Command to run on the rebooted host and expect success from to determine the machine is ready for further tasks. |
 
 ### `reboot_linux_state`<a id="variable-reboot_linux_state"></a>
 
@@ -233,7 +235,6 @@ machine is ready for further tasks.
 - **Type**: `str`
 - **Required**: No
 - **Default**: `"id"`
-
 
 
 

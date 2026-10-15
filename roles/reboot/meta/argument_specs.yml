@@ -13,6 +13,8 @@ argument_specs:
   # foundata.linux/roles/run/tasks/main.yml entry point
   main:
     short_description: "Main entry point for the foundata.linux.reboot role"
+    description: |
+      Manage operating-system reboots and wait for hosts to return.
     options:
 
       reboot_linux_state:

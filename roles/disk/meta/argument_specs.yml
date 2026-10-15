@@ -13,6 +13,8 @@ argument_specs:
   # foundata.linux/roles/disk/tasks/main.yml entry point
   main:
     short_description: "Main entry point for the foundata.linux.disk role"
+    description: |
+      Manage disks, partitions, filesystems, and mount points.
     options:
 
       disk_linux_state:

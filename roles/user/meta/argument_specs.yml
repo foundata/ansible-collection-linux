@@ -13,6 +13,8 @@ argument_specs:
   # foundata.linux/roles/user/tasks/main.yml entry point
   main:
     short_description: "Main entry point for the foundata.linux.user role"
+    description: |
+      Manage local user accounts and their configuration.
     options:
 
       user_linux_account_defaults:

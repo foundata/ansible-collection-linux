@@ -214,18 +214,20 @@ There are also tags that are generally not intended to be called directly but ar
 
 Main entry point for the foundata.linux.sudo role
 
+Install sudo and manage privilege-escalation rules.
+
 The following variables can be configured for this role:
 
-| Variable | Type | Required | Default | Description (abstract) |
-|----------|------|----------|---------|------------------------|
-| `sudo_linux_state` | `str` | No | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that `sudo` is installed and that the rules described in `sudo_linux_rules` (and any `sudo_linux_defaults`) are configured as drop-in files below […](#variable-sudo_linux_state) |
-| `sudo_linux_autoupgrade` | `bool` | No | `false` | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one).<br><br>This role manages the `sudo` package (it is missing from some minimal […](#variable-sudo_linux_autoupgrade) |
-| `sudo_linux_rules` | `list` | No | `[]` | List of sudo rules to manage. Each entry grants one or more users and/or groups the right to run a set of commands, and is rendered into validated drop-in files below `/etc/sudoers.d/` (one file per grantee, as the underlying […](#variable-sudo_linux_rules) |
-| `sudo_linux_rule_defaults` | `dict` | No | `{}` | Default values applied to every entry in `sudo_linux_rules` that does not set the corresponding key itself. The keys mirror the per-rule keys of the same name (see `sudo_linux_rules`). Any value provided here is overridden by an explicit value on the […](#variable-sudo_linux_rule_defaults) |
-| `sudo_linux_defaults` | `list` | No | `[]` | Global `Defaults` directives to apply, for sudo-wide settings that are not tied to a specific rule (the per-rule mechanism cannot express `Defaults` lines). Each entry is one directive: the role prepends the `Defaults` keyword and renders one […](#variable-sudo_linux_defaults) |
-| `sudo_linux_extra_content` | `str` | No | `""` | Last-resort escape hatch: raw sudoers content appended verbatim to the role's managed, `visudo`-validated drop-in file, after the lines rendered from `sudo_linux_defaults`. Use it for anything the structured variables cannot express, for example […](#variable-sudo_linux_extra_content) |
-| `sudo_linux_delete_unmanaged` | `bool` | No | `false` | If `true`, the role manages `/etc/sudoers.d/` authoritatively: every drop-in file that is **not** created by this role is removed, except for<br><br>- an internal, per-platform protected list (for example the `README` shipped by the `sudo` package on […](#variable-sudo_linux_delete_unmanaged) |
-| `sudo_linux_delete_unmanaged_exclude` | `list` | No | `[]` | List of drop-in file names (basenames, relative to `/etc/sudoers.d/`) that must never be removed by `sudo_linux_delete_unmanaged`, even though they are not managed by this role. Use this for files shipped by the distribution or other software that […](#variable-sudo_linux_delete_unmanaged_exclude) |
+|               Variable                |  Type  | Required |   Default   | Description (abstract) |
+| ------------------------------------- | ------ | -------- | ----------- | ---------------------- |
+| `sudo_linux_state`                    | `str`  | No       | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that `sudo` is installed and that the rules described in `sudo_linux_rules` (and any `sudo_linux_defaults`) are configured as drop-in files below […](#variable-sudo_linux_state) |
+| `sudo_linux_autoupgrade`              | `bool` | No       | `false`     | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one).<br><br>This role manages the `sudo` package (it is missing from some minimal […](#variable-sudo_linux_autoupgrade) |
+| `sudo_linux_rules`                    | `list` | No       | `[]`        | List of sudo rules to manage. Each entry grants one or more users and/or groups the right to run a set of commands, and is rendered into validated drop-in files below `/etc/sudoers.d/` (one file per grantee, as the underlying […](#variable-sudo_linux_rules) |
+| `sudo_linux_rule_defaults`            | `dict` | No       | `{}`        | Default values applied to every entry in `sudo_linux_rules` that does not set the corresponding key itself. The keys mirror the per-rule keys of the same name (see `sudo_linux_rules`). Any value provided here is overridden by an explicit value on the […](#variable-sudo_linux_rule_defaults) |
+| `sudo_linux_defaults`                 | `list` | No       | `[]`        | Global `Defaults` directives to apply, for sudo-wide settings that are not tied to a specific rule (the per-rule mechanism cannot express `Defaults` lines). Each entry is one directive: the role prepends the `Defaults` keyword and renders one […](#variable-sudo_linux_defaults) |
+| `sudo_linux_extra_content`            | `str`  | No       | `""`        | Last-resort escape hatch: raw sudoers content appended verbatim to the role's managed, `visudo`-validated drop-in file, after the lines rendered from `sudo_linux_defaults`. Use it for anything the structured variables cannot express, for example […](#variable-sudo_linux_extra_content) |
+| `sudo_linux_delete_unmanaged`         | `bool` | No       | `false`     | If `true`, the role manages `/etc/sudoers.d/` authoritatively: every drop-in file that is **not** created by this role is removed, except for<br><br>- an internal, per-platform protected list (for example the `README` shipped by the `sudo` package on […](#variable-sudo_linux_delete_unmanaged) |
+| `sudo_linux_delete_unmanaged_exclude` | `list` | No       | `[]`        | List of drop-in file names (basenames, relative to `/etc/sudoers.d/`) that must never be removed by `sudo_linux_delete_unmanaged`, even though they are not managed by this role. Use this for files shipped by the distribution or other software that […](#variable-sudo_linux_delete_unmanaged_exclude) |
 
 ### `sudo_linux_state`<a id="variable-sudo_linux_state"></a>
 
@@ -294,9 +296,10 @@ Security notes:
 - Avoid granting sudo access to broadly powerful commands such as `chmod`,
   `chown`, `cp`, `mv`, or shell-capable tools unless the arguments are tightly
   restricted. Misconfigured sudo rules can enable privilege escalation; see
-  GTFOBins for examples: https://gtfobins.org/
+  GTFOBins for examples: <https://gtfobins.org/>
 
 Example:
+
 ```yaml
 sudo_linux_rules:
   # Full administrative access for the platform admin group
@@ -496,6 +499,7 @@ a specifier directly to the keyword (`Defaults:user`, `Defaults@host`,
 `sudo_linux_extra_content` for those.
 
 Example:
+
 ```yaml
 sudo_linux_defaults:
   - "env_reset"
@@ -530,6 +534,7 @@ content fails the run rather than corrupting sudo. Prefer
 this only when there is no other way.
 
 Example:
+
 ```yaml
 sudo_linux_extra_content: |
   Defaults:ansible !requiretty
@@ -596,7 +601,6 @@ not need to repeat entries already protected there.
 - **Required**: No
 - **Default**: `[]`
 - **List Elements**: `str`
-
 
 
 
