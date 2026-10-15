@@ -5,7 +5,8 @@ SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-The `foundata.linux.user` Ansible role (part of the `foundata.linux` Ansible collection).
+The `foundata.linux.user` Ansible role (part of the `foundata.linux` Ansible
+collection).
 
 Manage local user accounts on Linux systems.
 
@@ -67,12 +68,37 @@ Manage local user accounts on Linux systems.
 
 ## Features<a id="features"></a>
 
-* **Local accounts and groups in one place**: declare groups via [`user_linux_groups`](#variable-user_linux_groups) and accounts via [`user_linux_accounts`](#variable-user_linux_accounts); groups are always created before accounts so they can be used as primary or supplementary groups in the same run.
-* **Defaults instead of repetition**: set login shell, umask, group-append behaviour, password update policy and more once in [`user_linux_account_defaults`](#variable-user_linux_account_defaults); every account inherits them unless it overrides the individual key.
-* **Home directory handling** via [`home`](#variable-user_linux_accounts-sub-home): choose the `path`, decide whether to `create` it, `move` it when the path changes, and pick the `skeleton` used to populate it.
-* **Safe password management** via [`password`](#variable-user_linux_accounts-sub-password): only pre-hashed crypt strings are accepted (plain-text is rejected), with `lock`, an `on_create`-vs-`always` `update` policy, and password aging (`expire_min`/`expire_max`/`expire_warn`).
-* **SSH `authorized_keys` management** via [`ssh_authorized_keys`](#variable-user_linux_accounts-sub-ssh_authorized_keys): install keys with optional per-key OpenSSH `options` (e.g. `from=`, `command=`, `restrict`), managed either authoritatively or additively via [`ssh_authorized_keys_delete_unmanaged`](#variable-user_linux_accounts-sub-ssh_authorized_keys_delete_unmanaged). An empty/unset key list never wipes an existing `authorized_keys`.
-* **Optional reaping of unmanaged accounts** via [`user_linux_accounts_delete_unmanaged`](#variable-user_linux_accounts_delete_unmanaged): off by default and guarded — only regular accounts inside the `UID_MIN`..`UID_MAX` range are candidates, while `root`, the current Ansible connection user, system accounts and every name in [`user_linux_accounts_delete_unmanaged_exclude`](#variable-user_linux_accounts_delete_unmanaged_exclude) are always protected.
+- **Local accounts and groups in one place**: declare groups via
+  [`user_linux_groups`](#variable-user_linux_groups) and accounts via
+  [`user_linux_accounts`](#variable-user_linux_accounts); groups are always
+  created before accounts so they can be used as primary or supplementary groups
+  in the same run.
+- **Defaults instead of repetition**: set login shell, umask, group-append
+  behaviour, password update policy and more once in
+  [`user_linux_account_defaults`](#variable-user_linux_account_defaults); every
+  account inherits them unless it overrides the individual key.
+- **Home directory handling** via
+  [`home`](#variable-user_linux_accounts-sub-home): choose the `path`, decide
+  whether to `create` it, `move` it when the path changes, and pick the
+  `skeleton` used to populate it.
+- **Safe password management** via
+  [`password`](#variable-user_linux_accounts-sub-password): only pre-hashed
+  crypt strings are accepted (plain-text is rejected), with `lock`, an
+  `on_create`-vs-`always` `update` policy, and password aging
+  (`expire_min`/`expire_max`/`expire_warn`).
+- **SSH `authorized_keys` management** via
+  [`ssh_authorized_keys`](#variable-user_linux_accounts-sub-ssh_authorized_keys):
+  install keys with optional per-key OpenSSH `options` (e.g. `from=`,
+  `command=`, `restrict`), managed either authoritatively or additively via
+  [`ssh_authorized_keys_delete_unmanaged`](#variable-user_linux_accounts-sub-ssh_authorized_keys_delete_unmanaged).
+  An empty/unset key list never wipes an existing `authorized_keys`.
+- **Optional reaping of unmanaged accounts** via
+  [`user_linux_accounts_delete_unmanaged`](#variable-user_linux_accounts_delete_unmanaged):
+  off by default and guarded — only regular accounts inside the
+  `UID_MIN`..`UID_MAX` range are candidates, while `root`, the current Ansible
+  connection user, system accounts and every name in
+  [`user_linux_accounts_delete_unmanaged_exclude`](#variable-user_linux_accounts_delete_unmanaged_exclude)
+  are always protected.
 
 
 ## Example playbooks, using this role<a id="examples"></a>
@@ -225,11 +251,14 @@ connection user, `root` and system accounts are always protected):
 
 It might be useful and faster to only call parts of the role by using tags:
 
-- `user_linux_config`: Manage the local groups, user accounts and SSH `authorized_keys`.
+- `user_linux_config`: Manage the local groups, user accounts and SSH
+  `authorized_keys`.
 
-There are also tags that are generally not intended to be called directly but are included for completeness and to cover edge cases:
+There are also tags that are generally not intended to be called directly but
+are included for completeness and to cover edge cases:
 
-- `user_linux_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
+- `user_linux_always`, `always`: Tasks needed by the role itself for internal
+  role setup and the Ansible environment.
 
 
 <!-- ANSIBLE DOCSMITH MAIN START -->
@@ -881,7 +910,8 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 
 ## Compatibility<a id="compatibility"></a>
 
-See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and `__user_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
+See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and
+`__user_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
 
 
 

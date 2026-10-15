@@ -5,7 +5,8 @@ SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-The `foundata.linux.sudo` Ansible role (part of the `foundata.linux` Ansible collection).
+The `foundata.linux.sudo` Ansible role (part of the `foundata.linux` Ansible
+collection).
 
 
 
@@ -42,19 +43,43 @@ The `foundata.linux.sudo` Ansible role (part of the `foundata.linux` Ansible col
 
 ## Features<a id="features"></a>
 
-* **Declarative, validated rules**: describe who may run what in [`sudo_linux_rules`](#variable-sudo_linux_rules); each rule is rendered into a `visudo`-validated drop-in file below `/etc/sudoers.d/` (via `community.general.sudoers`), so the main `/etc/sudoers` is never edited and a malformed rule does not break sudo.
-* **Per-rule grants** via [`sudo_linux_rules`](#variable-sudo_linux_rules): target one or more [`users`](#variable-sudo_linux_rules-sub-users) and/or [`groups`](#variable-sudo_linux_rules-sub-groups), allow specific [`commands`](#variable-sudo_linux_rules-sub-commands) (absolute paths or `ALL`), pick the [`runas`](#variable-sudo_linux_rules-sub-runas) identity and restrict by [`host`](#variable-sudo_linux_rules-sub-host), with `NOPASSWD`/`SETENV`/`NOEXEC` toggles ([`nopassword`](#variable-sudo_linux_rules-sub-nopassword), [`setenv`](#variable-sudo_linux_rules-sub-setenv), [`noexec`](#variable-sudo_linux_rules-sub-noexec)).
-* **Defaults instead of repetition**: set common rule options (`runas`, `host`, `nopassword`, ...) once in [`sudo_linux_rule_defaults`](#variable-sudo_linux_rule_defaults); every rule inherits them unless it overrides the key.
-* **Global `Defaults` directives** via [`sudo_linux_defaults`](#variable-sudo_linux_defaults): apply sudo-wide settings (`env_reset`, `secure_path`, `timestamp_timeout`, ...) through a single managed, validated drop-in file.
-* **Optional authoritative cleanup** via [`sudo_linux_delete_unmanaged`](#variable-sudo_linux_delete_unmanaged): off by default, removes any drop-in not managed by this role, while keeping an internal per-platform protected list plus the names in [`sudo_linux_delete_unmanaged_exclude`](#variable-sudo_linux_delete_unmanaged_exclude) (e.g. `90-cloud-init-users`) to avoid lockouts.
+- **Declarative, validated rules**: describe who may run what in
+  [`sudo_linux_rules`](#variable-sudo_linux_rules); each rule is rendered into a
+  `visudo`-validated drop-in file below `/etc/sudoers.d/` (via
+  `community.general.sudoers`), so the main `/etc/sudoers` is never edited and a
+  malformed rule does not break sudo.
+- **Per-rule grants** via [`sudo_linux_rules`](#variable-sudo_linux_rules):
+  target one or more [`users`](#variable-sudo_linux_rules-sub-users) and/or
+  [`groups`](#variable-sudo_linux_rules-sub-groups), allow specific
+  [`commands`](#variable-sudo_linux_rules-sub-commands) (absolute paths or
+  `ALL`), pick the [`runas`](#variable-sudo_linux_rules-sub-runas) identity and
+  restrict by [`host`](#variable-sudo_linux_rules-sub-host), with
+  `NOPASSWD`/`SETENV`/`NOEXEC` toggles
+  ([`nopassword`](#variable-sudo_linux_rules-sub-nopassword),
+  [`setenv`](#variable-sudo_linux_rules-sub-setenv),
+  [`noexec`](#variable-sudo_linux_rules-sub-noexec)).
+- **Defaults instead of repetition**: set common rule options (`runas`, `host`,
+  `nopassword`, ...) once in
+  [`sudo_linux_rule_defaults`](#variable-sudo_linux_rule_defaults); every rule
+  inherits them unless it overrides the key.
+- **Global `Defaults` directives** via
+  [`sudo_linux_defaults`](#variable-sudo_linux_defaults): apply sudo-wide
+  settings (`env_reset`, `secure_path`, `timestamp_timeout`, ...) through a
+  single managed, validated drop-in file.
+- **Optional authoritative cleanup** via
+  [`sudo_linux_delete_unmanaged`](#variable-sudo_linux_delete_unmanaged): off by
+  default, removes any drop-in not managed by this role, while keeping an
+  internal per-platform protected list plus the names in
+  [`sudo_linux_delete_unmanaged_exclude`](#variable-sudo_linux_delete_unmanaged_exclude)
+  (e.g. `90-cloud-init-users`) to avoid lockouts.
 
 
 ## Example playbooks, using this role<a id="examples"></a>
 
-Grant administrative access to a group and a few scoped, task-specific rules. The
-`admins` group gets full root access (with a password), while a deploy user and a
-monitoring group get only the exact commands they need — the deploy reloads are
-passwordless because they run non-interactively from CI:
+Grant administrative access to a group and a few scoped, task-specific rules.
+The `admins` group gets full root access (with a password), while a deploy user
+and a monitoring group get only the exact commands they need — the deploy
+reloads are passwordless because they run non-interactively from CI:
 
 ```yaml
 ---
@@ -201,11 +226,14 @@ intentionally kept):
 It might be useful and faster to only call parts of the role by using tags:
 
 - `sudo_linux_setup`: Manage basic resources, such as packages or service users.
-- `sudo_linux_config`: Manage settings, such as adapting or creating configuration files.
+- `sudo_linux_config`: Manage settings, such as adapting or creating
+  configuration files.
 
-There are also tags that are generally not intended to be called directly but are included for completeness and to cover edge cases:
+There are also tags that are generally not intended to be called directly but
+are included for completeness and to cover edge cases:
 
-- `sudo_linux_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
+- `sudo_linux_always`, `always`: Tasks needed by the role itself for internal
+  role setup and the Ansible environment.
 
 
 <!-- ANSIBLE DOCSMITH MAIN START -->
@@ -614,7 +642,8 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 
 ## Compatibility<a id="compatibility"></a>
 
-See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and `__sudo_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
+See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and
+`__sudo_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
 
 
 

@@ -5,9 +5,15 @@ SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-The `foundata.linux.disk` Ansible role (part of the `foundata.linux` Ansible collection) manages dedicated data disks. It takes a whole block device from raw disk to mounted filesystem a single partition spanning the disk, a filesystem (XFS or ext4) on it, and a mount plus `/etc/fstab` entry by filesystem UUID.
+The `foundata.linux.disk` Ansible role (part of the `foundata.linux` Ansible
+collection) manages dedicated data disks. It takes a whole block device from raw
+disk to mounted filesystem a single partition spanning the disk, a filesystem
+(XFS or ext4) on it, and a mount plus `/etc/fstab` entry by filesystem UUID.
 
-The role is built to never reformat or destroy existing data by default: it verifies the declared layout (partition table type, single partition, filesystem type) against the disk and fails hard on any deviation (`on_mismatch`) or mount/fstab conflicts.
+The role is built to never reformat or destroy existing data by default: it
+verifies the declared layout (partition table type, single partition, filesystem
+type) against the disk and fails hard on any deviation (`on_mismatch`) or
+mount/fstab conflicts.
 
 
 ## Table of contents<a id="toc"></a>
@@ -60,7 +66,8 @@ The role is built to never reformat or destroy existing data by default: it veri
 
 ## Example playbooks, using this role<a id="examples"></a>
 
-Minimal usage, one data disk with all defaults (GPT partition table, XFS, mounted by UUID):
+Minimal usage, one data disk with all defaults (GPT partition table, XFS,
+mounted by UUID):
 
 ```yaml
 ---
@@ -107,7 +114,9 @@ Two dedicated disks with shared settings hoisted into the defaults dictionary:
               path: "/srv"
 ```
 
-Mixed filesystems, boot-time `fsck` for ext4, a legacy MBR disk, an optional per-host disk, repurposing a disk with foreign content, and decommissioning a disk including data destruction:
+Mixed filesystems, boot-time `fsck` for ext4, a legacy MBR disk, an optional
+per-host disk, repurposing a disk with foreign content, and decommissioning a
+disk including data destruction:
 
 ```yaml
 ---
@@ -159,12 +168,16 @@ Mixed filesystems, boot-time `fsck` for ext4, a legacy MBR disk, an optional per
 
 It might be useful and faster to only call parts of the role by using tags:
 
-- `disk_linux_setup`: Manage basic resources, such as the needed partitioning and filesystem tool packages.
-- `disk_linux_config`: Manage the devices: partitioning, filesystem creation, content migration, mounting and `/etc/fstab`.
+- `disk_linux_setup`: Manage basic resources, such as the needed partitioning
+  and filesystem tool packages.
+- `disk_linux_config`: Manage the devices: partitioning, filesystem creation,
+  content migration, mounting and `/etc/fstab`.
 
-There are also tags that are generally not intended to be called directly but are included for completeness and to cover edge cases:
+There are also tags that are generally not intended to be called directly but
+are included for completeness and to cover edge cases:
 
-- `disk_linux_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
+- `disk_linux_always`, `always`: Tasks needed by the role itself for internal
+  role setup and the Ansible environment.
 
 
 <!-- ANSIBLE DOCSMITH MAIN START -->
@@ -946,7 +959,8 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 
 ## Compatibility<a id="compatibility"></a>
 
-See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and `__disk_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
+See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and
+`__disk_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
 
 
 

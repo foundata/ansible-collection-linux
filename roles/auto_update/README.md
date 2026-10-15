@@ -5,7 +5,8 @@ SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-The `foundata.linux.auto_update` Ansible role (part of the `foundata.linux` Ansible collection).
+The `foundata.linux.auto_update` Ansible role (part of the `foundata.linux`
+Ansible collection).
 
 
 
@@ -38,18 +39,31 @@ The `foundata.linux.auto_update` Ansible role (part of the `foundata.linux` Ansi
 
 ## Features<a id="features"></a>
 
-* **Cross-platform, one interface**: configures the native unattended-update mechanism of each platform behind a single set of variables — `unattended-upgrades` (Debian/Ubuntu), `dnf-automatic` / `dnf5-plugin-automatic` (RHEL/Fedora) and `os-update` (openSUSE Leap).
-* **Selectable apply mode**: install, download-only or notify-only via [`auto_update_linux_apply`](#variable-auto_update_linux_apply) (backend support varies; an unsupported mode emits a notice and falls back to `install`).
-* **Controlled schedule**: tune the update timer with standard systemd `[Timer]` directives via [`auto_update_linux_timer_settings`](#variable-auto_update_linux_timer_settings).
-* **Flexible reboot handling** via [`auto_update_linux_reboot`](#variable-auto_update_linux_reboot):
-  * `never`: never reboot automatically.
-  * `immediate`: let the backend reboot right after the update run (only when a reboot is required); timing rides the update timer's randomized delay.
-  * `scheduled`: reboot only when required, at a controlled time, via a role-managed cross-platform systemd reboot timer (see [`auto_update_linux_reboot_timer_settings`](#variable-auto_update_linux_reboot_timer_settings)).
+- **Cross-platform, one interface**: configures the native unattended-update
+  mechanism of each platform behind a single set of variables —
+  `unattended-upgrades` (Debian/Ubuntu), `dnf-automatic` /
+  `dnf5-plugin-automatic` (RHEL/Fedora) and `os-update` (openSUSE Leap).
+- **Selectable apply mode**: install, download-only or notify-only via
+  [`auto_update_linux_apply`](#variable-auto_update_linux_apply) (backend
+  support varies; an unsupported mode emits a notice and falls back to
+  `install`).
+- **Controlled schedule**: tune the update timer with standard systemd `[Timer]`
+  directives via
+  [`auto_update_linux_timer_settings`](#variable-auto_update_linux_timer_settings).
+- **Flexible reboot handling** via
+  [`auto_update_linux_reboot`](#variable-auto_update_linux_reboot):
+  - `never`: never reboot automatically.
+  - `immediate`: let the backend reboot right after the update run (only when a
+    reboot is required); timing rides the update timer's randomized delay.
+  - `scheduled`: reboot only when required, at a controlled time, via a
+    role-managed cross-platform systemd reboot timer (see
+    [`auto_update_linux_reboot_timer_settings`](#variable-auto_update_linux_reboot_timer_settings)).
 
 
 ## Example playbooks, using this role<a id="examples"></a>
 
-Automatic security updates every night, without rebooting (safe operations baseline):
+Automatic security updates every night, without rebooting (safe operations
+baseline):
 
 ```yaml
 ---
@@ -69,7 +83,9 @@ Automatic security updates every night, without rebooting (safe operations basel
         auto_update_linux_reboot: "never"
 ```
 
-Security updates with a controlled, cross-platform reboot window (reboot only when a reboot is actually required, at 04:00 AM, regardless of when the update ran):
+Security updates with a controlled, cross-platform reboot window (reboot only
+when a reboot is actually required, at 04:00 AM, regardless of when the update
+ran):
 
 ```yaml
 ---
@@ -92,7 +108,9 @@ Security updates with a controlled, cross-platform reboot window (reboot only wh
           RandomizedDelaySec: "30m"
 ```
 
-All updates, download-only, with email reports (needs a configured MTA, [foundata.postfix.run](https://foundata.com/en/projects/ansible-collection-postfix/) may help) and some packages held back:
+All updates, download-only, with email reports (needs a configured MTA,
+[foundata.postfix.run](https://foundata.com/en/projects/ansible-collection-postfix/)
+may help) and some packages held back:
 
 ```yaml
 ---
@@ -114,7 +132,8 @@ All updates, download-only, with email reports (needs a configured MTA, [foundat
           - "linux-image-*"
 ```
 
-Disable automatic updates (keep the mechanism installed, but stop and disable its timer):
+Disable automatic updates (keep the mechanism installed, but stop and disable
+its timer):
 
 ```yaml
 ---
@@ -154,13 +173,18 @@ Uninstall (remove managed configuration, timers and packages):
 
 It might be useful and faster to only call parts of the role by using tags:
 
-- `auto_update_linux_setup`: Manage basic resources, such as packages or service users.
-- `auto_update_linux_config`: Manage settings, such as adapting or creating configuration files.
-- `auto_update_linux_service`: Manage services and daemons, such as running states and service boot configurations.
+- `auto_update_linux_setup`: Manage basic resources, such as packages or service
+  users.
+- `auto_update_linux_config`: Manage settings, such as adapting or creating
+  configuration files.
+- `auto_update_linux_service`: Manage services and daemons, such as running
+  states and service boot configurations.
 
-There are also tags that are generally not intended to be called directly but are included for completeness and to cover edge cases:
+There are also tags that are generally not intended to be called directly but
+are included for completeness and to cover edge cases:
 
-- `auto_update_linux_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
+- `auto_update_linux_always`, `always`: Tasks needed by the role itself for
+  internal role setup and the Ansible environment.
 
 
 <!-- ANSIBLE DOCSMITH MAIN START -->
@@ -608,7 +632,8 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 
 ## Compatibility<a id="compatibility"></a>
 
-See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and `__auto_update_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
+See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and
+`__auto_update_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
 
 
 

@@ -5,9 +5,15 @@ SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-Manages Linux kernel parameters via `sysctl`, with optional workload-specific profiles that auto-tune values based on system resources.
+Manages Linux kernel parameters via `sysctl`, with optional workload-specific
+profiles that auto-tune values based on system resources.
 
-Choose one or more profiles for your workload (web server, the database engines, file server, virtualization host, container host, or router) and the role applies performance-tuned parameters. Security hardening lives in separate, stackable profiles (`hardening-default`, `hardening-extra`) — stack them with a workload profile, e.g. `["hardening-default", "web"]`. Override any value with `sysctl_linux_parameters`.
+Choose one or more profiles for your workload (web server, the database engines,
+file server, virtualization host, container host, or router) and the role
+applies performance-tuned parameters. Security hardening lives in separate,
+stackable profiles (`hardening-default`, `hardening-extra`) — stack them with a
+workload profile, e.g. `["hardening-default", "web"]`. Override any value with
+`sysctl_linux_parameters`.
 
 
 ## Table of contents<a id="toc"></a>
@@ -36,14 +42,28 @@ Choose one or more profiles for your workload (web server, the database engines,
 
 Main features:
 
-* **Simple usage**: Use the [`sysctl_linux_parameters`](#variable-sysctl_linux_parameters) dictionary to maintain custom kernel parameters
-* **Optional, stackable profiles** (`sysctl_linux_profile` is a list, applied in order, last wins):
-  * Workload (performance) profiles: `web`, `postgresql`, `mysql`, `redis`, `elasticsearch`, `file`, `virtualization`, `container`, `router`/`router_v4only`/`router_v6only` (see [`sysctl_linux_profile`](#variable-sysctl_linux_profile) for details).
-  * Security profiles to stack on a workload: `hardening-default` (shared network/kernel/filesystem hardening) and `hardening-extra` (stricter kernel hardening), e.g. `["hardening-default", "web", "hardening-extra"]`.
-  * Auto-tuning: Profiles automatically calculate optimal values based on system RAM using Ansible facts.
-  * Use [`sysctl_linux_parameters`](#variable-sysctl_linux_parameters) to overwrite a profile parameter to customize for edge cases.
-* Container-aware: on detected containers the role automatically skips live application (`sysctl -w`) and only writes the drop-in file, and tolerates `sysctl --system` reload failures — no need to set `sysctl_linux_verify: false` yourself.
-* Designed for cross-platform compatibility, working seamlessly across major Linux distributions.
+- **Simple usage**: Use the
+  [`sysctl_linux_parameters`](#variable-sysctl_linux_parameters) dictionary to
+  maintain custom kernel parameters
+- **Optional, stackable profiles** (`sysctl_linux_profile` is a list, applied in
+  order, last wins):
+  - Workload (performance) profiles: `web`, `postgresql`, `mysql`, `redis`,
+    `elasticsearch`, `file`, `virtualization`, `container`,
+    `router`/`router_v4only`/`router_v6only` (see
+    [`sysctl_linux_profile`](#variable-sysctl_linux_profile) for details).
+  - Security profiles to stack on a workload: `hardening-default` (shared
+    network/kernel/filesystem hardening) and `hardening-extra` (stricter kernel
+    hardening), e.g. `["hardening-default", "web", "hardening-extra"]`.
+  - Auto-tuning: Profiles automatically calculate optimal values based on system
+    RAM using Ansible facts.
+  - Use [`sysctl_linux_parameters`](#variable-sysctl_linux_parameters) to
+    overwrite a profile parameter to customize for edge cases.
+- Container-aware: on detected containers the role automatically skips live
+  application (`sysctl -w`) and only writes the drop-in file, and tolerates
+  `sysctl --system` reload failures — no need to set
+  `sysctl_linux_verify: false` yourself.
+- Designed for cross-platform compatibility, working seamlessly across major
+  Linux distributions.
 
 
 
@@ -111,17 +131,19 @@ Override profile values with custom parameters:
 
 
 
-
 ## Supported tags<a id="tags"></a>
 
 It might be useful and faster to only call parts of the role by using tags:
 
-- `sysctl_linux_setup`: Manage basic resources, such as packages or service users.
+- `sysctl_linux_setup`: Manage basic resources, such as packages or service
+  users.
 - `sysctl_linux_config`: Manage sysctl parameters.
 
-There are also tags that are generally not intended to be called directly but are included for completeness and to cover edge cases:
+There are also tags that are generally not intended to be called directly but
+are included for completeness and to cover edge cases:
 
-- `sysctl_linux_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
+- `sysctl_linux_always`, `always`: Tasks needed by the role itself for internal
+  role setup and the Ansible environment.
 
 
 <!-- ANSIBLE DOCSMITH MAIN START -->
@@ -475,7 +497,8 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 
 ## Compatibility<a id="compatibility"></a>
 
-See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and `__reboot_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
+See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and
+`__reboot_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
 
 
 
