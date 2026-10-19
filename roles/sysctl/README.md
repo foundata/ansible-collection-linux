@@ -495,7 +495,7 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 ## Compatibility<a id="compatibility"></a>
 
 See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and
-`__reboot_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
+`__sysctl_linux_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
 
 
 
