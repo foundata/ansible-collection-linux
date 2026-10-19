@@ -171,7 +171,7 @@ Uninstall (remove managed configuration, timers and packages):
 
 ## Supported tags<a id="tags"></a>
 
-It might be useful and faster to only call parts of the role by using tags:
+Run parts of the role with `--tags`:
 
 - `auto_update_linux_setup`: Manage basic resources, such as packages or service
   users.
@@ -180,11 +180,9 @@ It might be useful and faster to only call parts of the role by using tags:
 - `auto_update_linux_service`: Manage services and daemons, such as running
   states and service boot configurations.
 
-There are also tags that are generally not intended to be called directly but
-are included for completeness and to cover edge cases:
-
-- `auto_update_linux_always`, `always`: Tasks needed by the role itself for
-  internal role setup and the Ansible environment.
+The init tasks check the environment and prepare the role. They carry the tags
+`auto_update_linux_always` and `always`, so they run with any `--tags`
+selection; do not skip them.
 
 
 <!-- ANSIBLE DOCSMITH MAIN START -->
