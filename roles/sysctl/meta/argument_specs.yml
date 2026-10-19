@@ -12,7 +12,7 @@ argument_specs:
 
   # foundata.linux/roles/run/tasks/main.yml entry point
   main:
-    short_description: "Main entry point for the foundata.linux.sysctl role"
+    short_description: "Main entry point for the foundata.linux.sysctl role."
     description: |
       Configure kernel parameters through sysctl settings and profiles.
     options:
@@ -25,7 +25,7 @@ argument_specs:
           installed and configured.
 
           `absent` reverts changes as much as possible, such as removing packages,
-          deleting created users, stopping services, restoring modified settings, ...
+          deleting created users, stopping services and restoring modified settings.
 
           Note: For this role, the required component and package set is minimal. There
           are no users or services to manage and the components needed to set kernel
@@ -47,9 +47,8 @@ argument_specs:
 
       sysctl_linux_autoupgrade:
         description: |
-          If set to `true`, all managed packages will be upgraded during each Ansible
-          run (e.g., when the package provider detects a newer version than the
-          currently installed one).
+          If set to `true`, each Ansible run upgrades the managed packages to the
+          newest version the package provider offers.
         type: "bool"
         default: false
 

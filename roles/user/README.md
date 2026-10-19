@@ -265,7 +265,7 @@ are included for completeness and to cover edge cases:
 
 ## Role variables<a id="variables"></a>
 
-Main entry point for the foundata.linux.user role
+Main entry point for the foundata.linux.user role.
 
 Manage local user accounts and their configuration.
 

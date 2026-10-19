@@ -27,9 +27,8 @@
 # - Choices: present, absent
 sudo_linux_state: "present"
 
-# If set to `true`, all managed packages will be upgraded during each Ansible
-# run (e.g., when the package provider detects a newer version than the
-# currently installed one).
+# If set to `true`, each Ansible run upgrades the managed packages to the newest
+# version the package provider offers.
 #
 # This role manages the `sudo` package (it is missing from some minimal
 # installations), so this variable controls whether `sudo` is merely ensured

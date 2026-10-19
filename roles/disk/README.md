@@ -184,7 +184,7 @@ are included for completeness and to cover edge cases:
 
 ## Role variables<a id="variables"></a>
 
-Main entry point for the foundata.linux.disk role
+Main entry point for the foundata.linux.disk role.
 
 Manage disks, partitions, filesystems, and mount points.
 
@@ -193,7 +193,7 @@ The following variables can be configured for this role:
 |           Variable           |  Type  | Required |   Default   | Description (abstract) |
 | ---------------------------- | ------ | -------- | ----------- | ---------------------- |
 | `disk_linux_state`           | `str`  | No       | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-disk_linux_state) |
-| `disk_linux_autoupgrade`     | `bool` | No       | `false`     | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one).<br><br>Note: The role installs only the tools the declared devices actually […](#variable-disk_linux_autoupgrade) |
+| `disk_linux_autoupgrade`     | `bool` | No       | `false`     | If set to `true`, each Ansible run upgrades the managed packages to the newest version the package provider offers.<br><br>Note: The role installs only the tools the declared devices actually need (for example `xfsprogs` only when at least one entry […](#variable-disk_linux_autoupgrade) |
 | `disk_linux_device_defaults` | `dict` | No       | `{}`        | Default values applied to every entry in `disk_linux_devices` that does not set the corresponding key itself. This avoids repeating common settings (filesystem, mount options, ...) on each device.<br><br>The keys mirror the per-device keys of the […](#variable-disk_linux_device_defaults) |
 | `disk_linux_devices`         | `list` | No       | `[]`        | List of dedicated data disks to manage. Each entry describes one whole block device that is taken from raw disk to mounted filesystem: a single partition spanning the disk (kept spanning after disk enlargement, see `grow`), a filesystem on that […](#variable-disk_linux_devices) |
 
@@ -207,7 +207,7 @@ Determines whether the managed resources should be `present` or `absent`.
 installed and configured.
 
 `absent` reverts changes as much as possible, such as removing packages,
-deleting created users, stopping services, restoring modified settings, …
+deleting created users, stopping services and restoring modified settings.
 
 Note: For this role, the required component and package set is minimal.
 There are no users or services to manage, and the partitioning and
@@ -237,9 +237,8 @@ setting cannot destroy data when decommissioning a host.
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-If set to `true`, all managed packages will be upgraded during each Ansible
-run (e.g., when the package provider detects a newer version than the
-currently installed one).
+If set to `true`, each Ansible run upgrades the managed packages to the
+newest version the package provider offers.
 
 Note: The role installs only the tools the declared devices actually need
 (for example `xfsprogs` only when at least one entry uses the `xfs`

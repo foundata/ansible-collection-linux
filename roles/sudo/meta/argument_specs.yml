@@ -12,7 +12,7 @@ argument_specs:
 
   # foundata.linux/roles/sudo/tasks/main.yml entry point
   main:
-    short_description: "Main entry point for the foundata.linux.sudo role"
+    short_description: "Main entry point for the foundata.linux.sudo role."
     description: |
       Install sudo and manage privilege-escalation rules.
     options:
@@ -37,9 +37,8 @@ argument_specs:
 
       sudo_linux_autoupgrade:
         description: |
-          If set to `true`, all managed packages will be upgraded during each
-          Ansible run (e.g., when the package provider detects a newer version than
-          the currently installed one).
+          If set to `true`, each Ansible run upgrades the managed packages to the
+          newest version the package provider offers.
 
           This role manages the `sudo` package (it is missing from some minimal
           installations), so this variable controls whether `sudo` is merely ensured

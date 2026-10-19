@@ -103,7 +103,7 @@ are included for completeness and to cover edge cases:
 
 ## Role variables<a id="variables"></a>
 
-Main entry point for the foundata.linux.reboot role
+Main entry point for the foundata.linux.reboot role.
 
 Manage operating-system reboots and wait for hosts to return.
 
@@ -112,7 +112,7 @@ The following variables can be configured for this role:
 |            Variable            |  Type  | Required |                         Default                         | Description (abstract) |
 | ------------------------------ | ------ | -------- | ------------------------------------------------------- | ---------------------- |
 | `reboot_linux_state`           | `str`  | No       | `"present"`                                             | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-reboot_linux_state) |
-| `reboot_linux_autoupgrade`     | `bool` | No       | `false`                                                 | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
+| `reboot_linux_autoupgrade`     | `bool` | No       | `false`                                                 | If set to `true`, each Ansible run upgrades the managed packages to the newest version the package provider offers. |
 | `reboot_linux_boot_time_cmd`   | `str`  | No       | `"cat '/proc/sys/kernel/random/boot_id'"`               | Command to run that returns a unique string indicating the last time the system was booted.<br><br>Setting this to a command that has different output each time it is run will cause the task to fail. |
 | `reboot_linux_connect_timeout` | `int`  | No       | `0`                                                     | Maximum seconds to wait for a successful connection to the managed hosts before trying again.<br><br>If set to 0, the default setting for the underlying connection plugin is used. |
 | `reboot_linux_msg`             | `str`  | No       | `"Reboot initiated by Ansible (foundata.linux.reboot)"` | Message to display to users before reboot. |
@@ -130,7 +130,7 @@ Determines whether the managed resources should be `present` or `absent`.
 installed and configured.
 
 `absent` reverts changes as much as possible, such as removing packages,
-deleting created users, stopping services, restoring modified settings, …
+deleting created users, stopping services and restoring modified settings.
 
 Note: For this role, the required component and package set is minimal. There
 are no users or services to manage and the components needed to detect a
@@ -149,9 +149,8 @@ system beside executing reboots.
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-If set to `true`, all managed packages will be upgraded during each Ansible
-run (e.g., when the package provider detects a newer version than the
-currently installed one).
+If set to `true`, each Ansible run upgrades the managed packages to the
+newest version the package provider offers.
 
 - **Type**: `bool`
 - **Required**: No

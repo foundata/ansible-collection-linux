@@ -16,7 +16,7 @@
 # installed and configured.
 #
 # `absent` reverts changes as much as possible, such as removing packages,
-# deleting created users, stopping services, restoring modified settings, …
+# deleting created users, stopping services and restoring modified settings.
 #
 # Note: For this role, the required component and package set is minimal. There
 # are no users or services to manage, and the partitioning and filesystem tools
@@ -41,9 +41,8 @@
 disk_linux_state: "present"
 
 
-# If set to `true`, all managed packages will be upgraded during each Ansible
-# run (e.g., when the package provider detects a newer version than the
-# currently installed one).
+# If set to `true`, each Ansible run upgrades the managed packages to the newest
+# version the package provider offers.
 #
 # Note: The role installs only the tools the declared devices actually need (for
 # example `xfsprogs` only when at least one entry uses the `xfs` filesystem).

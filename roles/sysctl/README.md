@@ -150,7 +150,7 @@ are included for completeness and to cover edge cases:
 
 ## Role variables<a id="variables"></a>
 
-Main entry point for the foundata.linux.sysctl role
+Main entry point for the foundata.linux.sysctl role.
 
 Configure kernel parameters through sysctl settings and profiles.
 
@@ -159,7 +159,7 @@ The following variables can be configured for this role:
 |                 Variable                 |  Type  | Required |       Default       | Description (abstract) |
 | ---------------------------------------- | ------ | -------- | ------------------- | ---------------------- |
 | `sysctl_linux_state`                     | `str`  | No       | `"present"`         | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-sysctl_linux_state) |
-| `sysctl_linux_autoupgrade`               | `bool` | No       | `false`             | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
+| `sysctl_linux_autoupgrade`               | `bool` | No       | `false`             | If set to `true`, each Ansible run upgrades the managed packages to the newest version the package provider offers. |
 | `sysctl_linux_profile`                   | `list` | No       | `[]`                | Selects one or more predefined sets of kernel parameters ("profiles") optimized for specific workloads.<br><br>Profiles are applied in the given order and, for a parameter set by more than one profile, the later profile wins. The required kernel […](#variable-sysctl_linux_profile) |
 | `sysctl_linux_parameters`                | `dict` | No       | `{}`                | Dictionary of kernel parameters to manage via sysctl. Keys are parameter names (e.g., `net.ipv4.ip_forward`), values are the desired settings.<br><br>The drop-in configuration file is fully declarative: any parameter in the file that is not present […](#variable-sysctl_linux_parameters) |
 | `sysctl_linux_reload`                    | `bool` | No       | `true`              | If set to `true`, triggers `sysctl --system` after configuration changes to reload all sysctl configuration files following the proper precedence order. This ensures all drop-in files and possibly existing other sysctl configuration files not managed […](#variable-sysctl_linux_reload) |
@@ -178,7 +178,7 @@ Determines whether the managed resources should be `present` or `absent`.
 installed and configured.
 
 `absent` reverts changes as much as possible, such as removing packages,
-deleting created users, stopping services, restoring modified settings, ...
+deleting created users, stopping services and restoring modified settings.
 
 Note: For this role, the required component and package set is minimal. There
 are no users or services to manage and the components needed to set kernel
@@ -204,9 +204,8 @@ sysctl change, already-applied running values are not actively reset; a reload
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-If set to `true`, all managed packages will be upgraded during each Ansible
-run (e.g., when the package provider detects a newer version than the
-currently installed one).
+If set to `true`, each Ansible run upgrades the managed packages to the
+newest version the package provider offers.
 
 - **Type**: `bool`
 - **Required**: No

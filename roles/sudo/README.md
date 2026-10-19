@@ -240,7 +240,7 @@ are included for completeness and to cover edge cases:
 
 ## Role variables<a id="variables"></a>
 
-Main entry point for the foundata.linux.sudo role
+Main entry point for the foundata.linux.sudo role.
 
 Install sudo and manage privilege-escalation rules.
 
@@ -249,7 +249,7 @@ The following variables can be configured for this role:
 |               Variable                |  Type  | Required |   Default   | Description (abstract) |
 | ------------------------------------- | ------ | -------- | ----------- | ---------------------- |
 | `sudo_linux_state`                    | `str`  | No       | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that `sudo` is installed and that the rules described in `sudo_linux_rules` (and any `sudo_linux_defaults`) are configured as drop-in files below […](#variable-sudo_linux_state) |
-| `sudo_linux_autoupgrade`              | `bool` | No       | `false`     | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one).<br><br>This role manages the `sudo` package (it is missing from some minimal […](#variable-sudo_linux_autoupgrade) |
+| `sudo_linux_autoupgrade`              | `bool` | No       | `false`     | If set to `true`, each Ansible run upgrades the managed packages to the newest version the package provider offers.<br><br>This role manages the `sudo` package (it is missing from some minimal installations), so this variable controls whether `sudo` […](#variable-sudo_linux_autoupgrade) |
 | `sudo_linux_rules`                    | `list` | No       | `[]`        | List of sudo rules to manage. Each entry grants one or more users and/or groups the right to run a set of commands, and is rendered into validated drop-in files below `/etc/sudoers.d/` (one file per grantee, as the underlying […](#variable-sudo_linux_rules) |
 | `sudo_linux_rule_defaults`            | `dict` | No       | `{}`        | Default values applied to every entry in `sudo_linux_rules` that does not set the corresponding key itself. The keys mirror the per-rule keys of the same name (see `sudo_linux_rules`). Any value provided here is overridden by an explicit value on the […](#variable-sudo_linux_rule_defaults) |
 | `sudo_linux_defaults`                 | `list` | No       | `[]`        | Global `Defaults` directives to apply, for sudo-wide settings that are not tied to a specific rule (the per-rule mechanism cannot express `Defaults` lines). Each entry is one directive: the role prepends the `Defaults` keyword and renders one […](#variable-sudo_linux_defaults) |
@@ -283,9 +283,8 @@ itself rely on.
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-If set to `true`, all managed packages will be upgraded during each
-Ansible run (e.g., when the package provider detects a newer version than
-the currently installed one).
+If set to `true`, each Ansible run upgrades the managed packages to the
+newest version the package provider offers.
 
 This role manages the `sudo` package (it is missing from some minimal
 installations), so this variable controls whether `sudo` is merely ensured

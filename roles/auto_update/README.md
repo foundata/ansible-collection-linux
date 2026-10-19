@@ -191,7 +191,7 @@ are included for completeness and to cover edge cases:
 
 ## Role variables<a id="variables"></a>
 
-Main entry point for the foundata.linux.auto_update role
+Main entry point for the foundata.linux.auto_update role.
 
 Configure automatic operating-system package updates.
 
@@ -200,8 +200,8 @@ The following variables can be configured for this role:
 |                 Variable                  |  Type  | Required |   Default    | Description (abstract) |
 | ----------------------------------------- | ------ | -------- | ------------ | ---------------------- |
 | `auto_update_linux_state`                 | `str`  | No       | `"present"`  | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-auto_update_linux_state) |
-| `auto_update_linux_autoupgrade`           | `bool` | No       | `false`      | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one).<br><br>Note: This only affects the packages that provide the automatic update […](#variable-auto_update_linux_autoupgrade) |
-| `auto_update_linux_service_state`         | `str`  | No       | `"enabled"`  | Defines the status of the service(s).<br><br>`enabled`: Service is running and will start automatically at boot.<br><br>`disabled`: Service is stopped and will not start automatically at boot.<br><br>`running` Service is running but will not start […](#variable-auto_update_linux_service_state) |
+| `auto_update_linux_autoupgrade`           | `bool` | No       | `false`      | If set to `true`, each Ansible run upgrades the managed packages to the newest version the package provider offers.<br><br>Note: This only affects the packages that provide the automatic update mechanism itself (e.g., `unattended-upgrades`, […](#variable-auto_update_linux_autoupgrade) |
+| `auto_update_linux_service_state`         | `str`  | No       | `"enabled"`  | Defines the status of the service(s). Possible values:<br><br>- `enabled`: Service is running and will start automatically at boot. - `disabled`: Service is stopped and will not start automatically at boot. - `running`: Service is running but will […](#variable-auto_update_linux_service_state) |
 | `auto_update_linux_type`                  | `str`  | No       | `"security"` | Selects which kinds of updates are installed automatically. Possible values:<br><br>- `security`: Only security updates are applied. This is the default and safest for unattended operation. - `all`: All available updates are applied (security and […](#variable-auto_update_linux_type) |
 | `auto_update_linux_apply`                 | `str`  | No       | `"install"`  | Controls what the automatic update mechanism does when new updates are available. Possible values:<br><br>- `install`: Download and install updates automatically. - `download`: Only download updates; do not install them. - `notify`: Only check and […](#variable-auto_update_linux_apply) |
 | `auto_update_linux_timer_settings`        | `dict` | No       | `{}`         | Configuration for the systemd timer that triggers the automatic update run. This dictionary controls when and how often updates are checked/applied.<br><br>These settings map to systemd timer unit directives and are applied via a drop-in override […](#variable-auto_update_linux_timer_settings) |
@@ -221,7 +221,7 @@ Determines whether the managed resources should be `present` or `absent`.
 installed and configured.
 
 `absent` reverts changes as much as possible, such as removing packages,
-deleting created users, stopping services, restoring modified settings, …
+deleting created users, stopping services and restoring modified settings.
 
 - **Type**: `str`
 - **Required**: No
@@ -234,9 +234,8 @@ deleting created users, stopping services, restoring modified settings, …
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-If set to `true`, all managed packages will be upgraded during each Ansible
-run (e.g., when the package provider detects a newer version than the
-currently installed one).
+If set to `true`, each Ansible run upgrades the managed packages to the
+newest version the package provider offers.
 
 Note: This only affects the packages that provide the automatic update
 mechanism itself (e.g., `unattended-upgrades`, `dnf-automatic`,
@@ -254,23 +253,19 @@ updates applied to the rest of the system; those are governed by
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-Defines the status of the service(s).
+Defines the status of the service(s). Possible values:
 
-`enabled`: Service is running and will start automatically at boot.
+- `enabled`: Service is running and will start automatically at boot.
+- `disabled`: Service is stopped and will not start automatically at boot.
+- `running`: Service is running but will not start automatically at boot.
+  This can be used to start a service on the first Ansible run without
+  enabling it for boot.
+- `unmanaged`: Ansible does not manage the service at all: both the
+  running state and the boot (enablement) state are left exactly as they
+  are. This is primarily useful when services are monitored and managed
+  by systems other than Ansible.
 
-`disabled`: Service is stopped and will not start automatically at boot.
-
-`running` Service is running but will not start automatically at boot.
-This can be used to start a service on the first Ansible run without
-enabling it for boot.
-
-`unmanaged`: Ansible does not manage the service at all: both the
-running state and the boot (enablement) state are left exactly as they
-are. This is primarily useful when services are monitored and managed
-by systems other than Ansible.
-
-The singular form (`service`) is used for simplicity. However, the defined
-status applies to all services if multiple are being managed by this role.
+The defined status applies to all services if the role manages several.
 
 On all currently supported platforms this is currently just a systemd timer
 (such as `apt-daily-upgrade.timer`, `dnf-automatic.timer`,
