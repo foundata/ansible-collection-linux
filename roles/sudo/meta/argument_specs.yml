@@ -13,6 +13,7 @@ argument_specs:
   # foundata.linux/roles/sudo/tasks/main.yml entry point
   main:
     short_description: "Main entry point for the foundata.linux.sudo role."
+    version_added: "1.0.0"
     description: |
       Install sudo and manage privilege-escalation rules.
     options:
