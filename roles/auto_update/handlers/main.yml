@@ -9,5 +9,3 @@
     daemon_reload: true
   listen:
     - "auto_update_linux_reload_systemd_daemon"
-    # Migration alias; remove in 2.0.0.
-    - "auto_update_linux: systemd daemon-reload"

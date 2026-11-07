@@ -35,8 +35,6 @@
   register: __sysctl_reload_result
   listen:
     - "sysctl_linux_reload_kernel_parameters"
-    # Migration alias; remove in 2.0.0.
-    - "sysctl_linux: reload"
 - name: "Handlers | Log failed sysctl reload attempt (due to read-only params in containerized systems)"
   ansible.builtin.debug:
     msg: >-
@@ -53,5 +51,3 @@
     - false # noqa: no-changed-when
   listen:
     - "sysctl_linux_reload_kernel_parameters"
-    # Migration alias; remove in 2.0.0.
-    - "sysctl_linux: reload"
