@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - >-
+    auto_update role - Reload systemd directly before managing the timers
+    instead of flushing all pending play handlers, preserving the order of
+    unrelated handlers of the calling play.

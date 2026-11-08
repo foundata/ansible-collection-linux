@@ -8,8 +8,14 @@
 # The "service" managed here is the systemd timer that triggers the unattended
 # update run. Its unit name is platform-specific (see vars/<platform>.yml).
 
+# Directly, not by flushing the handlers: that would also run the calling
+# play's unrelated ones.
 - name: "Service | Default | Apply pending systemd changes before managing the timer"
-  ansible.builtin.meta: "flush_handlers"
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when:
+    - auto_update_linux_service_state != 'unmanaged'
+    - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
 
 
 - name: "Service | Default | Ensure timer state: {{ __auto_update_linux_systemd_timer_unit_name }}"
