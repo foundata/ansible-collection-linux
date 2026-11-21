@@ -83,9 +83,8 @@ baseline):
         auto_update_linux_reboot: "never"
 ```
 
-Security updates with a controlled, cross-platform reboot window (reboot only
-when a reboot is actually required, at 04:00 AM, regardless of when the update
-ran):
+This playbook installs security updates and permits requests for a needed
+reboot from 04:00 up to, but excluding, 04:30 each day.
 
 ```yaml
 ---
@@ -106,6 +105,7 @@ ran):
         auto_update_linux_reboot_timer_settings:
           OnCalendar: "*-*-* 04:00:00"
           RandomizedDelaySec: "30m"
+          Persistent: false
 ```
 
 All updates, download-only, with email reports (needs a configured MTA,
@@ -318,6 +318,7 @@ Backend support:
 - RHEL/Fedora (`dnf`/`dnf5` automatic): `install`, `download` and `notify`.
 - openSUSE Leap (`os-update`): `install` only. When set to `download` or
   `notify` the role emits a notice and falls back to `install`.
+
 - **Type**: `str`
 - **Required**: No
 - **Default**: `"install"`
@@ -410,8 +411,9 @@ Ansible run is active) and require a systemd-managed host. Possible values:
 - `scheduled`: Reboot at a controlled time via a role-managed systemd timer
   (`auto-update-reboot.timer`) that runs a "reboot if needed" check on the
   schedule from `auto_update_linux_reboot_timer_settings`. The platform's native
-  reboot is forced off so the system only reboots in the role-managed systemd
-  timer window.
+  reboot is disabled. Starting `auto-update-reboot.service` manually also
+  respects the timer window described below. To request a needed reboot at
+  any time, run `/usr/local/sbin/reboot-if-needed` directly as root.
 
 Both `immediate` and `scheduled` reboot *only* when a reboot is actually
 required (e.g. after a kernel, glibc or systemd upgrade); an up-to-date system
@@ -448,7 +450,21 @@ Dictionary structure:
   - `RandomizedDelaySec`: Random delay before execution to spread reboots
     across systems. Defaults to `30m`.
   - `Persistent`: Run a missed check at the next boot if the system was
-    powered off (even though . Defaults to `true`.
+    powered off. Defaults to `true`.
+
+The service calls `reboot-if-needed --respect-timer-window`. For a
+nonpersistent timer with only calendar triggers and a positive
+`RandomizedDelaySec`, each `OnCalendar` occurrence opens a window for
+that duration. For example, 04:00 with a one-hour delay permits a
+shutdown request from 04:00 up to, but excluding, 05:00. An early
+activation after a schedule change or a late activation is skipped.
+If the timer cannot be read or evaluated, the service fails safely.
+The one-minute shutdown warning can extend beyond the window.
+A timer reload can still start package updates outside their regular schedule.
+
+Persistent catch-up, monotonic triggers, clock or timezone changes, a nonzero
+`RandomizedOffsetSec`, and timers with no random delay retain their
+systemd behavior.
 
 Value contract for the six repeatable trigger directives (`OnCalendar`,
 `OnActiveSec`, `OnBootSec`, `OnStartupSec`, `OnUnitActiveSec`,
@@ -482,6 +498,7 @@ Special cases:
 
 - For boolean values, use `true`/`false` (these will be converted to strings
   by the role as needed).
+
 - **Type**: `dict`
 - **Required**: No
 - **Default**: `{}`
@@ -632,4 +649,5 @@ See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and
 
 ## External requirements<a id="requirements"></a>
 
-There are no special requirements not covered by Ansible itself.
+The scheduled reboot service uses `/usr/bin/python3`, `busctl`, and
+`systemd-analyze calendar` on the managed host to check the timer window.

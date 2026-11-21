@@ -10,4 +10,4 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart={{ tpl_reboot_script_path }}
+ExecStart={{ tpl_reboot_script_path }} --respect-timer-window

@@ -6,10 +6,19 @@ SPDX-License-Identifier: GPL-3.0-or-later
 # {{ tpl_managed }}
 #
 # reboot-if-needed: reboot the system if (and only if) a reboot is required.
-# Called by auto-update-reboot.service (triggered by auto-update-reboot.timer).
+# auto-update-reboot.service passes --respect-timer-window. Operators can run
+# the helper without arguments to request a needed reboot at any time.
 
 set -u                                                      # no uninitialized variables
 set -o 2>/dev/null | grep -Fq 'pipefail' && set +o pipefail # disable pipefail as it's non-POSIX
+
+case "$#:${1-}" in
+    0:|1:--respect-timer-window) ;;
+    *)
+        printf 'Usage: %s [--respect-timer-window]\n' "$0" >&2
+        exit 2
+        ;;
+esac
 
 __reboot_required='0'
 
@@ -91,9 +100,72 @@ if [ "${__reboot_required}" != '1' ] &&
     unset __selinux_current __selinux_config
 fi
 
-if [ "${__reboot_required}" = '1' ]; then
-    logger -t 'auto-update-reboot' 'Reboot required; scheduling reboot.' 2>/dev/null || true
-    exec shutdown -r +1 'Reboot required after automatic updates'
+[ "${__reboot_required}" = '1' ] || exit 0
+
+if [ "$#" -eq 1 ]; then
+    /usr/bin/python3 - <<'PYTHON'
+import json
+import os
+import subprocess
+import sys
+
+
+def calendar_window_is_open(calendar, delay_us):
+    # The first occurrence strictly after (now - delay) opens a window if it
+    # has already elapsed. systemd compares microseconds even when displaying
+    # wall-clock timestamps to whole seconds.
+    output = subprocess.check_output(
+        ["systemd-analyze", "calendar", f"--base-time=-{delay_us}us", "--", calendar],
+        text=True,
+    )
+    fields = dict(line.strip().split(": ", 1) for line in output.splitlines() if ": " in line)
+    if fields["Next elapse"] == "never":
+        return False
+    relative = fields["From now"]
+    if relative == "now" or relative.endswith(" ago"):
+        return True
+    if relative.endswith(" left"):
+        return False
+    raise ValueError(f"Unexpected calendar result: {relative}")
+
+
+def window_is_open():
+    reply = subprocess.check_output(
+        ["busctl", "--system", "--json=short", "call", "org.freedesktop.systemd1",
+         "/org/freedesktop/systemd1/unit/auto_2dupdate_2dreboot_2etimer",
+         "org.freedesktop.DBus.Properties", "GetAll", "s", "org.freedesktop.systemd1.Timer"],
+        text=True,
+    )
+    timer = {key: value["data"] for key, value in json.loads(reply)["data"][0].items()}
+    delay_us = timer["RandomizedDelayUSec"]
+    calendars = timer["TimersCalendar"]
+    # Monotonic triggers and clock changes can legitimately fire off calendar.
+    if timer["TimersMonotonic"] or timer["OnClockChange"] or timer["OnTimezoneChange"]:
+        return True
+    if not calendars:
+        raise ValueError("The reboot timer has no triggers")
+    if timer["Persistent"] or timer.get("RandomizedOffsetUSec") or not delay_us:
+        return True
+
+    return any(calendar_window_is_open(calendar, delay_us) for _, calendar, _ in calendars)
+
+
+os.environ.update(LC_ALL="C", SYSTEMD_COLORS="0")
+os.environ.pop("TZ", None)  # Unqualified calendars use the system manager's timezone.
+try:
+    sys.exit(0 if window_is_open() else 3)
+except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError, TypeError) as error:
+    sys.exit(f"Cannot verify the scheduled reboot window: {error}")
+PYTHON
+    case $? in
+        0) ;;
+        3)
+            logger -t 'auto-update-reboot' 'Deferring required reboot outside the scheduled window.'
+            exit 0
+            ;;
+        *) exit 1 ;;
+    esac
 fi
 
-exit 0
+logger -t 'auto-update-reboot' 'Reboot required; scheduling reboot.' 2>/dev/null || true
+exec shutdown -r +1 'Reboot required after automatic updates'

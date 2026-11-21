@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - >-
+    auto_update role - Guard scheduled reboot requests against out-of-window
+    activations after calendar changes. Running reboot-if-needed directly
+    without arguments still requests a needed reboot at any time.

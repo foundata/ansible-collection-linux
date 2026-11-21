@@ -267,6 +267,18 @@
     loop_var: "__testing_unit_stat"
     label: "{{ __testing_unit_stat['__testing_unit_path'] }}"
 
+- name: "Molecule | Verify | Exercise scheduled and operator reboot requests"
+  ansible.builtin.script:
+    cmd: >-
+      {{ __testing_reboot_window_check | ansible.builtin.quote }}
+      {{ __auto_update_linux_reboot_script_path | ansible.builtin.quote }}
+      {{ __auto_update_linux_reboot_service_unit_path | ansible.builtin.quote }}
+    executable: "/usr/bin/python3"
+  vars:
+    __testing_reboot_window_check: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/files/check-reboot-window.py"
+  changed_when:
+    - false
+
 - name: "Molecule | Verify | Read the scheduled reboot timer unit content"
   ansible.builtin.slurp:
     src: "{{ __auto_update_linux_reboot_timer_unit_path }}"
