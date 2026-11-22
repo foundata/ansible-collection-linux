@@ -279,6 +279,15 @@
   changed_when:
     - false
 
+- name: "Molecule | Verify | Change active weekly timers to daily with prior trigger history"
+  ansible.builtin.script:
+    cmd: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/files/check-active-timers.py"
+    executable: "/usr/bin/python3"
+  when:
+    - inventory_hostname == 'molecule-debian13'
+  changed_when:
+    - false
+
 - name: "Molecule | Verify | Read the scheduled reboot timer unit content"
   ansible.builtin.slurp:
     src: "{{ __auto_update_linux_reboot_timer_unit_path }}"
