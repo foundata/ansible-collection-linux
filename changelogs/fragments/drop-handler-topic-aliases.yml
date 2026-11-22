@@ -1,8 +1,8 @@
 ---
 minor_changes:
   - >-
-    Remove the previous handler topics ahead of the announced version 2.0.0:
-    "auto_update_linux: systemd daemon-reload" and "sysctl_linux: reload".
-    Notify the role-prefixed topics instead. We decided that this is a
-    non-breaking change: the topics are role internals, and their use by
-    third parties is very unlikely.
+    auto_update and sysctl roles - Remove the previous handler topics earlier
+    than the announced version 2.0.0. Before upgrading, change any external
+    notification of ``auto_update_linux: systemd daemon-reload`` to
+    ``auto_update_linux_reload_systemd_daemon`` and any notification of
+    ``sysctl_linux: reload`` to ``sysctl_linux_reload_kernel_parameters``.
