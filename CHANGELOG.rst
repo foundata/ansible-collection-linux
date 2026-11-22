@@ -4,6 +4,22 @@ foundata.linux Ansible collection Release Notes
 
 .. contents:: Topics
 
+v1.6.0
+======
+
+Minor Changes
+-------------
+
+- auto_update and sysctl roles - Remove the previous handler topics earlier than the announced version 2.0.0. Before upgrading, change any external notification of ``auto_update_linux: systemd daemon-reload`` to ``auto_update_linux_reload_systemd_daemon`` and any notification of ``sysctl_linux: reload`` to ``sysctl_linux_reload_kernel_parameters``.
+
+Bugfixes
+--------
+
+- auto_update role - Guard scheduled reboot requests against out-of-window activations after calendar changes. Running reboot-if-needed directly without arguments still requests a needed reboot at any time.
+- auto_update role - Reload systemd directly before managing the timers instead of flushing all pending play handlers, preserving the order of unrelated handlers of the calling play.
+- auto_update role - Reload systemd once when managed timer files change and skip the manager reload on unchanged runs. Service-only runs still pick up stale units.
+- reboot and auto_update roles - Avoid requesting repeated reboots solely because a different kernel image was already installed at boot. Package manager reboot indicators still take precedence.
+
 v1.5.0
 ======
 
