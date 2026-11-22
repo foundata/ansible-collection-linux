@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - >-
+    auto_update role - Reload systemd once when managed timer files change and
+    skip the manager reload on unchanged runs. Service-only runs still pick up stale units.

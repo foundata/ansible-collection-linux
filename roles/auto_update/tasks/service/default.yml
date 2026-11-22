@@ -8,14 +8,33 @@
 # The "service" managed here is the systemd timer that triggers the unattended
 # update run. Its unit name is platform-specific (see vars/<platform>.yml).
 
-# Directly, not by flushing the handlers: that would also run the calling
-# play's unrelated ones.
-- name: "Service | Default | Apply pending systemd changes before managing the timer"
-  ansible.builtin.systemd_service:
-    daemon_reload: true
+# Service-only runs can encounter unit files changed outside this play.
+- name: "Service | Default | Check whether systemd needs the timer units reloaded"
+  ansible.builtin.command:
+    argv: >-
+      {{ ['systemctl', 'show', '--property=NeedDaemonReload', '--property=LoadState', '--']
+         + ([__auto_update_linux_systemd_timer_unit_name] | ansible.builtin.reject('equalto', '') | ansible.builtin.list)
+         + ([__auto_update_linux_reboot_timer_unit_name, __auto_update_linux_reboot_service_unit_name]
+            if auto_update_linux_reboot == 'scheduled' else []) }}
   when:
     - auto_update_linux_service_state != 'unmanaged'
     - (ansible_facts['service_mgr'] | ansible.builtin.lower) == 'systemd'
+    - (__auto_update_linux_systemd_timer_unit_name | ansible.builtin.length) > 0 or auto_update_linux_reboot == 'scheduled'
+  changed_when:
+    - false
+  failed_when:
+    - __auto_update_linux_unit_status['rc'] not in [0, 4]
+  check_mode: false
+  register: __auto_update_linux_unit_status
+
+- name: "Service | Default | Reload stale timer units before managing their state"
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when:
+    - __auto_update_linux_unit_status is not ansible.builtin.skipped
+    - >-
+      'NeedDaemonReload=yes' in __auto_update_linux_unit_status['stdout_lines'] or
+      'LoadState=not-found' in __auto_update_linux_unit_status['stdout_lines']
 
 
 - name: "Service | Default | Ensure timer state: {{ __auto_update_linux_systemd_timer_unit_name }}"
