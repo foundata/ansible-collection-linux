@@ -209,7 +209,13 @@
         __kernel_current="$(uname -r)"
         if [ -n "${__kernel_installed}" ] \
           && [ "${__kernel_installed}" != "${__kernel_current}" ]; then
-          __reboot_required='1'
+          # A bootloader can deliberately keep selecting an older kernel. Only
+          # count a mismatching image as an update if it changed since boot.
+          __kernel_changed=$(stat -Lc '%Z' "/boot/vmlinuz-${__kernel_installed}") &&
+              __boot_time=$(awk '$1 == "btime" { print $2 }' /proc/stat) &&
+              [ -n "${__boot_time}" ] &&
+              [ "${__kernel_changed}" -gt "${__boot_time}" ] &&
+              __reboot_required='1'
         fi
         unset __kernel_installed __kernel_current
       fi

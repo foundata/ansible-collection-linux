@@ -38,8 +38,9 @@ Main features:
 - **Automatic detection of reboot requirements** using multiple methods:
   - Debian/Ubuntu: Checks for `/var/run/reboot-required` indicator file.
   - RHEL/Fedora: Uses `needs-restarting -r` to detect pending reboots.
-  - Kernel updates: Compares running kernel against newest installed kernel in
-    `/boot`.
+  - Kernel updates: Detects a different newest kernel image in `/boot` changed
+    since the current boot. A bootloader pinned to an older kernel can keep
+    booting it without the same image triggering another reboot.
   - SELinux: Detects mode changes that require a reboot to take effect.
 - Configurable reboot behavior (timeout, message, post-reboot delay, connection
   timeout).

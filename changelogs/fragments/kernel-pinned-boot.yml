@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - >-
+    reboot and auto_update roles - Avoid requesting repeated reboots solely
+    because a different kernel image was already installed at boot. Package
+    manager reboot indicators still take precedence.

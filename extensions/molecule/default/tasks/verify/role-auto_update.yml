@@ -793,6 +793,42 @@
           running release.
         success_msg: "The helper schedules a reboot for a prefix-colliding newer kernel."
 
+    # The decoy is absent from the bootloader configuration. A real boot
+    # leaves the same kernel selected, as on a host with a pinned kernel.
+    - name: "Molecule | Verify | Check both reboot detectors after booting the same kernel"
+      when:
+        - inventory_hostname == 'molecule-debian13'
+      block:
+        - name: "Molecule | Verify | Reboot the VM with the extra image still installed"
+          ansible.builtin.reboot:
+            reboot_timeout: 180
+
+        - name: "Molecule | Verify | Read the reboot role's decision after boot"
+          ansible.builtin.include_role:
+            name: "foundata.linux.reboot"
+            tasks_from: "init"
+            public: true
+
+        - name: "Molecule | Verify | Run the standalone helper after boot"
+          ansible.builtin.command:
+            argv:
+              - "{{ __auto_update_linux_reboot_script_path }}"
+          environment:
+            PATH: "/var/tmp/molecule-reboot-shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          changed_when:
+            - false
+
+        - name: "Molecule | Verify | Read shutdown requests after the reboot"
+          ansible.builtin.slurp:
+            src: "/var/tmp/molecule-reboot-shim/calls.log"
+          register: __testing_autoupdate_after_boot_calls
+
+        - name: "Molecule | Verify | Assert neither detector requests another reboot"
+          ansible.builtin.assert:
+            that:
+              - not (__reboot_linux_required | ansible.builtin.bool)
+              - __testing_autoupdate_after_boot_calls['content'] == __testing_autoupdate_helper_calls['content']
+
   always:
     - name: "Molecule | Verify | auto_update | Kernel prefix: remove the decoy kernel again"
       ansible.builtin.file:
