@@ -13,7 +13,7 @@
   ansible.builtin.command:
     argv: >-
       {{ ['systemctl', 'show', '--property=NeedDaemonReload', '--property=LoadState', '--']
-         + ([__auto_update_linux_systemd_timer_unit_name] | ansible.builtin.reject('equalto', '') | ansible.builtin.list)
+         + ([__auto_update_linux_systemd_timer_unit_name] if __auto_update_linux_systemd_timer_unit_name else [])
          + ([__auto_update_linux_reboot_timer_unit_name, __auto_update_linux_reboot_service_unit_name]
             if auto_update_linux_reboot == 'scheduled' else []) }}
   when:
